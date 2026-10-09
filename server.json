@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.keefng8/homeshed-mcp",
   "title": "HomeShed",
-  "description": "Every tool your AI needs, in one self-hosted install: memory, reasoning, git, Docker, network and more.",
+  "description": "Every tool your AI needs in one self-hosted install: memory, reasoning, git, Docker and more.",
   "version": "0.1.0",
   "packages": [
     {
