@@ -1,0 +1,34 @@
+{
+  "id": "bugs.export",
+  "name": "Known Bugs Export",
+  "description": "Export the public known bugs as a shareable feed, cleaned of secrets, private addresses and user folders.",
+  "risk": "read",
+  "requires": [],
+  "aliases": [
+    "export known bugs",
+    "known bugs feed",
+    "publish known bugs"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "python",
+    "handler": "tools.bugs.known.export"
+  },
+  "version": "1.0.0",
+  "category": "bugs",
+  "transport": "mcp",
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "latency": {
+    "expected_ms": 50
+  },
+  "related": [
+    "bugs.find",
+    "bugs.report",
+    "bugs.list",
+    "bugs.export",
+    "bugs.sync"
+  ]
+}

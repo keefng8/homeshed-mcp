@@ -1,0 +1,64 @@
+{
+  "id": "proxmox.vm.create",
+  "name": "Create a Proxmox VM or Container",
+  "version": "1.0.0",
+  "description": "Create a new VM (qemu) or container (lxc) with Proxmox's own create options. dry_run defaults true; dry_run=false only queues it for the owner's approval. Never replaces a guest; no secrets in options.",
+  "category": "proxmox",
+  "risk": "write",
+  "requires": [
+    "Proxmox VE API token (PROXMOX_TOKEN_ID, or PROXMOX_API_TOKEN)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "create proxmox vm",
+    "new lxc container on proxmox",
+    "spin up a vm on proxmox",
+    "make a new virtual machine"
+  ],
+  "inputs": {
+    "node": {
+      "type": "string",
+      "required": true
+    },
+    "vmid": {
+      "type": "integer",
+      "required": true
+    },
+    "kind": {
+      "type": "string",
+      "required": true,
+      "enum": [
+        "qemu",
+        "lxc"
+      ]
+    },
+    "options": {
+      "type": "object",
+      "required": true
+    },
+    "dry_run": {
+      "type": "boolean",
+      "required": false,
+      "default": true
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.proxmox.vm_create.vm_create"
+  },
+  "latency": {
+    "expected_ms": 800
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "proxmox.nodes.list",
+    "proxmox.node.status",
+    "proxmox.vms.list",
+    "proxmox.vm.status",
+    "proxmox.storage.list"
+  ],
+  "approval": "owner (proxmox_pending.py; POST /proxmox/pending/<id>/approve)"
+}

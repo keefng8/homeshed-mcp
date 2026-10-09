@@ -1,0 +1,44 @@
+{
+  "id": "apis.find",
+  "name": "API Catalog Find",
+  "version": "1.0.0",
+  "description": "Find APIs in the shared catalog by need, e.g. 'text to speech' or 'free web search'.",
+  "category": "apis",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "find an api for",
+    "is there an api",
+    "which api can",
+    "api that does"
+  ],
+  "inputs": {
+    "query": {
+      "type": "string",
+      "required": true
+    },
+    "k": {
+      "type": "integer",
+      "required": false,
+      "default": 5
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.apis.catalog.find_apis"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "apis.list",
+    "apis.find",
+    "local_ai.ask",
+    "registry.find"
+  ]
+}

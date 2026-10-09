@@ -1,0 +1,47 @@
+{
+  "id": "files.list",
+  "name": "List Directory",
+  "version": "1.0.0",
+  "description": "List a directory's entries, ls -F style by default (\"docs/\", \"notes.txt (1.2 KB)\"); detail=full gives type, size, modified time and permissions. At most 100 unless limit says otherwise, with total and more telling what was left out. Metadata only, never file content.",
+  "category": "files",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "list directory",
+    "list files",
+    "what's in this folder",
+    "directory listing",
+    "ls"
+  ],
+  "inputs": {
+    "path": {
+      "type": "string",
+      "required": false,
+      "default": "."
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 100
+    },
+    "detail": {
+      "type": "string",
+      "required": false,
+      "default": "compact",
+      "enum": ["compact", "full"]
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.files.list.list_dir"
+  },
+  "latency": {
+    "expected_ms": 30
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": []
+}

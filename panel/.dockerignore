@@ -1,0 +1,12 @@
+# Kept out of the image (release gate D11): secrets, tests, and files the image doesn't need
+.env
+.env.*
+*.log
+__pycache__/
+.deploy.lock
+test_*.py
+conftest.py
+check_*.py
+deploy-*.sh
+private_*.py
+tags.json

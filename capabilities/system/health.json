@@ -1,0 +1,33 @@
+{
+  "id": "system.health",
+  "name": "System Health",
+  "version": "1.0.0",
+  "description": "Check whether the configured dependencies (memory-core, the first local model, the app store backend, the Docker daemon) are reachable right now. Ones that aren't configured are skipped.",
+  "category": "system",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "health check",
+    "is everything working",
+    "check dependencies",
+    "system status",
+    "are things up"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "python",
+    "handler": "tools.system.health.health"
+  },
+  "latency": {
+    "expected_ms": 500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "network.port_check",
+    "system.info"
+  ]
+}

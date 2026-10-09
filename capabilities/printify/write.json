@@ -1,0 +1,70 @@
+{
+  "id": "printify.product.create",
+  "name": "Create Printify Product (draft)",
+  "version": "1.0.0",
+  "description": "Upload a print file and make an UNPUBLISHED product in the owner's Printify shop (for Printify's mockups). Off until the owner switches it on; daily cap.",
+  "category": "printify",
+  "risk": "write",
+  "requires": [
+    "PRINTIFY_API_TOKEN with uploads.write and products.write",
+    "PRINTIFY_SHOP_ID",
+    "the owner's switches: Printify read + create"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "create printify product",
+    "make a printify draft",
+    "printify product from print file"
+  ],
+  "inputs": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "string",
+      "required": true
+    },
+    "blueprint_id": {
+      "type": "integer",
+      "required": true
+    },
+    "print_provider_id": {
+      "type": "integer",
+      "required": true
+    },
+    "variants": {
+      "type": "array",
+      "required": true
+    },
+    "print_file": {
+      "type": "string",
+      "required": true
+    },
+    "position": {
+      "type": "string",
+      "required": false,
+      "default": "front"
+    },
+    "tags": {
+      "type": "array",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.printify.write.product_create"
+  },
+  "latency": {
+    "expected_ms": 8000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.print_file",
+    "printify.blueprints.list",
+    "printify.print_providers.list"
+  ]
+}

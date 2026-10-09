@@ -1,0 +1,30 @@
+{
+  "id": "mcp.install_links",
+  "name": "MCP Install Links",
+  "version": "1.0.0",
+  "description": "One-click install buttons, one-line commands and per-app configs for any MCP server, from a package name or URL.",
+  "category": "mcp",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "install links for my mcp server",
+    "add to cursor button",
+    "how do people install my mcp",
+    "claude mcp add command",
+    "readme install section"
+  ],
+  "inputs": {
+    "package": { "type": "string", "required": false },
+    "runner": { "type": "string", "required": false, "enum": ["uvx", "npx"], "default": "uvx" },
+    "url": { "type": "string", "required": false },
+    "name": { "type": "string", "required": false }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.mcp.install_links.install_links"
+  },
+  "latency": { "expected_ms": 5 },
+  "cache": { "enabled": false, "freshness": "real_time" },
+  "related": ["registry.find"]
+}

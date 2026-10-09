@@ -1,0 +1,55 @@
+{
+  "id": "printify.product.get",
+  "name": "Printify Product",
+  "version": "1.0.0",
+  "description": "One Printify product in detail: its enabled variants with price and cost (paged, or filtered to chosen variant ids), tags, blueprint, provider and where it's published.",
+  "category": "printify",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_printify_enabled switch",
+    "Printify token (PRINTIFY_API_TOKEN; PRINTIFY_SHOP_ID for shop tools)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "printify product details"
+  ],
+  "inputs": {
+    "product_id": {
+      "type": "string",
+      "required": true
+    },
+    "variant_ids": {
+      "type": "array",
+      "required": false
+    },
+    "offset": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 40
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.printify.read.product_get"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.shops.list",
+    "printify.products.list",
+    "printify.blueprints.list",
+    "printify.print_providers.list",
+    "printify.orders.list",
+    "printify.order.get"
+  ]
+}

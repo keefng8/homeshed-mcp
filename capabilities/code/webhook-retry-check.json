@@ -1,0 +1,59 @@
+{
+  "id": "code.webhook_retry_check",
+  "name": "Webhook Retry Check",
+  "version": "1.0.0",
+  "description": "Find webhook handlers whose catch block swallows the error and answers 200, so the sender (PayPal, Stripe) never retries.",
+  "category": "code",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "check my webhook handler",
+    "paypal webhook not retrying",
+    "stripe webhook swallowed error",
+    "webhook returns 200 on error",
+    "lost payment webhook"
+  ],
+  "inputs": {
+    "folder": {
+      "type": "string",
+      "required": true
+    },
+    "handler_pattern": {
+      "type": "string",
+      "required": false,
+      "default": "webhook"
+    },
+    "exclude": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
+    },
+    "detail": {
+      "type": "string",
+      "required": false,
+      "enum": [
+        "compact",
+        "full"
+      ],
+      "default": "compact"
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.code.webhook_retry_check.webhook_retry_check"
+  },
+  "latency": {
+    "expected_ms": 500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "strapi.check",
+    "code.dead_scan"
+  ]
+}

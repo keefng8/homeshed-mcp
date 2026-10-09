@@ -1,0 +1,58 @@
+{
+  "id": "printify.product.update",
+  "name": "Edit A Printify Draft",
+  "version": "1.0.0",
+  "description": "Edit an unpublished Printify draft's title, description, tags, variant prices and SKUs. Drafts only (never published, mid-publish or awaiting publish approval), never under the 30% margin floor after Etsy's fees, audited with the old values kept.",
+  "category": "printify",
+  "risk": "write",
+  "requires": [
+    "the owner's commerce_printify_enabled and commerce_printify_write_enabled switches"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "edit printify draft",
+    "update printify product",
+    "change draft price",
+    "fix draft tags"
+  ],
+  "inputs": {
+    "product_id": {
+      "type": "string",
+      "required": true
+    },
+    "title": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "description": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "tags": {
+      "type": "array",
+      "required": false
+    },
+    "variants": {
+      "type": "array",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.printify.update.product_update"
+  },
+  "latency": {
+    "expected_ms": 2500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.product.get",
+    "printify.product.create",
+    "printify.product.publish"
+  ]
+}

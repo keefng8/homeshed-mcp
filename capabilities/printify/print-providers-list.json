@@ -1,0 +1,41 @@
+{
+  "id": "printify.print_providers.list",
+  "name": "Printify Print Providers",
+  "version": "1.0.0",
+  "description": "The print providers that make one Printify blueprint: id, title, country. Read-only.",
+  "category": "printify",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_printify_enabled switch",
+    "Printify token (PRINTIFY_API_TOKEN; PRINTIFY_SHOP_ID for shop tools)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "printify print providers"
+  ],
+  "inputs": {
+    "blueprint_id": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.printify.read.print_providers_list"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.shops.list",
+    "printify.products.list",
+    "printify.product.get",
+    "printify.blueprints.list",
+    "printify.orders.list",
+    "printify.order.get"
+  ]
+}

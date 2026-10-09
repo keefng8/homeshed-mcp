@@ -1,0 +1,15 @@
+# Never in the image: settings files and their backups (they hold secrets: on 2026-09-30 eight .env backups were
+# found in /app, because only ".env" itself was listed), the deploy lock, and generated or cached output.
+# tests/test_serve_http.py checks these rules the way Docker applies them.
+.env
+.env.*
+!.env.example
+*.bak
+*.bak-*
+.deploy.lock
+graphify-out
+.git
+__pycache__
+*.pyc
+.venv
+.pytest_cache

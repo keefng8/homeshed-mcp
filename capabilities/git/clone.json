@@ -1,0 +1,32 @@
+{
+  "id": "git.clone",
+  "name": "Git Clone",
+  "version": "1.0.0",
+  "description": "Clone a git repository. Fully autonomous, no confirmation step.",
+  "category": "git",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "git clone",
+    "clone repository",
+    "clone repo"
+  ],
+  "inputs": {
+    "url": { "type": "string", "required": true },
+    "destination": { "type": "string", "required": true },
+    "branch": { "type": "string", "required": false }
+  },
+  "execution": {
+    "type": "subprocess",
+    "handler": "tools.git.clone.clone"
+  },
+  "latency": {
+    "expected_ms": 5000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": ["git.status", "git.pull"]
+}

@@ -1,0 +1,48 @@
+{
+  "id": "git.diff",
+  "name": "Git Diff",
+  "version": "1.0.0",
+  "description": "Unified diff for working-tree or staged changes in a git repository.",
+  "category": "git",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "git diff",
+    "show changes",
+    "what changed",
+    "diff this file"
+  ],
+  "inputs": {
+    "path": {
+      "type": "string",
+      "required": true
+    },
+    "staged": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    "file": {
+      "type": "string",
+      "required": false
+    },
+    "context_lines": {
+      "type": "integer",
+      "required": false,
+      "default": 3
+    }
+  },
+  "execution": {
+    "type": "subprocess",
+    "handler": "tools.git.diff.diff"
+  },
+  "latency": {
+    "expected_ms": 300
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": ["git.status"]
+}

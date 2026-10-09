@@ -1,0 +1,78 @@
+{
+  "manifest_version": "0.4",
+  "name": "homeshed-mcp",
+  "display_name": "HomeShed",
+  "version": "0.1.0",
+  "description": "Every tool your AI needs, in one install: memory, reasoning, git, network and more. Tools that act on your machines start off.",
+  "long_description": "A self-hosted MCP tool server: built-in memory, reasoning, git, files, network and code checks work with nothing else installed; other tools connect to what you already run, such as a local model, Docker or ntfy. Tools that act on your machines start switched off.",
+  "author": {
+    "name": "Keith Stewartson",
+    "url": "https://github.com/keefng8"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/keefng8/homeshed-mcp.git"
+  },
+  "homepage": "https://github.com/keefng8/homeshed-mcp",
+  "documentation": "https://github.com/keefng8/homeshed-mcp#readme",
+  "support": "https://github.com/keefng8/homeshed-mcp/issues",
+  "license": "Apache-2.0",
+  "keywords": [
+    "mcp",
+    "tools",
+    "memory",
+    "reasoning",
+    "local-first",
+    "self-hosted"
+  ],
+  "server": {
+    "type": "uv",
+    "entry_point": "cli.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--no-editable",
+        "--directory",
+        "${__dirname}",
+        "homeshed-mcp",
+        "serve"
+      ],
+      "env": {
+        "DATA_DIR": "${HOME}/.homeshed-mcp",
+        "LOCAL_AI_BASE_URL": "${user_config.local_ai_base_url}",
+        "ENABLE_TOOLS": "${user_config.enable_tools}"
+      }
+    }
+  },
+  "tools_generated": true,
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "python": ">=3.11"
+    }
+  },
+  "user_config": {
+    "local_ai_base_url": {
+      "type": "string",
+      "title": "Local model address (optional)",
+      "description": "An OpenAI-compatible server you run, e.g. http://localhost:11434/v1 for Ollama. Leave empty if you don't run one.",
+      "default": "",
+      "required": false
+    },
+    "enable_tools": {
+      "type": "string",
+      "title": "Write tools to switch on (optional)",
+      "description": "Comma-separated, e.g. git.commit,git.push. Leave empty to keep every tool that changes things off.",
+      "default": "",
+      "required": false
+    }
+  },
+  "privacy_policies": [
+    "https://jina.ai/legal/#privacy-policy"
+  ]
+}

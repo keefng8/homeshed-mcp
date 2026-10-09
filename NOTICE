@@ -1,0 +1,14 @@
+HomeShed
+Copyright 2026 Keith Stewartson
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes code adapted from:
+  - Lynkr (https://github.com/Fast-Editor/Lynkr), Copyright 2024-2025 Vishal Veera Reddy, Apache License 2.0
+  - Agent-Reach (https://github.com/Panniantong/Agent-Reach), Copyright (c) 2025 Agent Eyes, MIT License
+  - cognitive-workspace (https://github.com/tao-hpu/cognitive-workspace), Copyright (c) 2025 Tao An, MIT License
+  - task-observer by Eoghan Henn (https://github.com/rebelytics/one-skill-to-rule-them-all), CC BY 4.0
+Details, and the full MIT licence text, are in THIRD_PARTY.md.
+
+It can connect to optional third-party services that are not included in this distribution and are installed
+separately by the user, such as memory-core (TencentDB-Agent-Memory, MIT License, Copyright (C) Tencent).

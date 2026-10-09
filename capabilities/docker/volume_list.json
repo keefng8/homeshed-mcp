@@ -1,0 +1,28 @@
+{
+  "id": "docker.volume.list",
+  "name": "List Docker Volumes",
+  "version": "1.0.0",
+  "description": "List Docker volumes on this host: name, driver, mountpoint, creation time.",
+  "category": "docker",
+  "risk": "read",
+  "requires": ["Docker socket"],
+  "transport": "mcp",
+  "aliases": [
+    "list volumes",
+    "docker volumes",
+    "what volumes exist"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "docker_sdk",
+    "handler": "tools.docker.list_volumes.list_volumes"
+  },
+  "latency": {
+    "expected_ms": 300
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": ["docker.container.list", "docker.container.inspect"]
+}

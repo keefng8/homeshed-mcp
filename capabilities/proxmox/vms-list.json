@@ -1,0 +1,53 @@
+{
+  "id": "proxmox.vms.list",
+  "name": "List Proxmox VMs and Containers",
+  "version": "1.0.0",
+  "description": "List VMs (qemu) and containers (lxc) across the whole Proxmox cluster, with status, CPU, memory and uptime; optional node filter. Read-only.",
+  "category": "proxmox",
+  "risk": "read",
+  "requires": [
+    "Proxmox VE API token (PROXMOX_TOKEN_ID, or PROXMOX_API_TOKEN)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "list proxmox vms",
+    "what vms are running",
+    "list lxc containers on proxmox",
+    "show proxmox guests"
+  ],
+  "inputs": {
+    "node": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "kind": {
+      "type": "string",
+      "required": false,
+      "default": "all",
+      "enum": [
+        "all",
+        "qemu",
+        "lxc"
+      ]
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.proxmox.vms_list.vms_list"
+  },
+  "latency": {
+    "expected_ms": 500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "proxmox.nodes.list",
+    "proxmox.node.status",
+    "proxmox.vm.status",
+    "proxmox.storage.list",
+    "proxmox.tasks.list"
+  ]
+}

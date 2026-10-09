@@ -1,0 +1,37 @@
+{
+  "id": "threads.insights",
+  "name": "Threads Post Insights",
+  "version": "1.0.0",
+  "description": "Views, likes, replies, reposts, quotes and shares for one of the owner's Threads posts, or the account's follower count with no post id.",
+  "category": "threads",
+  "risk": "read",
+  "requires": [
+    "Threads connected with the insights permission"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "threads post stats",
+    "how did my threads post do"
+  ],
+  "inputs": {
+    "post_id": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.threads.publish.insights"
+  },
+  "latency": {
+    "expected_ms": 1500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "threads.publish",
+    "threads.status"
+  ]
+}

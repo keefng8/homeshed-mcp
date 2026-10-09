@@ -1,0 +1,64 @@
+{
+  "id": "observe.log",
+  "name": "Log Observation",
+  "version": "1.0.0",
+  "description": "Record a rule violation, user correction, or improvement gap in the persistent observation log; flags repeat violations of the same rule for escalation to a mechanical guard.",
+  "category": "observe",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "log a mistake",
+    "record a correction",
+    "I broke a rule",
+    "note this for later",
+    "log observation",
+    "the user corrected me"
+  ],
+  "inputs": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "issue": {
+      "type": "string",
+      "required": true
+    },
+    "rule": {
+      "type": "string",
+      "required": false
+    },
+    "fix": {
+      "type": "string",
+      "required": false
+    },
+    "area": {
+      "type": "string",
+      "required": false
+    },
+    "source": {
+      "type": "string",
+      "required": false,
+      "default": "claude"
+    },
+    "action_class": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.observe.log.log"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "observe.list",
+    "observe.update"
+  ]
+}

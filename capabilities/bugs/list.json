@@ -1,0 +1,55 @@
+{
+  "id": "bugs.list",
+  "name": "Known Bugs List",
+  "description": "List known bugs, newest first, by status or component.",
+  "risk": "read",
+  "requires": [],
+  "aliases": [
+    "list known bugs",
+    "open bugs",
+    "what bugs are known"
+  ],
+  "inputs": {
+    "fix_status": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "component": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 50
+    },
+    "detail": {
+      "type": "string",
+      "required": false,
+      "default": "compact",
+      "enum": ["compact", "full"]
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.bugs.known.list_bugs"
+  },
+  "version": "1.0.0",
+  "category": "bugs",
+  "transport": "mcp",
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "related": [
+    "bugs.report",
+    "bugs.find",
+    "bugs.list",
+    "observe.log"
+  ]
+}

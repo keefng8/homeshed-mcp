@@ -1,0 +1,56 @@
+{
+  "id": "image.carousel",
+  "name": "Social Slides From Designs",
+  "version": "1.1.0",
+  "description": "Designs as 1080x1350 (4:5) or 1080x1920 (9:16) social slides on their own background, saved in the images promo folder for threads.publish.",
+  "category": "image",
+  "risk": "write",
+  "requires": [
+    "the local image service"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "carousel slides",
+    "social slides",
+    "make a carousel"
+  ],
+  "inputs": {
+    "image_names": {
+      "type": "array",
+      "required": true
+    },
+    "shape": {
+      "type": "string",
+      "required": false,
+      "default": "4:5"
+    },
+    "background": {
+      "type": "string",
+      "required": false
+    },
+    "watermark": {
+      "type": "string",
+      "required": false
+    },
+    "watermark_style": {
+      "type": "string",
+      "required": false,
+      "default": "corner"
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.carousel.carousel"
+  },
+  "latency": {
+    "expected_ms": 8000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "threads.publish",
+    "image.print_file"
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "id": "dev.python",
+  "name": "Run Python",
+  "version": "1.0.0",
+  "description": "Run a Python command on the machine HomeShed runs on (your computer, or its container). Real code execution, no confirmation step.",
+  "category": "dev",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "run python",
+    "execute python script",
+    "python command"
+  ],
+  "inputs": {
+    "args": {
+      "type": "array",
+      "required": true
+    },
+    "cwd": {
+      "type": "string",
+      "required": true
+    },
+    "timeout": {
+      "type": "integer",
+      "required": false,
+      "default": 120
+    }
+  },
+  "execution": {
+    "type": "subprocess",
+    "handler": "tools.dev.python.python"
+  },
+  "latency": {
+    "expected_ms": 5000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "dev.test",
+    "dev.node"
+  ]
+}

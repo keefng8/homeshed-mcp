@@ -1,0 +1,40 @@
+{
+  "id": "reasoning.solve",
+  "name": "Solve Constraint Problem",
+  "version": "1.0.0",
+  "description": "Solve a constraint-satisfaction/logic problem via Z3, expressed in standard SMT-LIB2 text.",
+  "category": "reasoning",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "z3 solve",
+    "smt solve",
+    "check satisfiability",
+    "solve constraints",
+    "is this consistent"
+  ],
+  "inputs": {
+    "smt_lib2": {
+      "type": "string",
+      "required": true
+    },
+    "timeout_ms": {
+      "type": "integer",
+      "required": false,
+      "default": 5000
+    }
+  },
+  "execution": {
+    "type": "in_process",
+    "handler": "tools.reasoning.solve.solve"
+  },
+  "latency": {
+    "expected_ms": "variable — bounded by timeout_ms"
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": ["local_ai.classify_complexity", "workflow.run"]
+}

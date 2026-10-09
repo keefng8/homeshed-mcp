@@ -1,0 +1,56 @@
+{
+  "id": "image.print_file",
+  "name": "Print-Ready Design File",
+  "version": "1.0.0",
+  "description": "Turn a design on a plain background into transparent print files at a print area's exact size (300 DPI, full colour or flat colours), light-tee and dark-tee (keyline) versions.",
+  "category": "image",
+  "risk": "write",
+  "requires": [
+    "GPU image service (IMAGE_BASE_URL) for local jobs"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "print file",
+    "make it print ready",
+    "printify file",
+    "transparent png for printing"
+  ],
+  "inputs": {
+    "image": {
+      "type": "string",
+      "required": true
+    },
+    "width_px": {
+      "type": "integer",
+      "required": true
+    },
+    "height_px": {
+      "type": "integer",
+      "required": true
+    },
+    "variants": {
+      "type": "array",
+      "required": false
+    },
+    "colours": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.print_file.print_file"
+  },
+  "latency": {
+    "expected_ms": 8000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.generate",
+    "image.status"
+  ]
+}

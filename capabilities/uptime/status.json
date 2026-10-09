@@ -1,0 +1,32 @@
+{
+  "id": "uptime.status",
+  "name": "Uptime Kuma Monitor Status",
+  "version": "1.0.0",
+  "description": "Real Uptime Kuma monitor status, read directly from its database, read-only.",
+  "category": "uptime",
+  "risk": "read",
+  "requires": ["Uptime Kuma's database (KUMA_DB_PATH, default DATA_DIR/kuma/kuma.db)"],
+  "transport": "mcp",
+  "aliases": [
+    "monitor status",
+    "is anything down",
+    "uptime kuma status",
+    "what's down",
+    "check monitors"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "python",
+    "handler": "tools.uptime.status.status"
+  },
+  "latency": {
+    "expected_ms": 100
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "system.health"
+  ]
+}

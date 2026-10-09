@@ -1,0 +1,40 @@
+{
+  "id": "inbox.withdraw",
+  "name": "Withdraw a Message to the Owner",
+  "version": "1.0.0",
+  "description": "Take back your own message to the owner; it leaves his list at once.",
+  "category": "inbox",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "take back my message",
+    "delete my message to the owner",
+    "withdraw message"
+  ],
+  "inputs": {
+    "message_id": {
+      "type": "string",
+      "required": true
+    },
+    "sender": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.inbox.amend.withdraw"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "inbox.send",
+    "inbox.replies"
+  ]
+}

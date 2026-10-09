@@ -1,0 +1,39 @@
+{
+  "id": "printify.blueprint.get",
+  "name": "Printify Blueprint",
+  "version": "1.0.0",
+  "description": "One Printify blueprint (blank product): title, brand, model and its description as plain text, with the fabric, fibre and weight lines a listing's material bullet needs. Read-only.",
+  "category": "printify",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_printify_enabled switch",
+    "Printify token (PRINTIFY_API_TOKEN)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "printify blueprint details",
+    "blank product material",
+    "fabric of a printify product"
+  ],
+  "inputs": {
+    "blueprint_id": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.printify.read.blueprint_get"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.blueprints.list",
+    "printify.print_provider.get"
+  ]
+}

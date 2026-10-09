@@ -1,0 +1,39 @@
+{
+  "id": "commerce.requests.list",
+  "name": "My Shop Requests And Decisions",
+  "version": "1.0.0",
+  "description": "An app's own shop requests (Printify publishes, live-product updates, Etsy listing edits): what still waits for the owner, and the owner's decisions of the last 7 days (approved, declined, expired), with notes. Check this instead of assuming something still waits.",
+  "category": "commerce",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "was my publish approved",
+    "approval status",
+    "my waiting requests",
+    "owner decisions"
+  ],
+  "inputs": {
+    "days": {
+      "type": "integer",
+      "required": false,
+      "default": 7
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.commerce.waiting.requests_list"
+  },
+  "latency": {
+    "expected_ms": 50
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.product.publish",
+    "printify.product.update_live",
+    "etsy.listing.update"
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "id": "dev.build",
+  "name": "Run Build",
+  "version": "1.0.0",
+  "description": "Run a build command on the machine HomeShed runs on (your computer, or its container). Real code execution, no confirmation step. The toolchain must be installed there.",
+  "category": "dev",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "build project",
+    "run build",
+    "build application"
+  ],
+  "inputs": {
+    "command": {
+      "type": "array",
+      "required": true
+    },
+    "cwd": {
+      "type": "string",
+      "required": true
+    },
+    "timeout": {
+      "type": "integer",
+      "required": false,
+      "default": 300
+    }
+  },
+  "execution": {
+    "type": "subprocess",
+    "handler": "tools.dev.build.build"
+  },
+  "latency": {
+    "expected_ms": 30000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "dev.test",
+    "dev.lint"
+  ]
+}

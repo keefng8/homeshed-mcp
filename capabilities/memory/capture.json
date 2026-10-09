@@ -1,0 +1,63 @@
+{
+  "id": "memory.capture",
+  "name": "Capture to Persistent Memory",
+  "version": "1.0.0",
+  "description": "Write a fact/decision/preference into persistent memory (the built-in store, or a self-hosted TDAI memory-core), recallable in future sessions via memory.recall.",
+  "category": "memory",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "remember this",
+    "save to memory",
+    "persist this fact",
+    "write to memory"
+  ],
+  "inputs": {
+    "session_id": {
+      "type": "string",
+      "required": true
+    },
+    "content": {
+      "type": "string",
+      "required": true
+    },
+    "role": {
+      "type": "string",
+      "required": false,
+      "default": "user",
+      "enum": [
+        "user",
+        "assistant"
+      ]
+    },
+    "project_dir": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "scope": {
+      "type": "string",
+      "required": false,
+      "default": "project",
+      "enum": [
+        "project",
+        "global"
+      ]
+    }
+  },
+  "execution": {
+    "type": "http_api",
+    "handler": "tools.memory.capture.capture"
+  },
+  "latency": {
+    "expected_ms": 300
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "memory.recall"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "id": "git.push",
+  "name": "Git Push",
+  "version": "1.0.0",
+  "description": "Push the current branch to a remote. Fully autonomous, no confirmation step.",
+  "category": "git",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "git push",
+    "push changes",
+    "publish commits"
+  ],
+  "inputs": {
+    "path": { "type": "string", "required": true },
+    "remote": { "type": "string", "required": false, "default": "origin" },
+    "branch": { "type": "string", "required": false },
+    "force": { "type": "boolean", "required": false, "default": false }
+  },
+  "execution": {
+    "type": "subprocess",
+    "handler": "tools.git.push.push"
+  },
+  "latency": {
+    "expected_ms": 2000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": ["git.status", "git.commit", "git.pull"]
+}

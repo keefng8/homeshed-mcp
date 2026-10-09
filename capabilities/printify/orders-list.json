@@ -1,0 +1,52 @@
+{
+  "id": "printify.orders.list",
+  "name": "Printify Orders",
+  "version": "1.0.0",
+  "description": "The configured Printify shop's orders, compact and paged; no delivery addresses. Read-only.",
+  "category": "printify",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_printify_enabled switch",
+    "Printify token (PRINTIFY_API_TOKEN; PRINTIFY_SHOP_ID for shop tools)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "printify orders"
+  ],
+  "inputs": {
+    "page": {
+      "type": "integer",
+      "required": false,
+      "default": 1
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 10
+    },
+    "status": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.printify.read.orders_list"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.shops.list",
+    "printify.products.list",
+    "printify.product.get",
+    "printify.blueprints.list",
+    "printify.print_providers.list",
+    "printify.order.get"
+  ]
+}

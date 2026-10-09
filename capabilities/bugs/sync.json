@@ -1,0 +1,34 @@
+{
+  "id": "bugs.sync",
+  "name": "Known Bugs Sync",
+  "description": "Fetch the HomeShed Pro known-bugs feed with this install's Pro key and merge it in, so bugs.find knows every fix Pro members get.",
+  "risk": "write",
+  "requires": ["a Pro key (Settings > Pro membership)"],
+  "aliases": [
+    "sync known bugs",
+    "update known bugs",
+    "get the bug feed"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "python",
+    "handler": "tools.bugs.known.sync"
+  },
+  "version": "1.0.0",
+  "category": "bugs",
+  "transport": "mcp",
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "latency": {
+    "expected_ms": 50
+  },
+  "related": [
+    "bugs.find",
+    "bugs.report",
+    "bugs.list",
+    "bugs.export",
+    "bugs.sync"
+  ]
+}

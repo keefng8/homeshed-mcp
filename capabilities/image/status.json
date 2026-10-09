@@ -1,0 +1,43 @@
+{
+  "id": "image.status",
+  "name": "Image Job Status",
+  "version": "1.0.0",
+  "description": "Check an image generation job (local or paid provider): running/done/failed, progress, elapsed time, licence; optionally the image.",
+  "category": "image",
+  "risk": "read",
+  "requires": [
+    "GPU image service (IMAGE_BASE_URL) for local jobs"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "is my image ready",
+    "image progress",
+    "image job status"
+  ],
+  "inputs": {
+    "job_id": {
+      "type": "string",
+      "required": true
+    },
+    "include_image": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.status.status"
+  },
+  "latency": {
+    "expected_ms": 200
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.generate",
+    "image.providers.list"
+  ]
+}

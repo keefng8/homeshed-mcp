@@ -1,0 +1,39 @@
+{
+  "id": "image.history",
+  "name": "Image History",
+  "version": "1.0.0",
+  "description": "Recent generated images with the prompt each was made with, the model, seed and size, newest first: local and paid-provider images together. Read-only, no image data.",
+  "category": "image",
+  "risk": "read",
+  "requires": [
+    "GPU image service (IMAGE_BASE_URL) for local images"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "which prompt made this image",
+    "image prompts",
+    "recent images"
+  ],
+  "inputs": {
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 20
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.history.history"
+  },
+  "latency": {
+    "expected_ms": 200
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.generate",
+    "image.status"
+  ]
+}

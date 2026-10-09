@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      # Editable, the way contributors install it; the command must work from the checkout too.
+      - run: pip install -e ".[test,panel]" && homeshed-mcp --help
+      - run: pytest -q tests
+      # The optional Control Panel's own tests, in their own session.
+      - run: pytest -q panel
+
+  bundle:
+    # The Claude Desktop bundle starts the way Claude Desktop starts it (Node comes with the runner).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - run: python3 scripts/check_bundle.py
+
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: README tool list is up to date
+        run: python scripts/gen_tools_table.py --check
+      - name: README install section is up to date
+        run: python scripts/gen_install.py --package homeshed-mcp --check
+      - name: No broken local links in Markdown
+        run: python scripts/check_links.py
+      - name: Docs match the code (settings, anchors, commands)
+        run: python scripts/check_docs.py
+      - name: No disabled TLS verification
+        run: |
+          if grep -rnE 'verify\s*=\s*False|CERT_NONE|check_hostname\s*=\s*False' --include='*.py' . ; then
+            echo "::error::TLS verification must never be disabled"; exit 1
+          fi

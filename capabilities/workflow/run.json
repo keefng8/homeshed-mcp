@@ -1,0 +1,35 @@
+{
+  "id": "workflow.run",
+  "name": "Run Workflow",
+  "version": "1.0.0",
+  "description": "Chain existing capabilities into one multi-step task, stopping at the first failure.",
+  "category": "workflow",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "run workflow",
+    "chain capabilities",
+    "run pipeline",
+    "orchestrate",
+    "deploy verify notify"
+  ],
+  "inputs": {
+    "steps": {
+      "type": "array",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "in_process",
+    "handler": "tools.workflow.run.run"
+  },
+  "latency": {
+    "expected_ms": "variable — sum of its steps"
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": ["registry.find"]
+}

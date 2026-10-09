@@ -1,0 +1,44 @@
+{
+  "id": "bugs.find",
+  "name": "Known Bugs Find",
+  "description": "Has this error been seen before? Paste it and get the known cause and fix.",
+  "risk": "read",
+  "requires": [],
+  "aliases": [
+    "seen this error before",
+    "known fix for",
+    "why does this error",
+    "known bug"
+  ],
+  "inputs": {
+    "query": {
+      "type": "string",
+      "required": true
+    },
+    "k": {
+      "type": "integer",
+      "required": false,
+      "default": 5
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.bugs.known.find"
+  },
+  "version": "1.0.0",
+  "category": "bugs",
+  "transport": "mcp",
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "related": [
+    "bugs.report",
+    "bugs.find",
+    "bugs.list",
+    "observe.log"
+  ]
+}

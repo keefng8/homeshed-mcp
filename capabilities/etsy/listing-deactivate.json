@@ -1,0 +1,44 @@
+{
+  "id": "etsy.listing.deactivate",
+  "name": "Deactivate An Etsy Listing",
+  "version": "1.0.0",
+  "description": "Take one of the shop's active Etsy listings off sale at once (a brake for a listing that fails a check). No approval step: its own switch, a daily cap, audited, and the owner gets a push with the reason. Etsy's Shop Manager re-activates it.",
+  "category": "etsy",
+  "risk": "write",
+  "requires": [
+    "the owner's commerce_etsy_enabled and commerce_etsy_deactivate_enabled switches",
+    "an Etsy connection made with listing edits (listings_w)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "take listing off sale",
+    "deactivate etsy listing",
+    "pause etsy listing"
+  ],
+  "inputs": {
+    "listing_id": {
+      "type": "string",
+      "required": true
+    },
+    "reason": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.etsy.write.listing_deactivate"
+  },
+  "latency": {
+    "expected_ms": 1500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "etsy.listing.get",
+    "etsy.listing.update",
+    "etsy.listings.list"
+  ]
+}

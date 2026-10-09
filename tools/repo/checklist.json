@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "source": "REPO-STRUCTURE.md",
+  "when": {
+    "python": "a pyproject.toml, setup.py or *.py at the top level",
+    "apache": "LICENSE is the Apache License 2.0",
+    "docker": "a Dockerfile exists",
+    "settings": "the code reads environment variables (os.environ / getenv)",
+    "publishes": "the project is published as a package or image (pyproject [project] name, or a Dockerfile)",
+    "deps": "the project has dependencies or adapted third-party code"
+  },
+  "items": [
+    {
+      "path": "README.md",
+      "level": "required",
+      "fix": "Write it in this order: tagline, why, 3-step install, what it does, security, limits, roadmap, FAQ, licence (template/README.md).",
+      "checks": {
+        "must_not_contain": [
+          "<!-- TODO",
+          "<!-- DRAFT",
+          "<!-- GATE",
+          "{{PROJECT}}",
+          "{{OWNER}}"
+        ]
+      }
+    },
+    {
+      "path": "LICENSE",
+      "level": "required",
+      "fix": "Paste the licence's official text unedited; your name goes in NOTICE or the copyright line the licence asks for."
+    },
+    {
+      "path": ".gitignore",
+      "level": "required",
+      "fix": "Start with secrets (.env, .env.*, keys), then build output and caches (template/.gitignore).",
+      "checks": {
+        "must_contain": [
+          ".env"
+        ]
+      }
+    },
+    {
+      "path": "SECURITY.md",
+      "level": "recommended",
+      "fix": "Say how to report privately (GitHub advisories) and a response time you can keep (template/SECURITY.md)."
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "level": "recommended",
+      "fix": "Set-up, how to run the tests and checks, pull request rules (template/CONTRIBUTING.md)."
+    },
+    {
+      "path": "CODE_OF_CONDUCT.md",
+      "level": "recommended",
+      "fix": "Contributor Covenant 2.1 with a project contact address, never a personal email.",
+      "checks": {
+        "must_not_contain": [
+          "{{"
+        ]
+      }
+    },
+    {
+      "path": "CHANGELOG.md",
+      "level": "recommended",
+      "fix": "Keep a Changelog format with an Unreleased section on top."
+    },
+    {
+      "path": ".editorconfig",
+      "level": "recommended",
+      "fix": "Set indent, charset and final newline for every editor."
+    },
+    {
+      "path": ".gitattributes",
+      "level": "recommended",
+      "fix": "Add `* text=auto` so line endings stay consistent."
+    },
+    {
+      "path": "docs/getting-started.md",
+      "level": "recommended",
+      "fix": "A beginner path: every step, with what the user should see after it."
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "level": "recommended",
+      "fix": "Run the tests on every supported version, plus link and generated-section checks; actions pinned by commit SHA.",
+      "checks": {
+        "must_contain": [
+          "permissions:"
+        ]
+      }
+    },
+    {
+      "path": ".github/dependabot.yml",
+      "level": "recommended",
+      "fix": "Update dependencies, GitHub Actions and (with Docker) images."
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug_report.yml",
+      "level": "recommended",
+      "fix": "A bug form asking for version, steps and output, with a 'remove secrets first' note."
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/config.yml",
+      "level": "recommended",
+      "fix": "Turn off blank issues; link private security reporting and Discussions."
+    },
+    {
+      "path": ".github/PULL_REQUEST_TEMPLATE.md",
+      "level": "recommended",
+      "fix": "A short checklist: tests, changelog, docs."
+    },
+    {
+      "path": ".github/workflows/codeql.yml",
+      "level": "recommended",
+      "fix": "Enable code scanning on pushes and pull requests."
+    },
+    {
+      "path": ".github/CODEOWNERS",
+      "level": "recommended",
+      "fix": "Name who reviews each part, so branch rules can require them."
+    },
+    {
+      "path": "pyproject.toml",
+      "level": "conditional",
+      "fix": "Name, version, licence, authors, URLs, entry point and a test extra (template/pyproject.toml).",
+      "when": "python"
+    },
+    {
+      "path": "NOTICE",
+      "level": "conditional",
+      "fix": "Copyright line plus credits for adapted code (Apache projects).",
+      "when": "apache"
+    },
+    {
+      "path": "THIRD_PARTY.md",
+      "level": "conditional",
+      "fix": "List dependencies and adapted code: source, copyright, licence and what changed.",
+      "when": "deps"
+    },
+    {
+      "path": ".env.example",
+      "level": "conditional",
+      "fix": "Every setting the code reads, with a comment and no real values.",
+      "when": "settings"
+    },
+    {
+      "path": "docs/configuration.md",
+      "level": "conditional",
+      "fix": "Every setting: default, what it does, an example; stable headings other files can link to.",
+      "when": "settings"
+    },
+    {
+      "path": ".dockerignore",
+      "level": "conditional",
+      "fix": "Exclude .env, .env.* and *.bak (keep !.env.example) before anything else: COPY . . copies secrets too.",
+      "when": "docker",
+      "checks": {
+        "must_contain": [
+          ".env",
+          ".env.*"
+        ]
+      }
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "level": "conditional",
+      "fix": "On a version tag: test, build, trusted publishing with a required reviewer, a GitHub release with SHA256SUMS.",
+      "when": "publishes"
+    },
+    {
+      "path": "docs/RELEASING.md",
+      "level": "conditional",
+      "fix": "One-time setup and a per-release checklist.",
+      "when": "publishes"
+    }
+  ]
+}

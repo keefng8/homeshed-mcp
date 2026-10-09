@@ -1,0 +1,313 @@
+{
+  "_about": "API catalog: every API this server uses or has evaluated, for any session or person with MCP access, so nobody re-researches an API already tried. Served by apis.list / apis.find. NEVER put secret values here: `auth` names the environment variable that holds a key. status: live = working now. An api_catalog.private.json next to this file adds entries, or replaces ones with the same name.",
+  "apis": [
+    {
+      "name": "Your own model (local)",
+      "category": "llm",
+      "provider": "any OpenAI-compatible server you run (Ollama, llama.cpp, LM Studio, vLLM)",
+      "cost": "free",
+      "local": true,
+      "status": "needs-setup",
+      "auth": "none",
+      "how_to_use": "Set LOCAL_AI_BASE_URL and LOCAL_AI_MODEL (homeshed-mcp setup prints them for a running server); local_ai.ask model=auto tries it first",
+      "notes": "Free and private: prompts stay on your machine.",
+      "tags": [
+        "llm",
+        "chat",
+        "code",
+        "local model",
+        "private"
+      ]
+    },
+    {
+      "name": "NVIDIA hosted models (Nemotron)",
+      "category": "llm",
+      "provider": "build.nvidia.com",
+      "cost": "free tier",
+      "local": false,
+      "status": "needs-setup",
+      "auth": "bearer via env NVIDIA_API_KEY",
+      "how_to_use": "Set NVIDIA_API_KEY; local_ai.ask then uses it automatically as a cloud fallback",
+      "notes": "OpenAI-compatible at https://integrate.api.nvidia.com/v1. A free key for prototyping. Prompts leave your machine. Its reasoning models need enable_thinking=false, which local_ai.ask sends by default.",
+      "tags": [
+        "llm",
+        "reasoning",
+        "cloud",
+        "openai-compatible"
+      ]
+    },
+    {
+      "name": "Your own gateway (e.g. LiteLLM)",
+      "category": "llm",
+      "provider": "an OpenAI-compatible gateway you run",
+      "cost": "depends on the gateway",
+      "local": false,
+      "status": "needs-setup",
+      "auth": "bearer via env LOCAL_AI_GATEWAY_KEY",
+      "how_to_use": "Set LOCAL_AI_GATEWAY_URL and LOCAL_AI_GATEWAY_KEY; local_ai.ask uses its nvidia-* models as a cloud fallback",
+      "notes": "Only the gateway's nvidia-* models are used. Prompts leave your machine if the gateway sends them on.",
+      "tags": [
+        "llm",
+        "gateway",
+        "cloud",
+        "openai-compatible"
+      ]
+    },
+    {
+      "name": "Groq",
+      "category": "llm",
+      "provider": "console.groq.com",
+      "cost": "free tier",
+      "local": false,
+      "status": "needs-setup",
+      "auth": "bearer via env GROQ_API_KEY",
+      "how_to_use": "Set GROQ_API_KEY; local_ai.ask then uses it automatically as a cloud fallback",
+      "notes": "OpenAI-compatible at https://api.groq.com/openai/v1. About 100 requests a minute on the free tier. Prompts leave your machine.",
+      "tags": [
+        "llm",
+        "free",
+        "cloud",
+        "openai-compatible"
+      ]
+    },
+    {
+      "name": "OpenRouter (free models)",
+      "category": "llm",
+      "provider": "openrouter.ai",
+      "cost": "free tier",
+      "local": false,
+      "status": "needs-setup",
+      "auth": "bearer via env OPENROUTER_API_KEY",
+      "how_to_use": "Set OPENROUTER_API_KEY; local_ai.ask then uses it automatically as a cloud fallback",
+      "notes": "OpenAI-compatible at https://openrouter.ai/api/v1. Free models only (ids end in :free): 20 a minute, 50 a day. Prompts leave your machine.",
+      "tags": [
+        "llm",
+        "free",
+        "cloud",
+        "openai-compatible"
+      ]
+    },
+    {
+      "name": "Mistral AI",
+      "category": "llm",
+      "provider": "console.mistral.ai",
+      "cost": "free tier",
+      "local": false,
+      "status": "needs-setup",
+      "auth": "bearer via env MISTRAL_API_KEY",
+      "how_to_use": "Set MISTRAL_API_KEY; local_ai.ask then uses it automatically as a cloud fallback",
+      "notes": "OpenAI-compatible at https://api.mistral.ai/v1. About 1 request a second on the free tier. Prompts leave your machine.",
+      "tags": [
+        "llm",
+        "free",
+        "cloud",
+        "openai-compatible"
+      ]
+    },
+    {
+      "name": "Google Gemini",
+      "category": "llm",
+      "provider": "aistudio.google.com",
+      "cost": "free tier",
+      "local": false,
+      "status": "needs-setup",
+      "auth": "bearer via env GEMINI_API_KEY",
+      "how_to_use": "Set GEMINI_API_KEY; local_ai.ask then uses it automatically as a cloud fallback",
+      "notes": "OpenAI-compatible at https://generativelanguage.googleapis.com/v1beta/openai. About 15 a minute and 1,500 a day on the free Flash models. Prompts leave your machine.",
+      "tags": [
+        "llm",
+        "free",
+        "cloud",
+        "openai-compatible"
+      ]
+    },
+    {
+      "name": "OVHcloud AI Endpoints",
+      "category": "llm",
+      "provider": "endpoints.ai.cloud.ovh.net",
+      "cost": "free tier",
+      "local": false,
+      "status": "needs-setup",
+      "auth": "bearer via env OVH_AI_ENDPOINTS_TOKEN",
+      "how_to_use": "Set OVH_AI_ENDPOINTS_TOKEN; local_ai.ask then uses it automatically as a cloud fallback",
+      "notes": "OpenAI-compatible at https://oai.endpoints.kepler.ai.cloud.ovh.net/v1. Anonymous use is 2 a minute; a free token raises it. Prompts leave your machine.",
+      "tags": [
+        "llm",
+        "free",
+        "cloud",
+        "openai-compatible"
+      ]
+    },
+    {
+      "name": "Shared memory",
+      "category": "memory",
+      "provider": "the built-in store (SQLite), or a self-hosted TDAI memory-core",
+      "cost": "free",
+      "local": true,
+      "status": "live",
+      "auth": "none for the built-in store; memory-core's keys in the environment",
+      "how_to_use": "memory.remember_fact / recall_facts / recall_relevant / capture / recall",
+      "notes": "Cross-session facts and history, kept per project, for every client with MCP access.",
+      "tags": [
+        "remember",
+        "recall",
+        "memory",
+        "facts",
+        "history"
+      ]
+    },
+    {
+      "name": "Push notifications (ntfy)",
+      "category": "notify",
+      "provider": "ntfy.sh, or your own ntfy server (NTFY_BASE_URL)",
+      "cost": "free",
+      "local": true,
+      "status": "live",
+      "auth": "optional bearer token in NTFY_AUTH_TOKEN",
+      "how_to_use": "notify.send (the topic defaults to NTFY_DEFAULT_TOPIC)",
+      "notes": "Your phone follows the topic in the ntfy app.",
+      "tags": [
+        "notify",
+        "push",
+        "alert",
+        "phone",
+        "message"
+      ]
+    },
+    {
+      "name": "Jina Reader",
+      "category": "web",
+      "provider": "r.jina.ai (public)",
+      "cost": "free",
+      "local": false,
+      "status": "live",
+      "auth": "none",
+      "how_to_use": "web.read",
+      "notes": "Webpage-to-markdown. SSRF-hardened URL validation before any request. Rate-limited without a key.",
+      "tags": [
+        "web page",
+        "scrape",
+        "read url",
+        "website",
+        "markdown"
+      ]
+    },
+    {
+      "name": "Uptime Kuma",
+      "category": "monitoring",
+      "provider": "your Uptime Kuma (its database file, mounted read-only)",
+      "cost": "free",
+      "local": true,
+      "status": "live",
+      "auth": "read-only database mount (KUMA_DB_PATH)",
+      "how_to_use": "uptime.status",
+      "notes": "Monitor states; Uptime Kuma sends its own outage alerts.",
+      "tags": [
+        "uptime",
+        "monitor",
+        "health",
+        "outage",
+        "status"
+      ]
+    },
+    {
+      "name": "Docker engine",
+      "category": "infrastructure",
+      "provider": "the Docker daemon on the server's host",
+      "cost": "free",
+      "local": true,
+      "status": "live",
+      "auth": "the Docker socket, mounted only if you use these tools (it gives root on the host)",
+      "how_to_use": "docker.container.* / network.list / volume.list",
+      "notes": "Writes default to dry_run=true.",
+      "tags": [
+        "containers",
+        "restart",
+        "logs",
+        "docker"
+      ]
+    },
+    {
+      "name": "Z3 SMT solver",
+      "category": "reasoning",
+      "provider": "z3-solver library in mcp-server",
+      "cost": "free",
+      "local": true,
+      "status": "live",
+      "auth": "none",
+      "how_to_use": "reasoning.solve",
+      "notes": "Constraint/logic problems in SMT-LIB2.",
+      "tags": [
+        "solve",
+        "constraints",
+        "logic",
+        "sat",
+        "scheduling"
+      ]
+    },
+    {
+      "name": "Open-Meteo",
+      "category": "weather",
+      "provider": "open-meteo.com",
+      "cost": "free for non-commercial use only (<10,000 calls a day)",
+      "local": false,
+      "status": "candidate",
+      "auth": "none for the free tier",
+      "how_to_use": "GET https://api.open-meteo.com/v1/forecast?latitude=..&longitude=..&current=temperature_2m",
+      "notes": "Terms checked 2026-09-29: \"You may only use the free API services for non-commercial purposes.\" A paid plan is needed inside anything sold. Fine for the owner's own use.",
+      "tags": [
+        "free",
+        "weather",
+        "non-commercial"
+      ]
+    },
+    {
+      "name": "Nominatim (OpenStreetMap geocoding)",
+      "category": "maps",
+      "provider": "nominatim.openstreetmap.org",
+      "cost": "free, under a strict usage policy",
+      "local": false,
+      "status": "candidate",
+      "auth": "none; an identifying User-Agent is required",
+      "how_to_use": "GET https://nominatim.openstreetmap.org/search?q=..&format=json with a User-Agent naming the app",
+      "notes": "Policy checked 2026-09-29: at most 1 request a second, cache results, show OpenStreetMap attribution; no autocomplete, no bulk or grid jobs, no reselling. Self-host Nominatim for heavy use.",
+      "tags": [
+        "free",
+        "geocoding",
+        "attribution"
+      ]
+    },
+    {
+      "name": "Frankfurter (exchange rates)",
+      "category": "currency",
+      "provider": "frankfurter.dev",
+      "cost": "free",
+      "local": false,
+      "status": "candidate",
+      "auth": "none",
+      "how_to_use": "https://api.frankfurter.dev: latest and historical rates by base currency (see its docs for the current /v1 and /v2 paths)",
+      "notes": "Checked 2026-09-29: free, no key, commercial use allowed (\"the rates themselves fall under each provider's terms\"); rates from 104 central banks; rate-limited against abuse, no quotas. Cache results; it can be self-hosted.",
+      "tags": [
+        "free",
+        "currency",
+        "commercial-ok"
+      ]
+    },
+    {
+      "name": "Wikipedia (Wikimedia REST)",
+      "category": "knowledge",
+      "provider": "wikipedia.org",
+      "cost": "free",
+      "local": false,
+      "status": "candidate",
+      "auth": "none; User-Agent with contact details required",
+      "how_to_use": "GET https://en.wikipedia.org/api/rest_v1/page/summary/{title}",
+      "notes": "Checked 2026-09-29: no key; 200 requests a minute with a User-Agent naming the app plus a contact URL or email, only 10 a minute without. Content is CC BY-SA: credit Wikipedia when showing it.",
+      "tags": [
+        "free",
+        "knowledge",
+        "attribution"
+      ]
+    }
+  ]
+}

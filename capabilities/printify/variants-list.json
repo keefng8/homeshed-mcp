@@ -1,0 +1,60 @@
+{
+  "id": "printify.variants.list",
+  "name": "Printify Variants",
+  "version": "1.0.0",
+  "description": "One blueprint's variants from one print provider: id, colour, size and print-area sizes in pixels (cost appears only on a created draft).",
+  "category": "printify",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_printify_enabled switch",
+    "Printify token (PRINTIFY_API_TOKEN; PRINTIFY_SHOP_ID for shop tools)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "printify variants",
+    "variant ids",
+    "print area size",
+    "printify sizes and colours"
+  ],
+  "inputs": {
+    "blueprint_id": {
+      "type": "string",
+      "required": true
+    },
+    "print_provider_id": {
+      "type": "string",
+      "required": true
+    },
+    "colour": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "offset": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 40
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.printify.read.variants_list"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.print_providers.list",
+    "image.print_file",
+    "printify.product.create"
+  ]
+}

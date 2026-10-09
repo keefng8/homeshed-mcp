@@ -1,0 +1,52 @@
+{
+  "id": "apis.list",
+  "name": "API Catalog List",
+  "version": "1.0.0",
+  "description": "List APIs in the shared catalog (what APIs exist, cost, local vs cloud, status, how to use), filtered by category/cost/local/status. Never contains secrets.",
+  "category": "apis",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "what apis do we have",
+    "list apis",
+    "free apis",
+    "local apis",
+    "api catalog"
+  ],
+  "inputs": {
+    "category": {
+      "type": "string",
+      "required": false
+    },
+    "cost": {
+      "type": "string",
+      "required": false
+    },
+    "local": {
+      "type": "boolean",
+      "required": false
+    },
+    "status": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.apis.catalog.list_apis"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "apis.list",
+    "apis.find",
+    "local_ai.ask",
+    "registry.find"
+  ]
+}

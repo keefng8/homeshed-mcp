@@ -1,0 +1,54 @@
+{
+  "id": "printify.blueprints.list",
+  "name": "Printify Blueprints",
+  "version": "1.0.0",
+  "description": "Printify's catalogue of blank products, searchable and paged. Read-only.",
+  "category": "printify",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_printify_enabled switch",
+    "Printify token (PRINTIFY_API_TOKEN; PRINTIFY_SHOP_ID for shop tools)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "printify catalog",
+    "printify blueprints",
+    "print on demand products"
+  ],
+  "inputs": {
+    "query": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "offset": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 25
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.printify.read.blueprints_list"
+  },
+  "latency": {
+    "expected_ms": 1500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.shops.list",
+    "printify.products.list",
+    "printify.product.get",
+    "printify.print_providers.list",
+    "printify.orders.list",
+    "printify.order.get"
+  ]
+}

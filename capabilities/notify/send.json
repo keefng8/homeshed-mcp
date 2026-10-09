@@ -1,0 +1,53 @@
+{
+  "id": "notify.send",
+  "name": "Send Notification",
+  "version": "1.0.0",
+  "description": "Send a push notification via this deployment's self-hosted ntfy instance.",
+  "category": "notify",
+  "risk": "write",
+  "requires": ["ntfy (NTFY_BASE_URL, NTFY_AUTH_TOKEN)"],
+  "transport": "mcp",
+  "aliases": [
+    "notify me",
+    "send a notification",
+    "ping my phone",
+    "ntfy",
+    "alert me"
+  ],
+  "inputs": {
+    "message": {
+      "type": "string",
+      "required": true
+    },
+    "topic": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "title": {
+      "type": "string",
+      "required": false
+    },
+    "priority": {
+      "type": "string",
+      "required": false,
+      "default": "default"
+    },
+    "tags": {
+      "type": "array",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.notify.send.send"
+  },
+  "latency": {
+    "expected_ms": 300
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": []
+}

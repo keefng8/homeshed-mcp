@@ -1,0 +1,114 @@
+{
+  "_about": "Model registry for local_ai.ask model=\"auto\" (tools/local_ai/ask.py). Adding a model = one entry here, with no code change. Lower tier is tried first; within a tier the starting model rotates so every model gets work. A \"discover\" entry asks an OpenAI-compatible gateway which models it serves (cached 5 min), so a model added to your gateway is used automatically. No secrets in this file: urls/keys come from the named env vars.",
+  "backends": [
+    {
+      "name": "local",
+      "aliases": [
+        "qwen3-coder",
+        "qwen3",
+        "qwen-coder"
+      ],
+      "url_env": "LOCAL_AI_BASE_URL",
+      "model_env": "LOCAL_AI_MODEL",
+      "model": "",
+      "cloud": false,
+      "tier": 1,
+      "notes": "Your own model server (llama.cpp, Ollama or LM Studio): LOCAL_AI_BASE_URL, ending in /v1, and the model's name in LOCAL_AI_MODEL; both are needed (`homeshed-mcp setup` finds them). Tried first; everything below is a fallback."
+    },
+    {
+      "name": "gateway",
+      "discover": true,
+      "url_env": "LOCAL_AI_GATEWAY_URL",
+      "key_env": "LOCAL_AI_GATEWAY_KEY",
+      "include": [
+        "nvidia-*"
+      ],
+      "cloud": true,
+      "tier": 3,
+      "aliases": {
+        "nemotron-super": "nvidia-nemotron-3-super-120b-a12b",
+        "nemotron-ultra": "nvidia-nemotron-3-ultra-550b-a55b"
+      },
+      "notes": "An OpenAI-compatible gateway you run (for example LiteLLM) at LOCAL_AI_GATEWAY_URL, with LOCAL_AI_GATEWAY_KEY. Only its nvidia-* models are used, so a gateway alias for your local model never routes twice. Dormant until the URL is set."
+    },
+    {
+      "name": "nvidia",
+      "discover": true,
+      "url": "https://integrate.api.nvidia.com/v1",
+      "key_env": "NVIDIA_API_KEY",
+      "include": [
+        "nvidia/nemotron-3-*"
+      ],
+      "cloud": true,
+      "tier": 4,
+      "aliases": {
+        "nemotron-super": "nvidia/nemotron-3-super-120b-a12b",
+        "nemotron-ultra": "nvidia/nemotron-3-ultra-550b-a55b"
+      },
+      "notes": "NVIDIA's hosted models, for anyone without a GPU or a gateway. Dormant until NVIDIA_API_KEY is set (a free key from build.nvidia.com, for prototyping and personal use under NVIDIA's terms). Tier 4, so a local model or a gateway goes first."
+    },
+    {
+      "name": "groq",
+      "discover": true,
+      "url": "https://api.groq.com/openai/v1",
+      "key_env": "GROQ_API_KEY",
+      "include": [
+        "openai/gpt-oss-*",
+        "llama-3.3-70b*"
+      ],
+      "cloud": true,
+      "tier": 5,
+      "notes": "Free tier (about 100 requests a minute). Dormant until GROQ_API_KEY is set; get a key at console.groq.com. Prompts leave your machine."
+    },
+    {
+      "name": "openrouter",
+      "discover": true,
+      "url": "https://openrouter.ai/api/v1",
+      "key_env": "OPENROUTER_API_KEY",
+      "include": [
+        "*:free"
+      ],
+      "cloud": true,
+      "tier": 5,
+      "notes": "Free tier (free models only (ids end in :free): 20 a minute, 50 a day). Dormant until OPENROUTER_API_KEY is set; get a key at openrouter.ai. Prompts leave your machine."
+    },
+    {
+      "name": "mistral",
+      "discover": true,
+      "url": "https://api.mistral.ai/v1",
+      "key_env": "MISTRAL_API_KEY",
+      "include": [
+        "mistral-small-*",
+        "codestral-*"
+      ],
+      "cloud": true,
+      "tier": 5,
+      "notes": "Free tier (about 1 request a second). Dormant until MISTRAL_API_KEY is set; get a key at console.mistral.ai. Prompts leave your machine."
+    },
+    {
+      "name": "gemini",
+      "discover": true,
+      "url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "key_env": "GEMINI_API_KEY",
+      "include": [
+        "*gemini-*flash*"
+      ],
+      "cloud": true,
+      "tier": 5,
+      "notes": "Free tier (about 15 a minute and 1,500 a day on the free Flash models). Dormant until GEMINI_API_KEY is set; get a key at aistudio.google.com. Prompts leave your machine."
+    },
+    {
+      "name": "ovh",
+      "discover": true,
+      "url": "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+      "key_env": "OVH_AI_ENDPOINTS_TOKEN",
+      "include": [
+        "Qwen3-Coder-30B-A3B-Instruct",
+        "Meta-Llama-3_3-70B-Instruct"
+      ],
+      "cloud": true,
+      "tier": 5,
+      "notes": "Free tier (2 a minute without a token; a free token raises it). Dormant until OVH_AI_ENDPOINTS_TOKEN is set; get a key at endpoints.ai.cloud.ovh.net. Prompts leave your machine."
+    }
+  ]
+}

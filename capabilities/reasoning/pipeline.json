@@ -1,0 +1,48 @@
+{
+  "id": "reasoning.pipeline",
+  "name": "Reasoning Pipeline",
+  "version": "1.0.0",
+  "description": "Route, delegate, and persist a task's outcome to shared memory -- the full diagram in one call.",
+  "category": "reasoning",
+  "risk": "write",
+  "requires": ["model server (LOCAL_AI_BASE_URL) or a cloud key"],
+  "transport": "mcp",
+  "aliases": [
+    "run the pipeline",
+    "process task",
+    "local reasoning pipeline"
+  ],
+  "inputs": {
+    "task": {
+      "type": "string",
+      "required": true
+    },
+    "token_estimate": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "tool_count": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "remember": {
+      "type": "boolean",
+      "required": false,
+      "default": true
+    }
+  },
+  "execution": {
+    "type": "in_process",
+    "handler": "tools.reasoning.pipeline.pipeline"
+  },
+  "latency": {
+    "expected_ms": "variable — delegate's own latency plus one memory.capture call"
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": ["reasoning.delegate", "memory.capture", "memory.recall"]
+}

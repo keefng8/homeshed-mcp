@@ -1,0 +1,40 @@
+{
+  "id": "etsy.order.get",
+  "name": "Etsy Order",
+  "version": "1.0.0",
+  "description": "One Etsy order: status, money, items and shipments; no buyer personal details. Read-only.",
+  "category": "etsy",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_etsy_enabled switch",
+    "Etsy app and shop credentials (ETSY_KEYSTRING, ETSY_SHARED_SECRET, ETSY_REFRESH_TOKEN, ETSY_SHOP_ID)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "etsy order details",
+    "etsy receipt"
+  ],
+  "inputs": {
+    "receipt_id": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.etsy.read.order_get"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "etsy.shop.get",
+    "etsy.listings.list",
+    "etsy.listing.get",
+    "etsy.orders.list"
+  ]
+}

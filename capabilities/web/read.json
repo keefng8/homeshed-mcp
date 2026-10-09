@@ -1,0 +1,35 @@
+{
+  "id": "web.read",
+  "name": "Read Webpage",
+  "version": "1.0.0",
+  "description": "Fetch a public webpage as Markdown via Jina Reader, zero API key required.",
+  "category": "web",
+  "risk": "read",
+  "requires": ["internet access; pages are fetched through Jina Reader (r.jina.ai)"],
+  "transport": "mcp",
+  "aliases": [
+    "read webpage",
+    "fetch url",
+    "get page content",
+    "read this url",
+    "what's on this page"
+  ],
+  "inputs": {
+    "url": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.web.read.read"
+  },
+  "latency": {
+    "expected_ms": 3000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": []
+}

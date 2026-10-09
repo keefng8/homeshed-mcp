@@ -1,0 +1,54 @@
+{
+  "id": "reasoning.delegate",
+  "name": "Delegate Task",
+  "version": "1.0.0",
+  "description": "Route a task and, if the local model is recommended, actually ask it. Claude path never fakes an answer.",
+  "category": "reasoning",
+  "risk": "read",
+  "requires": [
+    "model server (LOCAL_AI_BASE_URL) or a cloud key"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "delegate task",
+    "auto route",
+    "ask locally if possible",
+    "efficient choose"
+  ],
+  "inputs": {
+    "task": {
+      "type": "string",
+      "required": true
+    },
+    "token_estimate": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "tool_count": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "background": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "in_process",
+    "handler": "tools.reasoning.delegate.delegate"
+  },
+  "latency": {
+    "expected_ms": "variable \u2014 up to a local_ai.ask call's own latency"
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "reasoning.route",
+    "local_ai.ask"
+  ]
+}

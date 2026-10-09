@@ -1,0 +1,51 @@
+{
+  "id": "etsy.listings.list",
+  "name": "Etsy Listings",
+  "version": "1.0.0",
+  "description": "The Etsy shop's listings, compact and paged: id, title, state, price, quantity. Read-only.",
+  "category": "etsy",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_etsy_enabled switch",
+    "Etsy app and shop credentials (ETSY_KEYSTRING, ETSY_SHARED_SECRET, ETSY_REFRESH_TOKEN, ETSY_SHOP_ID)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "etsy listings",
+    "what's in my etsy shop"
+  ],
+  "inputs": {
+    "state": {
+      "type": "string",
+      "required": false,
+      "default": "active"
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 20
+    },
+    "offset": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.etsy.read.listings_list"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "etsy.shop.get",
+    "etsy.listing.get",
+    "etsy.orders.list",
+    "etsy.order.get"
+  ]
+}

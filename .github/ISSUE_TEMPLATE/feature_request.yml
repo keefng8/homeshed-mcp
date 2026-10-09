@@ -1,0 +1,26 @@
+name: Tool or feature idea
+description: Suggest a new tool or an improvement.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the job your assistant can't do today, not the solution.
+    validations: { required: true }
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+      placeholder: e.g. a git.tag tool that creates an annotated tag
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Would it change anything (write), or only read?
+      options: [Read only, Writes or runs something, Not sure]
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: Contributing
+      options:
+        - label: I'd like to build this myself (see CONTRIBUTING.md)

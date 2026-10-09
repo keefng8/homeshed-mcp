@@ -1,0 +1,73 @@
+{
+  "id": "etsy.listing.update",
+  "name": "Ask To Set Etsy Listing Details",
+  "version": "1.0.0",
+  "description": "Ask to set an Etsy listing's category, materials, production partners, delivery profile, attributes (colour, occasion, recipient, holiday) and extra photos (up to 5 at a time, shown to the owner as thumbnails). Nothing changes until the owner approves it; only what differs is sent; details (not photos) are re-queued after a Printify re-publish.",
+  "category": "etsy",
+  "risk": "write",
+  "requires": [
+    "the owner's commerce_etsy_enabled and commerce_etsy_write_enabled switches",
+    "an Etsy connection made with listing edits (listings_w)",
+    "the owner's approval of each change"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "set etsy attributes",
+    "etsy listing properties",
+    "change etsy category",
+    "set delivery profile"
+  ],
+  "inputs": {
+    "listing_id": {
+      "type": "string",
+      "required": true
+    },
+    "taxonomy_id": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "materials": {
+      "type": "array",
+      "required": false
+    },
+    "production_partner_ids": {
+      "type": "array",
+      "required": false
+    },
+    "shipping_profile_id": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "properties": {
+      "type": "object",
+      "required": false
+    },
+    "reapply": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    "images": {
+      "type": "array",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.etsy.write.listing_update"
+  },
+  "latency": {
+    "expected_ms": 1500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "etsy.listing.get",
+    "etsy.listing.deactivate",
+    "printify.product.update_live"
+  ]
+}

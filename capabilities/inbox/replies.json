@@ -1,0 +1,33 @@
+{
+  "id": "inbox.replies",
+  "name": "Owner's Replies",
+  "version": "1.0.0",
+  "description": "Your messages to the owner and his replies, newest first.",
+  "category": "inbox",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "did the owner reply",
+    "check my messages to the owner",
+    "owner's answer"
+  ],
+  "inputs": {
+    "sender": {"type": "string", "required": false},
+    "limit": {"type": "integer", "required": false}
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.inbox.replies.replies"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "inbox.send"
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "id": "dev.test",
+  "name": "Run Tests",
+  "version": "1.0.0",
+  "description": "Run a test-suite command on the machine HomeShed runs on (your computer, or its container). Real code execution, no confirmation step. The test runner must be installed there.",
+  "category": "dev",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "run tests",
+    "run test suite",
+    "execute tests"
+  ],
+  "inputs": {
+    "command": {
+      "type": "array",
+      "required": true
+    },
+    "cwd": {
+      "type": "string",
+      "required": true
+    },
+    "timeout": {
+      "type": "integer",
+      "required": false,
+      "default": 300
+    }
+  },
+  "execution": {
+    "type": "subprocess",
+    "handler": "tools.dev.test.test"
+  },
+  "latency": {
+    "expected_ms": 15000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "dev.build",
+    "dev.lint"
+  ]
+}

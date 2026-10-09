@@ -1,0 +1,51 @@
+{
+  "id": "image.text_check",
+  "name": "Design Text Check",
+  "version": "1.0.0",
+  "description": "Does a design image carry text: words, pseudo-text or a signature-like mark? Free and local (RapidOCR on the image service, ~1-2 s). Returns ok/text_found and every candidate region with its corner and score.",
+  "category": "image",
+  "risk": "read",
+  "requires": [
+    "the local image service"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "check image for text",
+    "stray text in design",
+    "signature in image",
+    "ocr check"
+  ],
+  "inputs": {
+    "job_id": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "image_name": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "image_b64": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.text_check.text_check"
+  },
+  "latency": {
+    "expected_ms": 2500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.generate",
+    "image.status",
+    "image.print_file"
+  ]
+}

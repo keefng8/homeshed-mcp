@@ -1,0 +1,94 @@
+{
+  "id": "image.promo_card",
+  "name": "Branded Promo Card",
+  "version": "1.0.0",
+  "description": "A branded 1080x1920 (9:16) or 1080x1350 (4:5) promo card around a real product mockup: logo, headline, benefit, real GBP price, Shop now button and link, in a bold 'drop' or premium 'editorial' template, optionally on a brand frame. Saved in the images promo folder for threads.publish.",
+  "category": "image",
+  "risk": "write",
+  "requires": [
+    "the local image service",
+    "a brand kit on the image service"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "promo card",
+    "product card",
+    "story card",
+    "make a promo post image"
+  ],
+  "inputs": {
+    "product_image": {
+      "type": "string",
+      "required": true
+    },
+    "headline": {
+      "type": "string",
+      "required": true
+    },
+    "price_gbp": {
+      "type": "number",
+      "required": true
+    },
+    "template": {
+      "type": "string",
+      "required": false,
+      "default": "drop"
+    },
+    "benefit": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "link_text": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "kicker": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "shape": {
+      "type": "string",
+      "required": false,
+      "default": "9:16"
+    },
+    "frame": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "cutout": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    "watermark": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "watermark_style": {
+      "type": "string",
+      "required": false,
+      "default": "tiled"
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.promo_card.promo_card"
+  },
+  "latency": {
+    "expected_ms": 6000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.carousel",
+    "threads.publish",
+    "printify.mockup.fetch"
+  ]
+}

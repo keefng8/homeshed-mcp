@@ -1,0 +1,39 @@
+{
+  "id": "image.providers.list",
+  "name": "List Image Providers",
+  "version": "1.0.0",
+  "description": "Which image providers and models exist, whether each is switched on (owner-only switches; read-only here), configured (key stored: yes/no only), usable now (daily cap), its licence, whether outputs may be sold (commercial_use true/false/check), and cost (free local vs paid per image).",
+  "category": "image",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "image providers",
+    "which image models",
+    "can I sell this image",
+    "commercial image models",
+    "image licences"
+  ],
+  "inputs": {
+    "commercial_only": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.providers_list.providers_list"
+  },
+  "latency": {
+    "expected_ms": 300
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.generate",
+    "image.status"
+  ]
+}

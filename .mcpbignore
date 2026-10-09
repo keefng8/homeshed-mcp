@@ -1,0 +1,16 @@
+# Left out of the Claude Desktop bundle (.mcpb): it needs only the source, pyproject.toml, README and licences.
+# Secrets first: settings files and their backups must never be packed (the same rule as .dockerignore).
+.env
+.env.*
+*.bak
+*.bak-*
+.git/
+.github/
+tests/
+docs/
+scripts/
+dist/
+.venv/
+.pytest_cache/
+__pycache__/
+*.pyc

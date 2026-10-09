@@ -1,0 +1,46 @@
+{
+  "id": "network.port_check",
+  "name": "Port Check",
+  "version": "1.0.0",
+  "description": "Test TCP connectivity to a host:port -- a real connection attempt, not a guess.",
+  "category": "network",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "port check",
+    "is this port open",
+    "test connectivity",
+    "can i reach this port",
+    "tcp check"
+  ],
+  "inputs": {
+    "host": {
+      "type": "string",
+      "required": true
+    },
+    "port": {
+      "type": "integer",
+      "required": true
+    },
+    "timeout": {
+      "type": "number",
+      "required": false,
+      "default": 3.0
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.network.port_check.port_check"
+  },
+  "latency": {
+    "expected_ms": 200
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "network.dns.lookup"
+  ]
+}

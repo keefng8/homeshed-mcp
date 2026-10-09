@@ -1,0 +1,57 @@
+{
+  "id": "repo.leak_scan",
+  "name": "Private Detail and Secret Scan",
+  "version": "1.0.0",
+  "description": "Find private details (your names, domains, private addresses, folder paths) and secrets (API keys, tokens, private keys, passwords in settings) in a folder about to go public: file, line and pattern name, never the matched text.",
+  "category": "repo",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "scan for leaks before publishing",
+    "find secrets in my repo",
+    "private details in code",
+    "is it safe to make public",
+    "pre-release leak check"
+  ],
+  "inputs": {
+    "folder": {
+      "type": "string",
+      "required": false,
+      "default": "."
+    },
+    "patterns": {
+      "type": "object",
+      "required": false
+    },
+    "secrets": {
+      "type": "boolean",
+      "required": false,
+      "default": true
+    },
+    "detail": {
+      "type": "string",
+      "required": false,
+      "enum": [
+        "compact",
+        "full"
+      ],
+      "default": "compact"
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.repo.leak_scan.leak_scan"
+  },
+  "latency": {
+    "expected_ms": 2000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "repo.readiness",
+    "secrets.transcript_scan"
+  ]
+}

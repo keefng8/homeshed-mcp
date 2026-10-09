@@ -1,0 +1,39 @@
+{
+  "id": "printify.print_provider.get",
+  "name": "Printify Print Provider",
+  "version": "1.0.0",
+  "description": "One Printify print provider (maker): city, region and country (to confirm a UK maker; print_providers.list has no location, KB-0067) and the blueprints it makes. Read-only.",
+  "category": "printify",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_printify_enabled switch",
+    "Printify token (PRINTIFY_API_TOKEN)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "printify maker location",
+    "where is the print provider",
+    "uk print provider"
+  ],
+  "inputs": {
+    "print_provider_id": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.printify.read.print_provider_get"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.print_providers.list",
+    "printify.blueprint.get"
+  ]
+}

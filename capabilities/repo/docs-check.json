@@ -1,0 +1,57 @@
+{
+  "id": "repo.docs_check",
+  "name": "Docs Match the Code",
+  "version": "1.0.0",
+  "description": "Check a project's README and docs/ against its code: link anchors that point at real headings, documented settings the code actually reads, and documented CLI commands and options that exist.",
+  "category": "repo",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "do my docs match the code",
+    "broken anchors in docs",
+    "documented settings nothing reads",
+    "check readme commands",
+    "docs drift"
+  ],
+  "inputs": {
+    "folder": {
+      "type": "string",
+      "required": false,
+      "default": "."
+    },
+    "package": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "cli": {
+      "type": "string",
+      "required": false,
+      "default": "cli.py"
+    },
+    "detail": {
+      "type": "string",
+      "required": false,
+      "enum": [
+        "compact",
+        "full"
+      ],
+      "default": "compact"
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.repo.docs_check.docs_check"
+  },
+  "latency": {
+    "expected_ms": 800
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "repo.readiness"
+  ]
+}

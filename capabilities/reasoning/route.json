@@ -1,0 +1,44 @@
+{
+  "id": "reasoning.route",
+  "name": "Route Local vs Claude",
+  "version": "1.0.0",
+  "description": "Recommend whether a task should go to the local model or Claude, advisory only.",
+  "category": "reasoning",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "route task",
+    "local or claude",
+    "should this be local",
+    "routing recommendation"
+  ],
+  "inputs": {
+    "text": {
+      "type": "string",
+      "required": true
+    },
+    "token_estimate": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "tool_count": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    }
+  },
+  "execution": {
+    "type": "in_process",
+    "handler": "tools.reasoning.route.route"
+  },
+  "latency": {
+    "expected_ms": 5
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": ["local_ai.classify_complexity", "local_ai.ask"]
+}

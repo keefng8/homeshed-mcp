@@ -1,0 +1,35 @@
+{
+  "id": "etsy.shop.get",
+  "name": "Etsy Shop",
+  "version": "1.0.0",
+  "description": "The configured Etsy shop: name, currency, listing and sales counts, reviews, vacation mode. Read-only, proxied (the app never holds the key).",
+  "category": "etsy",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_etsy_enabled switch",
+    "Etsy app and shop credentials (ETSY_KEYSTRING, ETSY_SHARED_SECRET, ETSY_REFRESH_TOKEN, ETSY_SHOP_ID)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "etsy shop info",
+    "my etsy shop"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "http",
+    "handler": "tools.etsy.read.shop_get"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "etsy.listings.list",
+    "etsy.listing.get",
+    "etsy.orders.list",
+    "etsy.order.get"
+  ]
+}

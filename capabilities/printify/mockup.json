@@ -1,0 +1,44 @@
+{
+  "id": "printify.mockup.fetch",
+  "name": "Fetch A Printify Mockup",
+  "version": "1.0.0",
+  "description": "Copy one of a product's Printify mockups into the image store and return its image name, for image.carousel (watermarked slides) and threads.publish.",
+  "category": "printify",
+  "risk": "write",
+  "requires": [
+    "the owner's commerce_printify_enabled switch",
+    "Printify token (PRINTIFY_API_TOKEN)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "printify mockup",
+    "product mockup image",
+    "use the printify image"
+  ],
+  "inputs": {
+    "product_id": {
+      "type": "string",
+      "required": true
+    },
+    "src": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.printify.mockup.mockup_fetch"
+  },
+  "latency": {
+    "expected_ms": 3000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.product.get",
+    "image.carousel",
+    "threads.publish"
+  ]
+}

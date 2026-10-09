@@ -1,0 +1,43 @@
+{
+  "id": "network.exposure_check",
+  "name": "Exposure Check",
+  "version": "1.0.0",
+  "description": "What your own public sites answer on the paths attackers try first: admin panels, /.env, /.git, status pages. Read-only; public hosts only.",
+  "category": "network",
+  "risk": "read",
+  "requires": ["internet access"],
+  "transport": "mcp",
+  "aliases": [
+    "is my admin panel exposed",
+    "check my site for open admin pages",
+    "is my .env public",
+    "exposure check",
+    "what can the internet see"
+  ],
+  "inputs": {
+    "hosts": {
+      "type": "array",
+      "required": true
+    },
+    "paths": {
+      "type": "array",
+      "required": false,
+      "default": null
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.network.exposure_check.exposure_check"
+  },
+  "latency": {
+    "expected_ms": 3000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "network.port_check",
+    "network.dns.lookup"
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "id": "image.prompts",
+  "name": "Saved Image Prompts",
+  "version": "1.0.0",
+  "description": "List, add, edit or remove the owner's saved image prompts (shared with the Control Panel).",
+  "category": "image",
+  "risk": "write",
+  "requires": [
+    "GPU image service (IMAGE_BASE_URL) for local jobs"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "saved image prompts",
+    "prompt library",
+    "save this image prompt"
+  ],
+  "inputs": {
+    "action": {
+      "type": "string",
+      "required": false,
+      "enum": [
+        "list",
+        "add",
+        "edit",
+        "remove"
+      ]
+    },
+    "prompt_id": {
+      "type": "string",
+      "required": false
+    },
+    "prompt": {
+      "type": "string",
+      "required": false
+    },
+    "name": {
+      "type": "string",
+      "required": false
+    },
+    "size": {
+      "type": "string",
+      "required": false
+    },
+    "upscale": {
+      "type": "boolean",
+      "required": false
+    },
+    "folder": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.prompts.prompts"
+  },
+  "latency": {
+    "expected_ms": 100
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.generate",
+    "image.queue"
+  ]
+}

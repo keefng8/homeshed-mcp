@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "homeshed-mcp"
+version = "0.1.0"
+description = "Every tool your AI needs, in one install."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+authors = [{ name = "Keith Stewartson" }]
+keywords = ["mcp", "tools", "memory", "reasoning", "local-first", "self-hosted"]
+dependencies = [
+    "mcp>=2.0",
+    "typing_extensions>=4.6",  # TypedDict in tool signatures: pydantic refuses typing.TypedDict on Python < 3.12
+    "uvicorn>=0.30",
+    "docker>=7.1",
+    "httpx>=0.27",
+    "graphifyy>=0.9",
+    "z3-solver>=4.13",
+    "cryptography>=42",   # vault.py: Fernet encryption of stored credentials
+]
+
+[project.optional-dependencies]
+# pytest-asyncio: the panel's async tests (CI installs ".[test,panel]").
+test = ["pytest>=8.0", "pytest-asyncio>=0.24"]
+# Time-zone data for tools that follow a vendor's clock. The Docker image installs it: its slim base has no zone files.
+timezones = ["tzdata>=2024.1"]
+# The optional web panel (panel/ in the public repo): uvx --from "homeshed-mcp[panel]" homeshed-mcp panel
+panel = ["fastapi>=0.115"]
+
+[project.scripts]
+homeshed-mcp = "homeshed_mcp._app.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/keefng8/homeshed-mcp"
+Issues = "https://github.com/keefng8/homeshed-mcp/issues"
+
+# The server's modules are flat (server.py, registry.py, tools/...). The wheel puts them all inside one private package,
+# homeshed_mcp/_app, so nothing lands in site-packages under a generic name like "server"; cli.py puts that folder on
+# sys.path before importing them (release v1, 2026-09-29).
+[tool.hatch.build.targets.wheel]
+include = ["/*.py", "/tools", "/capabilities", "/api_catalog.json", "/local_ai_backends.json", "/panel"]
+# The web panel's own tests, checks and container files stay out of the wheel; `homeshed-mcp panel` runs the rest.
+exclude = ["/tests", "/conftest.py", "**/__pycache__", "/panel/test_*.py", "/panel/conftest.py", "/panel/check_*.py",
+           "/panel/Dockerfile", "/panel/.dockerignore", "/panel/.env.example"]
+sources = { "" = "homeshed_mcp/_app" }
+# Editable installs (pip install -e .) put the repo root on sys.path instead of doing the rename above, which hatchling
+# refuses in dev mode; homeshed_mcp/_app/__init__.py (a dev-only shim, not in the wheel) maps the package onto it.
+# Found and proven by R&D, 2026-09-30 (researchandimprovements/tool-server-packaging-review.md).
+dev-mode-dirs = ["."]

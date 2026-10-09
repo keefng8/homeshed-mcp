@@ -1,0 +1,47 @@
+{
+  "id": "printify.products.list",
+  "name": "Printify Products",
+  "version": "1.0.0",
+  "description": "The configured Printify shop's products, compact and paged. Read-only.",
+  "category": "printify",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_printify_enabled switch",
+    "Printify token (PRINTIFY_API_TOKEN; PRINTIFY_SHOP_ID for shop tools)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "printify products"
+  ],
+  "inputs": {
+    "page": {
+      "type": "integer",
+      "required": false,
+      "default": 1
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 20
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.printify.read.products_list"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.shops.list",
+    "printify.product.get",
+    "printify.blueprints.list",
+    "printify.print_providers.list",
+    "printify.orders.list",
+    "printify.order.get"
+  ]
+}

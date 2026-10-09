@@ -1,0 +1,61 @@
+{
+  "id": "code.dead_scan",
+  "name": "Dead Code Scan",
+  "version": "1.0.0",
+  "description": "Walk a Python project's import graph from its real entry points: files nothing reaches, and __init__.py re-exports nothing uses (delete-with-care).",
+  "category": "code",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "find dead python files",
+    "unused modules",
+    "what can i delete safely",
+    "unreachable code",
+    "is this file still used"
+  ],
+  "inputs": {
+    "root": {
+      "type": "string",
+      "required": true
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": true
+    },
+    "exclude": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "required": false
+    },
+    "detail": {
+      "type": "string",
+      "required": false,
+      "enum": [
+        "compact",
+        "full"
+      ],
+      "default": "compact"
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.code.dead_scan.dead_scan"
+  },
+  "latency": {
+    "expected_ms": 1500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "graphify.query",
+    "code.webhook_retry_check"
+  ]
+}

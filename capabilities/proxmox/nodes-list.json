@@ -1,0 +1,37 @@
+{
+  "id": "proxmox.nodes.list",
+  "name": "List Proxmox Nodes",
+  "version": "1.0.0",
+  "description": "List every node in the Proxmox cluster (one token covers the cluster): online or not, CPU and memory use, uptime, plus the cluster's name and quorum. Read-only.",
+  "category": "proxmox",
+  "risk": "read",
+  "requires": [
+    "Proxmox VE API token (PROXMOX_TOKEN_ID, or PROXMOX_API_TOKEN)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "list proxmox nodes",
+    "is proxmox up",
+    "show my proxmox servers",
+    "proxmox node health"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "http",
+    "handler": "tools.proxmox.nodes_list.nodes_list"
+  },
+  "latency": {
+    "expected_ms": 400
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "proxmox.node.status",
+    "proxmox.vms.list",
+    "proxmox.vm.status",
+    "proxmox.storage.list",
+    "proxmox.tasks.list"
+  ]
+}

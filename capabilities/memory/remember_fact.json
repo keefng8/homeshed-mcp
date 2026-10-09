@@ -1,0 +1,56 @@
+{
+  "id": "memory.remember_fact",
+  "name": "Remember a Durable Fact",
+  "version": "1.0.0",
+  "description": "Write a durable, high-value fact into the dedicated facts tier of persistent memory — outranks topic-scoped memory.capture entries on recall.",
+  "category": "memory",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "remember this fact",
+    "save this as a fact",
+    "record this permanently",
+    "this is important, remember it"
+  ],
+  "inputs": {
+    "content": {
+      "type": "string",
+      "required": true
+    },
+    "category": {
+      "type": "string",
+      "required": false,
+      "default": "general"
+    },
+    "project_dir": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "scope": {
+      "type": "string",
+      "required": false,
+      "default": "project",
+      "enum": [
+        "project",
+        "global"
+      ]
+    }
+  },
+  "execution": {
+    "type": "http_api",
+    "handler": "tools.memory.remember_fact.remember_fact"
+  },
+  "latency": {
+    "expected_ms": 300
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "memory.recall_facts",
+    "memory.capture"
+  ]
+}

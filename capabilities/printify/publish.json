@@ -1,0 +1,40 @@
+{
+  "id": "printify.product.publish",
+  "name": "Ask To Publish A Printify Product",
+  "version": "1.0.0",
+  "description": "Ask to publish a Printify draft to the owner's connected Etsy shop. It waits for the owner's approval in the Control Panel; only then does it go live.",
+  "category": "printify",
+  "risk": "write",
+  "requires": [
+    "the owner's commerce_printify_enabled and commerce_printify_publish_enabled switches",
+    "a Printify shop connected to Etsy"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "publish printify product",
+    "publish to etsy",
+    "list on etsy"
+  ],
+  "inputs": {
+    "product_id": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.printify.publish.product_publish"
+  },
+  "latency": {
+    "expected_ms": 1500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.product.create",
+    "printify.product.get",
+    "etsy.listing.get"
+  ]
+}

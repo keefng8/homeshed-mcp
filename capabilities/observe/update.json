@@ -1,0 +1,45 @@
+{
+  "id": "observe.update",
+  "name": "Update Observation",
+  "version": "1.0.0",
+  "description": "Change an observation's status (actioned, declined, superseded, parked, open) and append a dated resolution note.",
+  "category": "observe",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "mark observation done",
+    "resolve observation",
+    "close observation",
+    "park observation"
+  ],
+  "inputs": {
+    "id": {
+      "type": "string",
+      "required": true
+    },
+    "status": {
+      "type": "string",
+      "required": true
+    },
+    "resolution": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.observe.update.update"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "observe.log",
+    "observe.list"
+  ]
+}

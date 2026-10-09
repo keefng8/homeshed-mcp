@@ -1,0 +1,32 @@
+{
+  "id": "git.pull",
+  "name": "Git Pull",
+  "version": "1.0.0",
+  "description": "Pull changes into the current branch. Fully autonomous, no confirmation step.",
+  "category": "git",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "git pull",
+    "pull changes",
+    "update repository"
+  ],
+  "inputs": {
+    "path": { "type": "string", "required": true },
+    "remote": { "type": "string", "required": false, "default": "origin" },
+    "branch": { "type": "string", "required": false }
+  },
+  "execution": {
+    "type": "subprocess",
+    "handler": "tools.git.pull.pull"
+  },
+  "latency": {
+    "expected_ms": 2000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": ["git.status", "git.push"]
+}

@@ -1,0 +1,65 @@
+{
+  "id": "local_ai.ask",
+  "name": "Ask Local AI",
+  "version": "1.0.0",
+  "description": "Ask your own model (LOCAL_AI_MODEL) a question, or a cloud model you've added a key for. Cheap local-first answers before escalating to a bigger model.",
+  "category": "local_ai",
+  "risk": "read",
+  "requires": [
+    "model server (LOCAL_AI_BASE_URL) or a cloud key"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "ask local model",
+    "use local ai",
+    "local inference",
+    "ask my own model",
+    "cheap analysis"
+  ],
+  "inputs": {
+    "prompt": {
+      "type": "string",
+      "required": true
+    },
+    "model": {
+      "type": "string",
+      "required": false,
+      "default": "auto",
+      "description": "auto (the registry's order: your own model first), or a backend name or alias"
+    },
+    "max_tokens": {
+      "type": "integer",
+      "required": false,
+      "default": 1024
+    },
+    "temperature": {
+      "type": "number",
+      "required": false,
+      "default": 0.2
+    },
+    "enable_thinking": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    "allow_cloud": {
+      "type": "boolean",
+      "required": false,
+      "default": true
+    }
+  },
+  "execution": {
+    "type": "http_api",
+    "handler": "tools.local_ai.ask.ask"
+  },
+  "latency": {
+    "expected_ms": 500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "registry.find"
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "id": "llm.chat",
+  "name": "Language Model Chat (relay)",
+  "version": "1.0.0",
+  "description": "One chat turn with a PAID language model (xAI Grok first), relayed so the caller never holds the key: the key stays in the owner's vault. Off until the owner switches the provider on and sets a daily cap (Settings > Language models); refused with the reason when off, keyless or capped. Returns text, model, usage (tokens, cost) and a truncated flag, under 5,000 characters.",
+  "category": "llm",
+  "risk": "write",
+  "requires": [
+    "the owner's llm_provider_xai_enabled switch and an llm_daily_cap_xai above 0",
+    "XAI_API_KEY in the vault"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "ask grok",
+    "use a paid model",
+    "chat with an llm",
+    "llm relay",
+    "language model"
+  ],
+  "inputs": {
+    "messages": {
+      "type": "array",
+      "required": true
+    },
+    "system": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "model": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "max_tokens": {
+      "type": "integer",
+      "required": false,
+      "default": 1024
+    },
+    "temperature": {
+      "type": "number",
+      "required": false,
+      "default": null
+    },
+    "provider": {
+      "type": "string",
+      "required": false,
+      "default": "xai"
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.llm.chat.chat"
+  },
+  "latency": {
+    "expected_ms": 8000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "llm.providers.list",
+    "local_ai.ask"
+  ]
+}

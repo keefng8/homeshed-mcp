@@ -1,0 +1,29 @@
+{
+  "id": "docker.network.list",
+  "name": "List Docker Networks",
+  "version": "1.0.0",
+  "description": "List Docker networks on this host, including which containers are attached to each.",
+  "category": "docker",
+  "risk": "read",
+  "requires": ["Docker socket"],
+  "transport": "mcp",
+  "aliases": [
+    "list networks",
+    "docker networks",
+    "what networks exist",
+    "network inspect"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "docker_sdk",
+    "handler": "tools.docker.list_networks.list_networks"
+  },
+  "latency": {
+    "expected_ms": 500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": ["docker.container.list", "docker.container.inspect"]
+}

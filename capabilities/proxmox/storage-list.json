@@ -1,0 +1,42 @@
+{
+  "id": "proxmox.storage.list",
+  "name": "List Proxmox Storage",
+  "version": "1.0.0",
+  "description": "Storage pools on Proxmox and how full they are, on every node or one. Read-only.",
+  "category": "proxmox",
+  "risk": "read",
+  "requires": [
+    "Proxmox VE API token (PROXMOX_TOKEN_ID, or PROXMOX_API_TOKEN)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "proxmox storage",
+    "how full is proxmox disk",
+    "list proxmox storage pools"
+  ],
+  "inputs": {
+    "node": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.proxmox.storage_list.storage_list"
+  },
+  "latency": {
+    "expected_ms": 400
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "proxmox.nodes.list",
+    "proxmox.node.status",
+    "proxmox.vms.list",
+    "proxmox.vm.status",
+    "proxmox.tasks.list"
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "id": "docker.container.list",
+  "name": "List Docker Containers",
+  "version": "1.0.0",
+  "description": "List containers on the target Docker host, running or all.",
+  "category": "docker",
+  "risk": "read",
+  "requires": ["Docker socket"],
+  "transport": "mcp",
+  "aliases": [
+    "list containers",
+    "what's running",
+    "docker ps",
+    "container status"
+  ],
+  "inputs": {
+    "all": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    }
+  },
+  "execution": {
+    "type": "docker_sdk",
+    "handler": "tools.docker.list_containers.list_containers"
+  },
+  "latency": {
+    "expected_ms": 50
+  },
+  "cache": {
+    "enabled": true,
+    "ttl": 10,
+    "freshness": "eventual"
+  },
+  "related": [
+    "docker.container.inspect",
+    "docker.container.logs",
+    "docker.container.restart"
+  ]
+}

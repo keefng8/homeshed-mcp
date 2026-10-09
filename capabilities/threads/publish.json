@@ -1,0 +1,58 @@
+{
+  "id": "threads.publish",
+  "name": "Post to Threads",
+  "version": "1.0.0",
+  "description": "Post text, one image, a carousel (2-10 images) or a Studio video to the owner's connected Threads account. Public; off until the owner switches it on.",
+  "category": "threads",
+  "risk": "write",
+  "requires": [
+    "Threads connected in Settings > Online shops",
+    "the owner's switch: Let apps post to Threads"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "post to threads",
+    "publish on threads",
+    "threads post"
+  ],
+  "inputs": {
+    "text": {
+      "type": "string",
+      "required": true
+    },
+    "link": {
+      "type": "string",
+      "required": false
+    },
+    "image_names": {
+      "type": "array",
+      "required": false
+    },
+    "alt_text": {
+      "type": "string",
+      "required": false
+    },
+    "topic_tag": {
+      "type": "string",
+      "required": false
+    },
+    "video_name": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.threads.publish.publish"
+  },
+  "latency": {
+    "expected_ms": 15000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "threads.status"
+  ]
+}

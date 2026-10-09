@@ -1,0 +1,41 @@
+{
+  "id": "printify.order.get",
+  "name": "Printify Order",
+  "version": "1.0.0",
+  "description": "One Printify order: status, totals, items, shipments; no delivery address. Read-only.",
+  "category": "printify",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_printify_enabled switch",
+    "Printify token (PRINTIFY_API_TOKEN; PRINTIFY_SHOP_ID for shop tools)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "printify order details"
+  ],
+  "inputs": {
+    "order_id": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.printify.read.order_get"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.shops.list",
+    "printify.products.list",
+    "printify.product.get",
+    "printify.blueprints.list",
+    "printify.print_providers.list",
+    "printify.orders.list"
+  ]
+}

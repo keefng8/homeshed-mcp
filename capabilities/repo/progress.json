@@ -1,0 +1,38 @@
+{
+  "id": "repo.progress",
+  "name": "Release Progress",
+  "version": "1.0.0",
+  "description": "How far each project's release has got, as its agent last reported: percent of gates done, measured numbers such as readiness, what waits on the owner and since when, and the last 20 updates.",
+  "category": "repo",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "release progress",
+    "how far is the release",
+    "project status percentage",
+    "what is waiting on me"
+  ],
+  "inputs": {
+    "project": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.repo.progress.progress"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "repo.progress_update",
+    "repo.readiness"
+  ]
+}

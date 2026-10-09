@@ -1,0 +1,108 @@
+{
+  "id": "repo.progress_update",
+  "name": "Report Release Progress",
+  "version": "1.1.0",
+  "description": "An agent preparing a project for release reports how far it has got (pass/fail gates with evidence, measured numbers, what waits on the owner), so the owner sees a percentage on a dashboard.",
+  "category": "repo",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "report release progress",
+    "update project progress",
+    "mark a release gate done",
+    "tell the owner what waits on them"
+  ],
+  "inputs": {
+    "project": {
+      "type": "string",
+      "required": true
+    },
+    "title": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "required": false
+    },
+    "metrics": {
+      "type": "object",
+      "required": false
+    },
+    "waiting_on_owner": {
+      "type": "array",
+      "items": {
+        "type": [
+          "string",
+          "object"
+        ]
+      },
+      "required": false
+    },
+    "note": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "agent": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "repo": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "visibility": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "branch": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "version": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "licence": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "workspace": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "next_step": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.repo.progress.progress_update"
+  },
+  "latency": {
+    "expected_ms": 50
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "repo.progress",
+    "repo.readiness"
+  ]
+}

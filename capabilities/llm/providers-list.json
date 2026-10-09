@@ -1,0 +1,32 @@
+{
+  "id": "llm.providers.list",
+  "name": "List Language Model Providers",
+  "version": "1.0.0",
+  "description": "Which paid language-model providers llm.chat relays to and whether each is usable now: the owner's switch (read-only here), key stored (yes/no only), why not, today's request and token caps and use, today's cost (all apps and per client), and model prices.",
+  "category": "llm",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "llm providers",
+    "can I use grok",
+    "language model caps",
+    "llm spend today"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "python",
+    "handler": "tools.llm.providers_list.providers_list"
+  },
+  "latency": {
+    "expected_ms": 50
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "llm.chat",
+    "image.providers.list"
+  ]
+}

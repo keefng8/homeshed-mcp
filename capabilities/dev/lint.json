@@ -1,0 +1,45 @@
+{
+  "id": "dev.lint",
+  "name": "Run Lint",
+  "version": "1.0.0",
+  "description": "Run a lint or code-quality command on the machine HomeShed runs on (your computer, or its container). Real code execution, no confirmation step. The linter must be installed there.",
+  "category": "dev",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "run lint",
+    "lint code",
+    "code quality check"
+  ],
+  "inputs": {
+    "command": {
+      "type": "array",
+      "required": true
+    },
+    "cwd": {
+      "type": "string",
+      "required": true
+    },
+    "timeout": {
+      "type": "integer",
+      "required": false,
+      "default": 120
+    }
+  },
+  "execution": {
+    "type": "subprocess",
+    "handler": "tools.dev.lint.lint"
+  },
+  "latency": {
+    "expected_ms": 5000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "dev.build",
+    "dev.test"
+  ]
+}

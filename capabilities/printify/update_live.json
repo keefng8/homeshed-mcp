@@ -1,0 +1,59 @@
+{
+  "id": "printify.product.update_live",
+  "name": "Ask To Update A Live Printify Product",
+  "version": "1.0.0",
+  "description": "Ask to change a published Printify product's title, description, tags or prices on the owner's Etsy shop. Nothing changes until the owner approves it in the Control Panel; then Printify edits it and re-publishes only the changed parts. SKUs never change on a live product; never under the 30% margin floor; capped and audited.",
+  "category": "printify",
+  "risk": "write",
+  "requires": [
+    "the owner's commerce_printify_enabled and commerce_printify_live_update_enabled switches",
+    "the owner's approval of each update"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "update live listing",
+    "fix published product",
+    "change live price",
+    "edit etsy listing title"
+  ],
+  "inputs": {
+    "product_id": {
+      "type": "string",
+      "required": true
+    },
+    "title": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "description": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "tags": {
+      "type": "array",
+      "required": false
+    },
+    "variants": {
+      "type": "array",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.printify.update_live.product_update_live"
+  },
+  "latency": {
+    "expected_ms": 2500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.product.update",
+    "printify.product.publish",
+    "printify.product.get"
+  ]
+}

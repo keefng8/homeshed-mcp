@@ -1,0 +1,52 @@
+{
+  "id": "inbox.amend",
+  "name": "Correct a Message to the Owner",
+  "version": "1.0.0",
+  "description": "Correct your own open message to the owner (text, command or need); shown as edited.",
+  "category": "inbox",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "fix my message to the owner",
+    "correct the command i sent",
+    "amend message"
+  ],
+  "inputs": {
+    "message_id": {
+      "type": "string",
+      "required": true
+    },
+    "sender": {
+      "type": "string",
+      "required": false
+    },
+    "text": {
+      "type": "string",
+      "required": false
+    },
+    "command": {
+      "type": "string",
+      "required": false
+    },
+    "need": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.inbox.amend.amend"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "inbox.send",
+    "inbox.replies"
+  ]
+}

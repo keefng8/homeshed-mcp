@@ -1,0 +1,38 @@
+{
+  "id": "docker.container.start",
+  "name": "Start Docker Container",
+  "version": "1.0.0",
+  "description": "Start a stopped container. dry_run defaults true and IS the confirmation step.",
+  "category": "docker",
+  "risk": "write",
+  "requires": ["Docker socket"],
+  "transport": "mcp",
+  "aliases": [
+    "start container",
+    "boot container",
+    "bring container up"
+  ],
+  "inputs": {
+    "container": {
+      "type": "string",
+      "required": true
+    },
+    "dry_run": {
+      "type": "boolean",
+      "required": false,
+      "default": true
+    }
+  },
+  "execution": {
+    "type": "docker_sdk",
+    "handler": "tools.docker.container_start.container_start"
+  },
+  "latency": {
+    "expected_ms": 500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": ["docker.container.list", "docker.container.stop", "docker.container.restart"]
+}

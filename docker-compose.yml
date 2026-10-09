@@ -1,0 +1,43 @@
+services:
+  mcp-server:
+    build: .
+    env_file: .env
+    ports:
+      # This machine only. To reach it from other machines, see docs/configuration.md#http first.
+      - "127.0.0.1:8765:8765"
+    volumes:
+      # Everything the server keeps (paths.py puts it all under DATA_DIR=/data): usage counters, settings and the
+      # built-in memory; the encrypted credentials vault; the observe.* log. Named volumes survive rebuilds.
+      - usage:/data/usage
+      - vault:/data/vault
+      - observations:/data/observations
+      # The docker.* tools need the Docker socket. It gives root on this machine: mount it only if you use them.
+      # - /var/run/docker.sock:/var/run/docker.sock
+    # The server runs as an ordinary user, so with the socket mounted it also needs the socket's group. The number is
+    # what `stat -c %g /var/run/docker.sock` prints on your machine:
+    # group_add: ["999"]
+    restart: unless-stopped
+
+  # The optional web panel for this install. Start it with HomeShed:
+  #   docker compose --profile panel up -d        and find its first-run password with   docker compose logs panel
+  # It gets only HomeShed's token (from .env, by name), not the vault key or anything else in .env.
+  panel:
+    profiles: [panel]
+    build: ./panel
+    ports:
+      - "127.0.0.1:9090:8080"
+    environment:
+      MCP_BASE_URL: http://mcp-server:8765
+      MCP_HOST_HEADER: localhost:8765
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:?run homeshed-mcp init first}
+    volumes:
+      - panel:/data
+    depends_on:
+      - mcp-server
+    restart: unless-stopped
+
+volumes:
+  usage: {}
+  vault: {}
+  observations: {}
+  panel: {}

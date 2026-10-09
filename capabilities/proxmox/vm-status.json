@@ -1,0 +1,55 @@
+{
+  "id": "proxmox.vm.status",
+  "name": "Proxmox VM Status",
+  "version": "1.0.0",
+  "description": "One VM's or container's live status, found cluster-wide by vmid (node optional): running or not, lock, CPU, memory, disk, network. Read-only.",
+  "category": "proxmox",
+  "risk": "read",
+  "requires": [
+    "Proxmox VE API token (PROXMOX_TOKEN_ID, or PROXMOX_API_TOKEN)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "proxmox vm status",
+    "is vm 101 running",
+    "container status on proxmox"
+  ],
+  "inputs": {
+    "vmid": {
+      "type": "integer",
+      "required": true
+    },
+    "node": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "kind": {
+      "type": "string",
+      "required": false,
+      "default": "qemu",
+      "enum": [
+        "qemu",
+        "lxc"
+      ]
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.proxmox.vm_status.vm_status"
+  },
+  "latency": {
+    "expected_ms": 400
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "proxmox.nodes.list",
+    "proxmox.node.status",
+    "proxmox.vms.list",
+    "proxmox.storage.list",
+    "proxmox.tasks.list"
+  ]
+}

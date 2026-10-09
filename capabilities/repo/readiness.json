@@ -1,0 +1,48 @@
+{
+  "id": "repo.readiness",
+  "name": "Repository Readiness",
+  "version": "1.0.0",
+  "description": "How ready a project folder is to publish on GitHub: the files a pro-level repository has (README, licence, security policy, CI, templates...), with a concrete fix for each gap, plus checks inside a Dockerfile and compose file.",
+  "category": "repo",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "is my repo ready to publish",
+    "github readiness",
+    "what files is my repo missing",
+    "open source checklist",
+    "prepare a repository for release"
+  ],
+  "inputs": {
+    "folder": {
+      "type": "string",
+      "required": false,
+      "default": "."
+    },
+    "detail": {
+      "type": "string",
+      "required": false,
+      "enum": [
+        "compact",
+        "full"
+      ],
+      "default": "compact"
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.repo.readiness.readiness"
+  },
+  "latency": {
+    "expected_ms": 300
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "mcp.install_links",
+    "secrets.transcript_scan"
+  ]
+}

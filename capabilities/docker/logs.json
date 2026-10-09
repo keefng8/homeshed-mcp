@@ -1,0 +1,43 @@
+{
+  "id": "docker.container.logs",
+  "name": "Docker Container Logs",
+  "version": "1.0.0",
+  "description": "Fetch recent log lines from a container.",
+  "category": "docker",
+  "risk": "read",
+  "requires": ["Docker socket"],
+  "transport": "mcp",
+  "aliases": [
+    "container logs",
+    "show logs",
+    "what's in the logs",
+    "recent log output",
+    "tail logs"
+  ],
+  "inputs": {
+    "container": {
+      "type": "string",
+      "required": true
+    },
+    "tail": {
+      "type": "integer",
+      "required": false,
+      "default": 200
+    }
+  },
+  "execution": {
+    "type": "docker_sdk",
+    "handler": "tools.docker.container_logs.container_logs"
+  },
+  "latency": {
+    "expected_ms": 100
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "docker.container.list",
+    "docker.container.inspect"
+  ]
+}

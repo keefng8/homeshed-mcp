@@ -1,0 +1,66 @@
+{
+  "id": "memory.recall_relevant",
+  "name": "Recall Relevant Messages",
+  "version": "1.0.0",
+  "description": "Recall messages from a session ranked by relevance to a query, not just chronological order.",
+  "category": "memory",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "recall relevant",
+    "search memory",
+    "find relevant messages",
+    "relevant recall"
+  ],
+  "inputs": {
+    "session_id": {
+      "type": "string",
+      "required": true
+    },
+    "query": {
+      "type": "string",
+      "required": true
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 50
+    },
+    "max_results": {
+      "type": "integer",
+      "required": false,
+      "default": 5
+    },
+    "max_chars": {
+      "type": "integer",
+      "required": false,
+      "default": 300
+    },
+    "scope": {
+      "type": "string",
+      "required": false,
+      "default": "project"
+    },
+    "project_dir": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "in_process",
+    "handler": "tools.memory.recall_relevant.recall_relevant"
+  },
+  "latency": {
+    "expected_ms": "variable — memory.recall's own latency plus O(n) ranking"
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "memory.recall",
+    "memory.capture"
+  ]
+}

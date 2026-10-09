@@ -1,0 +1,58 @@
+{
+  "id": "memory.recall_facts",
+  "name": "Recall Durable Facts",
+  "version": "1.0.0",
+  "description": "Read back one category of the project's durable facts tier — scoped, fast, no unneeded text from other categories.",
+  "category": "memory",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "what do you know about this project",
+    "recall the facts",
+    "what are the current facts",
+    "project knowledge base"
+  ],
+  "inputs": {
+    "category": {
+      "type": "string",
+      "required": false,
+      "default": "general"
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 20
+    },
+    "max_chars": {
+      "type": "integer",
+      "required": false,
+      "default": 300
+    },
+    "scope": {
+      "type": "string",
+      "required": false,
+      "default": "project"
+    },
+    "project_dir": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "http_api",
+    "handler": "tools.memory.recall_facts.recall_facts"
+  },
+  "latency": {
+    "expected_ms": 300
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "memory.remember_fact",
+    "memory.recall"
+  ]
+}

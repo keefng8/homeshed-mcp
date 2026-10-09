@@ -1,0 +1,47 @@
+{
+  "id": "docker.container.inspect",
+  "name": "Inspect Docker Container",
+  "version": "1.0.0",
+  "description": "Inspect a container's config, networking and mounts. Env values withheld by default.",
+  "category": "docker",
+  "risk": "read",
+  "requires": ["Docker socket"],
+  "transport": "mcp",
+  "aliases": [
+    "inspect container",
+    "container configuration",
+    "container networking",
+    "container IP",
+    "container mounts"
+  ],
+  "inputs": {
+    "container": {
+      "type": "string",
+      "required": true
+    },
+    "include_env_values": {
+      "type": "boolean",
+      "required": false,
+      "default": false,
+      "sensitive": true
+    }
+  },
+  "execution": {
+    "type": "docker_sdk",
+    "handler": "tools.docker.container_inspect.container_inspect"
+  },
+  "sensitive_params": ["include_env_values"],
+  "latency": {
+    "expected_ms": 80
+  },
+  "cache": {
+    "enabled": true,
+    "ttl": 10,
+    "freshness": "eventual"
+  },
+  "related": [
+    "docker.container.list",
+    "docker.container.logs",
+    "docker.container.restart"
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "id": "image.generate",
+  "name": "Generate Image",
+  "version": "1.2.0",
+  "description": "Start an image generation job; returns a job_id immediately. Default: free local GPU (stable-diffusion.cpp), whose default model Qwen-Image-2.1 is NON-COMMERCIAL. Opt-in PAID providers (openai, stability, replicate, fal, together, xai) via provider=..., IMAGE_DEFAULT_PROVIDER, or require_commercial=true, which refuses models whose outputs can't be sold.",
+  "category": "image",
+  "risk": "write",
+  "requires": [
+    "GPU image service (IMAGE_BASE_URL) for local-sdcpp",
+    "a provider API key in the vault for a paid provider"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "generate an image",
+    "make a picture",
+    "draw",
+    "text to image",
+    "create an image",
+    "generate a commercial image",
+    "use openai for an image",
+    "image with flux"
+  ],
+  "inputs": {
+    "prompt": {
+      "type": "string",
+      "required": true
+    },
+    "width": {
+      "type": "integer",
+      "required": false,
+      "default": 768
+    },
+    "height": {
+      "type": "integer",
+      "required": false,
+      "default": 768
+    },
+    "steps": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "seed": {
+      "type": "integer",
+      "required": false,
+      "default": -1
+    },
+    "model": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "enhance_prompt": {
+      "type": "boolean",
+      "required": false,
+      "default": true
+    },
+    "upscale": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    "provider": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "require_commercial": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    "folder": {
+      "type": "string",
+      "required": false
+    },
+    "paid_fallback": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    "negative_prompt": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "default_negative": {
+      "type": "boolean",
+      "required": false,
+      "default": true
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.generate.generate"
+  },
+  "latency": {
+    "expected_ms": 1000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.status",
+    "image.providers.list"
+  ]
+}

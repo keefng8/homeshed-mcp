@@ -1,0 +1,39 @@
+{
+  "id": "reasoning.decompose_task",
+  "name": "Decompose Task",
+  "version": "1.0.0",
+  "description": "Break a task description into an ordered list of subtasks via the local model.",
+  "category": "reasoning",
+  "risk": "read",
+  "requires": ["model server (LOCAL_AI_BASE_URL) or a cloud key"],
+  "transport": "mcp",
+  "aliases": [
+    "decompose task",
+    "break down task",
+    "plan subtasks",
+    "task decomposition"
+  ],
+  "inputs": {
+    "task": {
+      "type": "string",
+      "required": true
+    },
+    "max_subtasks": {
+      "type": "integer",
+      "required": false,
+      "default": 8
+    }
+  },
+  "execution": {
+    "type": "in_process",
+    "handler": "tools.reasoning.decompose_task.decompose_task"
+  },
+  "latency": {
+    "expected_ms": "variable — one or two local_ai.ask calls"
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": ["local_ai.ask", "reasoning.solve", "workflow.run"]
+}

@@ -1,0 +1,57 @@
+{
+  "id": "etsy.orders.list",
+  "name": "Etsy Orders",
+  "version": "1.0.0",
+  "description": "The Etsy shop's orders (receipts), compact and paged; no buyer names, emails or addresses. Read-only.",
+  "category": "etsy",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_etsy_enabled switch",
+    "Etsy app and shop credentials (ETSY_KEYSTRING, ETSY_SHARED_SECRET, ETSY_REFRESH_TOKEN, ETSY_SHOP_ID)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "etsy orders",
+    "etsy sales",
+    "etsy receipts"
+  ],
+  "inputs": {
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 20
+    },
+    "offset": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "was_paid": {
+      "type": "string",
+      "required": false,
+      "default": "any"
+    },
+    "was_shipped": {
+      "type": "string",
+      "required": false,
+      "default": "any"
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.etsy.read.orders_list"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "etsy.shop.get",
+    "etsy.listings.list",
+    "etsy.listing.get",
+    "etsy.order.get"
+  ]
+}

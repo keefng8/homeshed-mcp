@@ -1,0 +1,35 @@
+{
+  "id": "git.status",
+  "name": "Git Repository Status",
+  "version": "1.0.0",
+  "description": "Branch, ahead/behind tracking, and staged/unstaged/untracked files for a git repository.",
+  "category": "git",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "git status",
+    "repo status",
+    "what's changed",
+    "uncommitted changes",
+    "current branch"
+  ],
+  "inputs": {
+    "path": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "subprocess",
+    "handler": "tools.git.status.status"
+  },
+  "latency": {
+    "expected_ms": 200
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": ["git.diff"]
+}

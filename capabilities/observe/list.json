@@ -1,0 +1,51 @@
+{
+  "id": "observe.list",
+  "name": "List Observations",
+  "version": "1.0.0",
+  "description": "List observations from the persistent observation log, filtered by status and rule.",
+  "category": "observe",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "open observations",
+    "what have I got wrong",
+    "list observations",
+    "outstanding corrections"
+  ],
+  "inputs": {
+    "status": {
+      "type": "string",
+      "required": false,
+      "default": "open"
+    },
+    "rule": {
+      "type": "string",
+      "required": false
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 50
+    },
+    "action_class": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.observe.list.list_observations"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "observe.log",
+    "observe.update"
+  ]
+}

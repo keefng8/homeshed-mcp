@@ -1,0 +1,34 @@
+{
+  "id": "git.branch",
+  "name": "Git Branch",
+  "version": "1.0.0",
+  "description": "Create and/or switch to a git branch. Fully autonomous, no confirmation step.",
+  "category": "git",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "git branch",
+    "create branch",
+    "switch branch",
+    "checkout branch"
+  ],
+  "inputs": {
+    "path": { "type": "string", "required": true },
+    "name": { "type": "string", "required": true },
+    "create": { "type": "boolean", "required": false, "default": true },
+    "base": { "type": "string", "required": false }
+  },
+  "execution": {
+    "type": "subprocess",
+    "handler": "tools.git.branch.branch"
+  },
+  "latency": {
+    "expected_ms": 300
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": ["git.status", "git.commit"]
+}

@@ -1,0 +1,53 @@
+{
+  "id": "printify.shipping",
+  "name": "Printify Delivery Prices",
+  "version": "1.0.0",
+  "description": "Delivery prices for one blueprint from one print provider: handling time, and per group of variants and countries the first and each additional item's price, in Printify's currency (never converted).",
+  "category": "printify",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_printify_enabled switch",
+    "Printify token (PRINTIFY_API_TOKEN)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "printify shipping",
+    "printify delivery cost",
+    "shipping rates"
+  ],
+  "inputs": {
+    "blueprint_id": {
+      "type": "string",
+      "required": true
+    },
+    "print_provider_id": {
+      "type": "string",
+      "required": true
+    },
+    "country": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "variant_id": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.printify.read.shipping"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.variants.list",
+    "printify.print_providers.list"
+  ]
+}

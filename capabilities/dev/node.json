@@ -1,0 +1,47 @@
+{
+  "id": "dev.node",
+  "name": "Run Node.js",
+  "version": "1.0.0",
+  "description": "Run a Node.js command on the machine HomeShed runs on (your computer, or its container). Real code execution, no confirmation step. Node must be installed there; the Docker image doesn't include it.",
+  "category": "dev",
+  "risk": "write",
+  "requires": [
+    "node on PATH"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "run node",
+    "execute node script",
+    "node command"
+  ],
+  "inputs": {
+    "args": {
+      "type": "array",
+      "required": true
+    },
+    "cwd": {
+      "type": "string",
+      "required": true
+    },
+    "timeout": {
+      "type": "integer",
+      "required": false,
+      "default": 120
+    }
+  },
+  "execution": {
+    "type": "subprocess",
+    "handler": "tools.dev.node.node"
+  },
+  "latency": {
+    "expected_ms": 5000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "dev.build",
+    "dev.python"
+  ]
+}

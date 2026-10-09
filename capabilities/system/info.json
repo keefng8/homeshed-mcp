@@ -1,0 +1,34 @@
+{
+  "id": "system.info",
+  "name": "System Info",
+  "version": "1.0.0",
+  "description": "Hardware and OS information for the machine HomeShed runs on (your computer, or its container).",
+  "category": "system",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "system info",
+    "hardware info",
+    "os info",
+    "how much memory",
+    "disk space",
+    "uptime"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "python",
+    "handler": "tools.system.info.info"
+  },
+  "latency": {
+    "expected_ms": 50
+  },
+  "cache": {
+    "enabled": true,
+    "ttl": 10,
+    "freshness": "eventual"
+  },
+  "related": [
+    "system.health"
+  ]
+}

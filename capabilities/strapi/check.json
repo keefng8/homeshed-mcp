@@ -1,0 +1,51 @@
+{
+  "id": "strapi.check",
+  "name": "Strapi Check",
+  "version": "1.0.0",
+  "description": "Lint a Strapi v5 project for six known silent bugs (missing pagination, v4 .attributes, bad filter paths, NODE_ENV, /api/api routes) and optionally probe its live /admin.",
+  "category": "strapi",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "check my strapi project",
+    "strapi only returns 25 rows",
+    "strapi v5 attributes undefined",
+    "strapi filter returns nothing",
+    "is my strapi admin public"
+  ],
+  "inputs": {
+    "repo": {
+      "type": "string",
+      "required": true
+    },
+    "url": {
+      "type": "string",
+      "required": false
+    },
+    "detail": {
+      "type": "string",
+      "required": false,
+      "enum": [
+        "compact",
+        "full"
+      ],
+      "default": "compact"
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.strapi.check.check"
+  },
+  "latency": {
+    "expected_ms": 800
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "code.webhook_retry_check",
+    "bugs.find"
+  ]
+}

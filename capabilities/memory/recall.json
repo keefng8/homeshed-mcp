@@ -1,0 +1,56 @@
+{
+  "id": "memory.recall",
+  "name": "Recall from Persistent Memory",
+  "version": "1.0.0",
+  "description": "Read back raw conversation history previously written with memory.capture for a given session_id, from the built-in store or a self-hosted TDAI memory-core.",
+  "category": "memory",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "recall memory",
+    "what did I save",
+    "read memory",
+    "check memory"
+  ],
+  "inputs": {
+    "session_id": {
+      "type": "string",
+      "required": true
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 20
+    },
+    "max_chars": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "scope": {
+      "type": "string",
+      "required": false,
+      "default": "project"
+    },
+    "project_dir": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "http_api",
+    "handler": "tools.memory.recall.recall"
+  },
+  "latency": {
+    "expected_ms": 300
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "memory.capture"
+  ]
+}

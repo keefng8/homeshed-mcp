@@ -1,0 +1,44 @@
+{
+  "id": "etsy.listing.get",
+  "name": "Etsy Listing",
+  "version": "1.0.0",
+  "description": "One Etsy listing in detail: title, description, price, tags, materials, views, favourites. Read-only.",
+  "category": "etsy",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_etsy_enabled switch",
+    "Etsy app and shop credentials (ETSY_KEYSTRING, ETSY_SHARED_SECRET, ETSY_REFRESH_TOKEN, ETSY_SHOP_ID)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "etsy listing details"
+  ],
+  "inputs": {
+    "listing_id": {
+      "type": "string",
+      "required": true
+    },
+    "full": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.etsy.read.listing_get"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "etsy.shop.get",
+    "etsy.listings.list",
+    "etsy.orders.list",
+    "etsy.order.get"
+  ]
+}

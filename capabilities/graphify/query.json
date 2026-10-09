@@ -1,0 +1,48 @@
+{
+  "id": "graphify.query",
+  "name": "Query Graphify Code Graph",
+  "version": "1.0.0",
+  "description": "Ask an already-generated graphify code graph a question via BFS/DFS traversal. Locator, not an answerer — returns src= paths to read, not final answers.",
+  "category": "graphify",
+  "risk": "read",
+  "requires": ["graphify, and a graph built for the project"],
+  "transport": "mcp",
+  "aliases": [
+    "query graph",
+    "ask the code graph",
+    "graphify query",
+    "search architecture graph"
+  ],
+  "inputs": {
+    "project_path": {
+      "type": "string",
+      "required": true
+    },
+    "question": {
+      "type": "string",
+      "required": true
+    },
+    "budget": {
+      "type": "integer",
+      "required": false,
+      "default": 2000
+    },
+    "dfs": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    }
+  },
+  "execution": {
+    "type": "cli",
+    "handler": "tools.graphify.query.query"
+  },
+  "latency": {
+    "expected_ms": 800
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": []
+}

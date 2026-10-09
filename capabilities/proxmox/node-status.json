@@ -1,0 +1,41 @@
+{
+  "id": "proxmox.node.status",
+  "name": "Proxmox Node Status",
+  "version": "1.0.0",
+  "description": "One Proxmox node's health: CPU, load, memory, swap, root disk, versions, uptime. Read-only.",
+  "category": "proxmox",
+  "risk": "read",
+  "requires": [
+    "Proxmox VE API token (PROXMOX_TOKEN_ID, or PROXMOX_API_TOKEN)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "proxmox node status",
+    "how busy is the proxmox node",
+    "proxmox memory and disk"
+  ],
+  "inputs": {
+    "node": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.proxmox.node_status.node_status"
+  },
+  "latency": {
+    "expected_ms": 400
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "proxmox.nodes.list",
+    "proxmox.vms.list",
+    "proxmox.vm.status",
+    "proxmox.storage.list",
+    "proxmox.tasks.list"
+  ]
+}

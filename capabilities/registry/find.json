@@ -1,0 +1,39 @@
+{
+  "id": "registry.find",
+  "name": "Find Capability",
+  "version": "1.0.0",
+  "description": "Find which capability best matches a natural-language request. Exact ID, then alias/keyword, then local-AI fallback. Never executes anything.",
+  "category": "registry",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "what capability should I use",
+    "find a tool for this",
+    "which capability handles this",
+    "search capabilities"
+  ],
+  "inputs": {
+    "query": {
+      "type": "string",
+      "required": true
+    },
+    "top_n": {
+      "type": "integer",
+      "required": false,
+      "default": 3
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.registry.find.find"
+  },
+  "latency": {
+    "expected_ms": 2000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": []
+}

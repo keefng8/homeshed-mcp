@@ -1,0 +1,42 @@
+{
+  "id": "threads.replies",
+  "name": "Threads Post Replies",
+  "version": "1.0.0",
+  "description": "The replies to one of the owner's Threads posts (read-only), for answering and for design ideas.",
+  "category": "threads",
+  "risk": "read",
+  "requires": [
+    "Threads connected with the read-replies permission"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "threads replies",
+    "comments on my threads post"
+  ],
+  "inputs": {
+    "post_id": {
+      "type": "string",
+      "required": true
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 25
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.threads.publish.replies"
+  },
+  "latency": {
+    "expected_ms": 1500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "threads.publish",
+    "threads.insights"
+  ]
+}

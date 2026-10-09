@@ -1,0 +1,29 @@
+{
+  "id": "threads.status",
+  "name": "Threads Status",
+  "version": "1.0.0",
+  "description": "Whether Threads is connected and posting is on, the account, and posts in the last 24 hours.",
+  "category": "threads",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "is threads connected",
+    "threads status"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "python",
+    "handler": "tools.threads.publish.status"
+  },
+  "latency": {
+    "expected_ms": 50
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "threads.publish"
+  ]
+}

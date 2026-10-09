@@ -1,0 +1,38 @@
+{
+  "id": "inbox.send",
+  "name": "Message the Owner",
+  "version": "1.0.0",
+  "description": "Leave the owner a message on the Control Panel (and his phone): a note, a command for him to run, or a decision he needs to make.",
+  "category": "inbox",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "ask the owner",
+    "message the owner",
+    "leave the owner a message",
+    "need the owner to run a command",
+    "need a decision from the owner"
+  ],
+  "inputs": {
+    "text": {"type": "string", "required": true},
+    "need": {"type": "string", "required": false, "enum": ["info", "run_command", "decision", "other"]},
+    "command": {"type": "string", "required": false},
+    "sender": {"type": "string", "required": false}
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.inbox.send.send"
+  },
+  "latency": {
+    "expected_ms": 50
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "inbox.replies",
+    "notify.send"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "id": "printify.shops.list",
+  "name": "Printify Shops",
+  "version": "1.0.0",
+  "description": "The Printify shops the token can see: id, title, sales channel. Read-only, proxied.",
+  "category": "printify",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_printify_enabled switch",
+    "Printify token (PRINTIFY_API_TOKEN; PRINTIFY_SHOP_ID for shop tools)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "printify shops"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "http",
+    "handler": "tools.printify.read.shops_list"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.products.list",
+    "printify.product.get",
+    "printify.blueprints.list",
+    "printify.print_providers.list",
+    "printify.orders.list",
+    "printify.order.get"
+  ]
+}

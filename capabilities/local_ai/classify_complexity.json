@@ -1,0 +1,44 @@
+{
+  "id": "local_ai.classify_complexity",
+  "name": "Classify Request Complexity",
+  "version": "1.0.0",
+  "description": "Score a request's complexity 0-100 with a fast, deterministic, offline regex heuristic. Advisory only -- never routes or executes anything.",
+  "category": "local_ai",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "classify complexity",
+    "score request complexity",
+    "how complex is this",
+    "complexity heuristic"
+  ],
+  "inputs": {
+    "text": {
+      "type": "string",
+      "required": true
+    },
+    "token_estimate": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "tool_count": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    }
+  },
+  "execution": {
+    "type": "in_process",
+    "handler": "tools.local_ai.classify_complexity.classify_complexity"
+  },
+  "latency": {
+    "expected_ms": 5
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": ["local_ai.ask", "registry.find"]
+}

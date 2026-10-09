@@ -1,0 +1,91 @@
+{
+  "id": "bugs.report",
+  "name": "Known Bugs Report",
+  "description": "Record a known bug (or a new occurrence of one) with its cause and fix, so nobody hits it twice.",
+  "risk": "write",
+  "requires": [],
+  "aliases": [
+    "record a bug",
+    "log this bug",
+    "known issue",
+    "we fixed a bug"
+  ],
+  "inputs": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "symptom": {
+      "type": "string",
+      "required": false
+    },
+    "error_text": {
+      "type": "string",
+      "required": false
+    },
+    "root_cause": {
+      "type": "string",
+      "required": false
+    },
+    "workaround": {
+      "type": "string",
+      "required": false
+    },
+    "fix": {
+      "type": "string",
+      "required": false
+    },
+    "fix_status": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "component": {
+      "type": "string",
+      "required": false
+    },
+    "guard": {
+      "type": "string",
+      "required": false
+    },
+    "tags": {
+      "type": "array",
+      "required": false
+    },
+    "source": {
+      "type": "string",
+      "required": false,
+      "default": "claude"
+    },
+    "id": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "audience": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.bugs.known.report"
+  },
+  "version": "1.0.0",
+  "category": "bugs",
+  "transport": "mcp",
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "related": [
+    "bugs.report",
+    "bugs.find",
+    "bugs.list",
+    "observe.log"
+  ]
+}

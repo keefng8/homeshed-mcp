@@ -1,0 +1,33 @@
+{
+  "id": "image.queue",
+  "name": "Image Queue",
+  "version": "1.0.0",
+  "description": "The local image service's line: busy or not, the image being made and the ones waiting.",
+  "category": "image",
+  "risk": "read",
+  "requires": [
+    "GPU image service (IMAGE_BASE_URL) for local jobs"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "is the image generator busy",
+    "image queue",
+    "what images are waiting"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.queue.queue"
+  },
+  "latency": {
+    "expected_ms": 100
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.generate",
+    "image.status"
+  ]
+}

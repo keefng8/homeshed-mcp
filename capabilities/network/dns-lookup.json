@@ -1,0 +1,36 @@
+{
+  "id": "network.dns.lookup",
+  "name": "DNS Lookup",
+  "version": "1.0.0",
+  "description": "Resolve a hostname to its IP addresses (A/AAAA only).",
+  "category": "network",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "dns lookup",
+    "resolve hostname",
+    "what's the ip",
+    "can this resolve"
+  ],
+  "inputs": {
+    "hostname": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.network.dns_lookup.dns_lookup"
+  },
+  "latency": {
+    "expected_ms": 100
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "network.port_check"
+  ]
+}
