@@ -22,7 +22,7 @@ from tools.commerce import _http as h
 from tools.commerce import vault_name
 
 # The standard vault entry names (spelled out so they can be searched for, and the docs check can see them). The
-# owner can name others in Settings > Online shops; the functions below read his choice on every call.
+# owner can name others in Settings > Shops and social; the functions below read his choice on every call.
 KEYSTRING, SHARED_SECRET = "ETSY_KEYSTRING", "ETSY_SHARED_SECRET"
 REFRESH_TOKEN, SHOP_ID = "ETSY_REFRESH_TOKEN", "ETSY_SHOP_ID"
 
@@ -162,7 +162,7 @@ def write(method: str, path: str, form: dict, setting: str, label: str, files: d
                 continue  # the access token went stale early: refresh once and try again
             if "HTTP 403" in str(exc):
                 raise h.CommerceError(f"{exc}. If that's a missing scope: the shop was connected read-only; press "
-                                      "Connect Etsy again (Settings > Online shops), which now asks for listing edits "
+                                      "Connect Etsy again (Settings > Shops and social), which now asks for listing edits "
                                       "(listings_w)") from None
             raise
     raise h.CommerceError("Etsy refused the refreshed token (HTTP 401)")

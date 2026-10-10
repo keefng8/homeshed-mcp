@@ -655,7 +655,7 @@ flowchart LR
 | Tool | What it does | Risk | Needs |
 |---|---|---|---|
 | `threads.insights` | Views, likes, replies, reposts, quotes and shares for one of the owner's Threads posts, or the account's follower count with no post id. | read | Threads connected with the insights permission |
-| `threads.publish` | Post text, one image, a carousel (2-10 images) or a Studio video to the owner's connected Threads account. Public; off until the owner switches it on. | write | Threads connected in Settings > Online shops, the owner's switch: Let apps post to Threads |
+| `threads.publish` | Post text, one image, a carousel (2-10 images) or a Studio video to the owner's connected Threads account. Public; off until the owner switches it on. | write | Threads connected in Settings > Shops and social, the owner's switch: Let apps post to Threads |
 | `threads.replies` | The replies to one of the owner's Threads posts (read-only), for answering and for design ideas. | read | Threads connected with the read-replies permission |
 | `threads.status` | Whether Threads is connected and posting is on, the account, and posts in the last 24 hours. | read | nothing |
 

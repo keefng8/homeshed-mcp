@@ -4,7 +4,7 @@
 `threads.publish`
 
 ## Purpose
-Post text, one image or a carousel to the Threads account the owner connected (Settings > Online shops > Connect
+Post text, one image or a carousel to the Threads account the owner connected (Settings > Shops and social > Connect
 Threads). **Public.** Only call it for a post that has been approved for publishing. Off until the owner switches
 "Let apps post to Threads" on.
 

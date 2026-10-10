@@ -21,4 +21,4 @@ characters.
 
 ## Needs
 The `threads_read_replies` permission (added to the connect scopes 2026-10-07): connect Threads again in Settings >
-Online shops if it says it's missing.
+Shops and social if it says it's missing.

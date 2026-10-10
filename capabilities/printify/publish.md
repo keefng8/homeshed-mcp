@@ -28,7 +28,7 @@ takes a minute or two; `etsy.listings.list` then shows the listing and `printify
 
 ## Switches
 `commerce_printify_enabled` (read) and `commerce_printify_publish_enabled` ("Let apps ask to publish Printify products
-to your shop"), both in Settings > Online shops, off until the owner switches them on. The drafts switch isn't needed:
+to your shop"), both in Settings > Shops and social, off until the owner switches them on. The drafts switch isn't needed:
 asking to publish is a separate permission.
 
 ## Paused by a private add-on (2026-10-08)

@@ -111,7 +111,7 @@ def enabled(setting: str) -> bool:
 def require(setting: str, label: str) -> None:
     if not enabled(setting):
         raise CommerceError(f"{label} access is switched off: only the owner can switch it on "
-                            "(Control Panel > Settings > Online shops)")
+                            "(Control Panel > Settings > Shops and social)")
 
 
 def missing(names: list[str], what: str) -> CommerceError:

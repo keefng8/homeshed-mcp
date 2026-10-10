@@ -10,7 +10,7 @@ Etsy, and returns a compact answer. Writes (listing changes, prices, orders) are
 will be dry-run first and queued for the owner's approval, as the Proxmox changes are.
 
 ## Switch and credentials
-- Owner switch: **Control Panel > Settings > Online shops > "Let apps read your Etsy shop"**
+- Owner switch: **Control Panel > Settings > Shops and social > "Let apps read your Etsy shop"**
   (`commerce_etsy_enabled`, default **off**). Off: every etsy.* call is refused with that message.
 - Vault entries (Keys and passwords), by name only:
   | Name | What |

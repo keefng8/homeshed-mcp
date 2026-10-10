@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "homeshed-mcp",
   "display_name": "HomeShed",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Every tool your AI needs, in one install: memory, reasoning, git, network and more. Tools that act on your machines start off.",
   "long_description": "A self-hosted MCP tool server: built-in memory, reasoning, git, files, network and code checks work with nothing else installed; other tools connect to what you already run, such as a local model, Docker or ntfy. Tools that act on your machines start switched off.",
   "author": {

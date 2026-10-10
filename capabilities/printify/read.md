@@ -10,7 +10,7 @@ the vault and returns compact answers. Writes (create product, publish, submit o
 come they'll be dry-run first and queued for the owner's approval.
 
 ## Switch and credentials
-- Owner switch: **Control Panel > Settings > Online shops > "Let apps read your Printify account"**
+- Owner switch: **Control Panel > Settings > Shops and social > "Let apps read your Printify account"**
   (`commerce_printify_enabled`, default **off**).
 - `PRINTIFY_API_TOKEN`: a personal access token (Printify > My account > Connections), sent as Bearer with a
   User-Agent, as Printify requires.

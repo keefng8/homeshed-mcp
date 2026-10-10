@@ -813,13 +813,13 @@ details summary { cursor: pointer; color: var(--text-2); }
 @media (max-width: 860px) { .api-grid, .api-form { grid-template-columns: minmax(0,1fr); } }
 
 /* ---- Tools page (per-tool switches; idea from OmniRoute's MCP tools & scopes page) ---- */
-.sw { position: relative; display: inline-block; width: 38px; height: 22px; flex: 0 0 auto; }
+.sw { position: relative; display: inline-block; width: 42px; height: 24px; flex: 0 0 auto; }
 .sw input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; z-index: 1; }
-.sw span { position: absolute; inset: 0; border-radius: 11px; background: var(--fill-2); transition: background .25s; pointer-events: none; }
-.sw span::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff;
+.sw span { position: absolute; inset: 0; border-radius: 12px; background: var(--fill-2); transition: background .25s; pointer-events: none; }
+.sw span::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
   box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .28s cubic-bezier(.32,.72,0,1); }
 .sw input:checked + span { background: var(--ok); }
-.sw input:checked + span::after { transform: translateX(16px); }
+.sw input:checked + span::after { transform: translateX(18px); }
 .sw input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sw input:disabled { cursor: wait; }
 .tool-group { margin-top: 6px; }
@@ -1127,6 +1127,17 @@ body.no-anim *, body.no-anim *::before, body.no-anim *::after { animation-durati
 .set-cat-sel { display: none; }
 #setForm .set-nomatch { display: none !important; }
 .set-adv { border-top: 1px solid var(--separator); margin-top: 2px; }
+.set-helpwrap { display: flex; align-items: baseline; gap: 6px; cursor: pointer; }
+.set-help { flex: 1 1 auto; min-width: 0; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.set-helpwrap.open .set-help { display: block; }
+.set-more { flex: 0 0 auto; background: none; border: 0; padding: 6px 8px; margin: -6px -8px; min-height: 0; color: var(--accent);
+  font-size: 12px; cursor: pointer; }
+@media (pointer: coarse) { .set-more { padding: 14px 12px; margin: -14px -12px; } }
+.set-fold { background: none; border: 1px solid var(--separator); border-radius: 8px; padding: 4px 8px; min-height: 0;
+  font-size: 12px; color: var(--text-2); margin-right: 8px; white-space: nowrap; }
+.set-fold-body { margin-left: 4px; padding-left: 12px; border-left: 2px solid var(--separator); }
+#set-sharing #viewersCard { margin: 14px 0 0 !important; padding: 14px 0 0; border: 0; border-top: 1px solid var(--separator);
+  border-radius: 0; background: none; box-shadow: none; }
 .set-adv > summary { cursor: pointer; list-style: none; padding: 10px 0; font-size: 13px; color: var(--text-2); }
 .set-adv > summary::-webkit-details-marker { display: none; }
 .set-adv > summary::before { content: '▸ '; } .set-adv[open] > summary::before { content: '▾ '; }
@@ -1338,7 +1349,11 @@ body:not(.summary) [data-card].collapsed > .card-head { margin-bottom: 0; }
   #viewersCard label { min-height: 44px; }  /* a checkbox's whole row is its target */
   label.sw { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }
   input[type=checkbox] { min-width: 22px; min-height: 22px; }
+  /* the label stays the 44 px target, but the track keeps its own pill size: filling the label made it a 44x44 square
+     with the knob in its top corner (R&D's settings re-shoot, 2026-10-09) */
+  label.sw > span { inset: auto; top: 50%; left: 50%; width: 42px; height: 24px; margin: -12px 0 0 -21px; border-radius: 12px; }
 }
+@media (pointer: coarse) { label.sw > span { width: 52px; height: 32px; margin: -16px 0 0 -26px; border-radius: 16px; } }
 
 /* ---- Summary screen (the owner, 2026-10-01: "a summary dash ... on a monitor that's spare ... like a clone of the overview
    but in a more compact readable panels. so everything is on one page not scrollable"). The Overview's own live cards,
@@ -1358,7 +1373,13 @@ body.summary .sum-bar { display: flex; align-items: center; gap: 14px; margin-bo
   body.summary { overflow: hidden; }
   body.summary .main { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
   body.summary .ops-view.active { flex: 1; min-height: 0; display: grid; gap: 12px; animation: none;
-    grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: auto auto; grid-auto-rows: minmax(0, 1fr); }
+    grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr);
+    /* fixed shares (2026-10-09): sized by content, the context card's session list made the top 450 px and left the
+       cards below ~120 px, cut off. Now: the top two rows 1.15 : 0.85, each row below 1 (a long list is cut, as ever) */
+    grid-template-rows: minmax(0, 1.15fr) minmax(0, 0.85fr); }
+  body.summary .ctx-row { padding: 5px 0; }
+  body.summary .ctx-row .ctx-act button { padding-top: 3px; padding-bottom: 3px; }
+  body.summary .tok-head .sub { display: none; }  /* the counters below give the measured/estimated split */
   body.summary .ops-view.active > * { min-width: 0; min-height: 0; margin: 0; overflow: hidden; }
   body.summary #statusHero { grid-area: 1 / 1 / 2 / 7; padding: 14px 20px; }
   body.summary .stat-strip { grid-area: 2 / 1 / 3 / 7; }
@@ -1373,6 +1394,9 @@ body.summary .sum-bar { display: flex; align-items: center; gap: 14px; margin-bo
   body.summary :is(.live-card, .ai-strip-card, .tok-strip, .activity-card) { display: flex; flex-direction: column; }
   body.summary .live-feed { flex: 1; min-height: 0; max-height: none; overflow: hidden; }
   body.summary .ai-strip { flex: 1; min-height: 0; overflow: hidden; align-content: start; }
+  /* release progress at a glance (the Github prepper, 2026-10-10: at 1440x900 the card cut "Next:" in half): the
+     title, the bars, the next step and what waits on you; the small print stays on the Overview */
+  body.summary .prog-row > :is(.prog-facts, .prog-metrics, .hint, .prog-gates-btn, .prog-gates) { display: none; }
   body.summary .tok-strip { gap: 10px; }
   body.summary .tok-cells { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 14px; }
   body.summary .tok-cell i { display: none; }  /* "measured" / "estimate": the Overview has them */
@@ -1383,6 +1407,34 @@ body.summary .sum-bar { display: flex; align-items: center; gap: 14px; margin-bo
   body.summary .tok-head .big { font-size: 34px; }
   body.summary .rw-count { font-size: 28px; }
   body.summary .core-wrap { width: 132px; height: 132px; margin: -6px -4px -6px 8px; }
+  /* the owner, 2026-10-09: "fix this summary screen". The number boxes sat at the top of a box stretched to the
+     context card's height; the counters under "Work handled locally" ran off the side; Reads/Writes squeezed its
+     latest-call line into a word a line (the Recent calls row below shows the calls anyway). */
+  body.summary .stat-strip { align-content: center; }
+  body.summary .stat-strip .stat-num { font-size: 40px; }  /* read across a room, and the box isn't half empty */
+  body.summary .reasoning-strip { padding: 12px 8px 10px; align-content: flex-start; }
+  body.summary .reasoning-strip-label { margin-bottom: 4px; }
+  body.summary .reasoning-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); row-gap: 6px; }
+  body.summary .reasoning-stat { padding: 2px 10px; }
+  body.summary .reasoning-stat-lbl { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  body.summary .rw-sub { display: none; }
+  /* Tokens: each counter on one line (name, then figure), two columns, so all of them fit */
+  body.summary .tok-cells { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 18px; }
+  body.summary .tok-cell { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+  body.summary .tok-cell > span:not(.tok-sw) { display: none; }
+  body.summary .tok-cell b { margin: 0 0 0 auto; font-size: clamp(13px, 0.8vw, 15px); }
+  body.summary .tok-cell { font-size: clamp(11px, 0.68vw, 12.5px); }
+  /* sizes follow the screen's width, so a 1440 px monitor keeps every card's three figures on one line */
+  body.summary .live-stats { flex-wrap: nowrap; gap: clamp(8px, 0.8vw, 16px); }
+  body.summary .live-stats > div { min-width: 0; }
+  body.summary .live-stats b { font-size: clamp(17px, 1.3vw, 24px); white-space: nowrap; }
+  /* Reads / Writes: the figure under its title, not beside it (side by side, a narrow screen ran them into each other) */
+  body.summary .rw-panel { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; row-gap: 2px;
+    padding: 12px 16px; }
+  body.summary .rw-ring { grid-row: 1 / span 2; align-self: center; }
+  body.summary .rw-count { grid-column: 2; line-height: 1.1; }
+  body.summary .live-stats span { font-size: 11px; line-height: 1.25; }
+  body.summary .rw-count { font-size: clamp(20px, 1.5vw, 28px); }
 }
 
 /* Run page (to-do #50): run any tool by hand */
@@ -1765,7 +1817,7 @@ body.summary .sum-bar { display: flex; align-items: center; gap: 14px; margin-bo
     <div class="section-head"><h2>Log a correction</h2><p>Saved with you as the source. The same rule broken twice escalates to a mechanical guard.</p></div>
     <div class="obs-form">
       <input id="obsTitle" placeholder="Title, one line">
-      <input id="obsRule" list="obsRuleList" placeholder="Rule ID, e.g. RULE-D-PROJECTS-006 (optional)">
+      <input id="obsRule" list="obsRuleList" placeholder="Rule ID, e.g. RULE-001 (optional)">
       <datalist id="obsRuleList"></datalist>
       <textarea id="obsIssue" rows="3" placeholder="What happened: what you saw versus what you expected"></textarea>
       <input id="obsFix" class="full" placeholder="Proposed fix (optional)">
@@ -5039,7 +5091,11 @@ const SET_INTRO = {
   'API access': 'Defaults for apps and projects that use HomeShed.',
   'Image generation': "Which image providers and models Claude may use. Your PC's own models are free; every paid provider is off until you switch it on, give it a daily cap and add its key under Keys and passwords. Licences: image.providers.list.",
   'Language models': "Let apps (such as a shop agent) use a paid model such as Grok through HomeShed, so they never hold the key. Off until you switch a provider on and give it a daily cap; spend per app: llm.providers.list.",
-  'Online shops': "Let apps (such as a shop agent) read your Etsy and Printify shops through HomeShed, so they never hold the keys. Read-only; buyers' personal details are left out. Off until you switch them on.",
+  'Online shops': "Other shop settings.",
+  'Etsy': "Let apps (such as a shop agent) use your Etsy shop through HomeShed, so they never hold the keys. Buyers' personal details are left out. Each switch is off until you turn it on.",
+  'Printify': "Let apps read your Printify account, make drafts, publish and update products. Publishing and live changes wait for your approval, unless an app is trusted under Approvals.",
+  'Approvals': "Where your approval comes from. By default every publish and live change waits for you in the approvals bar.",
+  'Threads': "Let apps post to the Threads account you connect here. Every post is public.",
   'Capabilities': 'Switch whole groups of tools on or off. A switched-off tool answers with a clear message instead of running.',
   'Sharing': 'What people with a view-only login can see, and the address they use.',
   'Control Panel': 'How this Control Panel behaves on your devices.',
@@ -5056,18 +5112,67 @@ const setSlug = g => 'set-' + g.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 // intro inside its section; a group no section names stands alone at the end.
 // Seven sections (R&D batch 5, settings-page-review.md): "Claude plan usage" and "To-do list" used to stand alone as
 // loose tabs, and Credentials made "Access and sharing" 2,700 px tall, so keys get their own section.
+// Shops and images left "AI and tools" (the owner, 2026-10-09: "i seem to be scrolling for ages on some sections. the
+// shop settings etc needs its own category"): Online shops is its own section, one card per service, and Image
+// generation shows one row per provider with its cap and models folded under it. R&D (settings-page-review.md, ad5623a):
+// "Shops and social" (a beginner looks for Threads with the shop), help text clamped to one line with More, Capabilities
+// folded to one row, Sharing one card, and 24 px switches.
 const SET_SECTIONS = [
   ['Claude', ['Claude context', 'Claude plan usage', 'Rules and monitoring']],
   ['Agents', ['To-do list']],
-  ['AI and tools', ['AI models', 'Image generation', 'Language models', 'Online shops', 'Capabilities', 'Known bugs', 'APIs you can use']],
+  ['AI and tools', ['AI models', 'Language models', 'Capabilities', 'Known bugs', 'APIs you can use']],
+  ['Shops and social', ['Etsy', 'Printify', 'Approvals', 'Threads', 'Online shops']],
+  ['Images and video', ['Image generation']],
   ['Keys and passwords', ['Credentials']],
   ['Alerts', ['Notifications']],
   ['Account and sharing', ['Pro membership', 'Sharing', 'API access']],
   ['System', ['Control Panel', 'Connections', 'Storage on your PC']],
 ];
 const SET_LABEL = { 'Credentials': 'Keys and passwords' };  // shown names
-// Numbers that fine-tune a choice go under "Advanced", so the choices come first.
-const SET_ADVANCED = { 'Rules and monitoring': it => it.type === 'int' };
+// Numbers that fine-tune a choice go under "Advanced", so the choices come first; so do the shops' vault entry names.
+const _vaultName = it => /_name$/.test(it.key || '');
+const SET_ADVANCED = { 'Rules and monitoring': it => it.type === 'int', 'Etsy': _vaultName, 'Printify': _vaultName,
+  'Threads': _vaultName, 'Online shops': _vaultName };
+// The tool server sends one "Online shops" group; the page splits it into a card per service (first match wins).
+const SHOP_CARDS = [['Approvals', k => k.startsWith('approvals_')], ['Printify', k => k.includes('printify')],
+  ['Threads', k => k.includes('threads')], ['Etsy', k => k.includes('etsy')]];
+function splitGroup(groups, from, cards) {
+  const items = groups[from];
+  if (!items) return;
+  delete groups[from];
+  items.forEach(it => {
+    const card = cards.find(([, test]) => test(it.key || ''));
+    const g = card ? card[0] : from;
+    (groups[g] = groups[g] || []).push({ ...it, group: g });
+  });
+}
+// Image generation: each provider's switch, with its daily cap and model switches folded under it (open while it's
+// on), instead of 28 rows in a column.
+function imageProviderRows(items) {
+  const provs = items.map(it => (/^image_provider_(.+)_enabled$/.exec(it.key || '') || [])[1]).filter(Boolean)
+    .sort((a, b) => b.length - a.length);
+  const of = it => provs.find(p => (it.key || '').startsWith(`image_daily_cap_${p}`) || (it.key || '').startsWith(`image_model_${p}_`));
+  const loose = items.filter(it => !/^image_provider_.+_enabled$/.test(it.key || '') && !of(it));
+  return loose.map(settingRow).join('') + items.filter(it => /^image_provider_.+_enabled$/.test(it.key || '')).map(sw => {
+    const p = /^image_provider_(.+)_enabled$/.exec(sw.key)[1], more = items.filter(it => it !== sw && of(it) === p);
+    const open = !!sw.value, fold = more.length ? `<button type="button" class="set-fold" aria-expanded="${open}"
+      onclick="toggleFold(this)" title="This provider's daily cap and models">Cap and models (${more.length}) ${open ? '▾' : '▸'}</button>` : '';
+    return settingRow(paidHelp(sw), fold) + (more.length ? `<div class="set-fold-body"${open ? '' : ' hidden'}>${more.map(settingRow).join('')}</div>` : '');
+  }).join('');
+}
+function toggleFold(btn) {
+  const body = btn.closest('.set-row').nextElementSibling, o = body.hidden;
+  body.hidden = !o;
+  btn.setAttribute('aria-expanded', o);
+  btn.textContent = btn.textContent.replace(/[▸▾]$/, o ? '▾' : '▸');
+}
+// 3: every paid provider repeated "Also needs <KEY> under Keys and passwords, and a daily cap above 0. Off until you
+// switch it on." The card's intro says it once; a row keeps its cost and its key's name.
+function paidHelp(it) {
+  const m = /^Paid per image \((.*)\)\. Also needs (\S+) under Keys and passwords, and a daily cap above 0\. Off until you switch it on\.$/.exec(it.help || '');
+  return m ? { ...it, help: `Paid: ${m[1]}. Key: ${m[2]}.` } : it;
+}
+const SET_RENDER = { 'Image generation': imageProviderRows };
 const SET_SECTION_OF = Object.fromEntries(SET_SECTIONS.flatMap(([s, gs]) => gs.map(g => [g, s])));
 const sectionOf = g => SET_SECTION_OF[g] || g;
 // Quiet hours are one row, "from 23:00 to 07:00", instead of two separate number boxes.
@@ -5109,6 +5214,7 @@ async function loadSettings() {
   await _installedReady;  // a group for a part this setup doesn't have (no coding agent, no voice) isn't shown
   Object.keys(groups).forEach(g => { if (_installed[INSTALL_GROUPS[g]] === false) delete groups[g]; });
   if (groups['Voice']) groups['Voice'] = joinQuietHours(groups['Voice']);
+  splitGroup(groups, 'Online shops', SHOP_CARDS);
   const inSections = SET_SECTIONS.flatMap(([, gs]) => gs);
   const names =[...inSections.filter(g => groups[g]), ...SET_ORDER.filter(g => groups[g] && !inSections.includes(g)),
     ...Object.keys(groups).filter(g => !inSections.includes(g) && !SET_ORDER.includes(g))];
@@ -5118,6 +5224,7 @@ async function loadSettings() {
   document.getElementById('setCatSel').innerHTML = sections.map(s => `<option value="${escAttr(s)}">${escapeHtml(s)}</option>`).join('');
   const down = Object.values(d.errors || {}).map(m => `<div class="empty">${escapeHtml(m)}, so its settings aren't shown until it's back.</div>`).join('');
   const rowsOf = g => {
+    if (SET_RENDER[g]) return SET_RENDER[g](groups[g]);
     const adv = SET_ADVANCED[g], items = groups[g];
     const main = adv ? items.filter(it => !adv(it)) : items, extra = adv ? items.filter(adv) : [];
     return main.map(settingRow).join('')
@@ -5127,7 +5234,7 @@ async function loadSettings() {
       ${SET_INTRO[g] ? `<p class="hint">${escapeHtml(SET_INTRO[g])}</p>` : ''}
       <div id="${setSlug(g)}-rows">${rowsOf(g)}</div></section>`).join('');
   const sharing = document.getElementById('set-sharing');  // the view-only logins belong with Sharing
-  if (sharing) sharing.insertAdjacentElement('afterend', document.getElementById('viewersCard'));
+  if (sharing) sharing.appendChild(document.getElementById('viewersCard'));  // one Sharing card (R&D)
   showSetCat(sections.includes(_setCat) ? _setCat : sections[0]);
   loadOwnerPassword();
   loadViewers();
@@ -5146,10 +5253,13 @@ let _setCat = null;
 // (PKCE). Etsy only sends you back to an https address registered in your Etsy app. On https, that's this panel's
 // /api/etsy/callback; otherwise any https address you registered, and you paste the address Etsy sends you to.
 async function loadEtsyConnect() {
-  const rows = document.getElementById('set-online-shops-rows');
+  const rows = document.getElementById('set-etsy-rows');
   if (!rows || _viewer) return;
   let box = document.getElementById('etsyConnect');
-  if (!box) { box = document.createElement('div'); box.id = 'etsyConnect'; box.className = 'etsy-connect'; rows.appendChild(box); }
+  if (!box) {  // above the folded vault names
+    box = document.createElement('div'); box.id = 'etsyConnect'; box.className = 'etsy-connect';
+    rows.insertBefore(box, rows.querySelector(':scope > details.set-adv'));
+  }
   let d;
   try { d = await apiCall('GET', '/api/etsy'); }
   catch (e) { box.innerHTML = `<p class="hint">Connect Etsy: ${escapeHtml(e.message)}</p>`; return; }
@@ -5173,16 +5283,24 @@ async function loadEtsyConnect() {
     </ol>`}
     <p class="hint" id="etsyNote"></p>`;
   const q = new URLSearchParams(location.hash.split('?')[1] || '');
-  if (q.get('etsy')) document.getElementById('etsyNote').textContent = q.get('etsy') === 'ok'
-    ? `Etsy connected${q.get('shop') ? `: ${q.get('shop')}` : ''}.` : `Etsy didn't connect: ${q.get('why') || 'unknown reason'}`;
+  if (q.get('etsy')) {
+    document.getElementById('etsyNote').textContent = q.get('etsy') === 'ok'
+      ? `Etsy connected${q.get('shop') ? `: ${q.get('shop')}` : ''}.` : `Etsy didn't connect: ${q.get('why') || 'unknown reason'}`;
+    // Back from Etsy: open the shops and show the result (the owner, 2026-10-09: "it opens my homeshed page?").
+    showSetCat('Shops and social');
+    box.scrollIntoView({ block: 'center' });
+  }
 }
 // Connect Threads (the owner, 2026-10-06: "i need a connect app like the etsy one ... add a [posting] agent
 // "). Same steps as Etsy: Meta also only returns to an https address registered in the app.
 async function loadThreadsConnect() {
-  const rows = document.getElementById('set-online-shops-rows');
+  const rows = document.getElementById('set-threads-rows');
   if (!rows || _viewer) return;
   let box = document.getElementById('threadsConnect');
-  if (!box) { box = document.createElement('div'); box.id = 'threadsConnect'; box.className = 'etsy-connect'; rows.appendChild(box); }
+  if (!box) {  // above the folded vault names
+    box = document.createElement('div'); box.id = 'threadsConnect'; box.className = 'etsy-connect';
+    rows.insertBefore(box, rows.querySelector(':scope > details.set-adv'));
+  }
   let d;
   try { d = await apiCall('GET', '/api/threads'); }
   catch (e) { box.innerHTML = `<p class="hint">Connect Threads: ${escapeHtml(e.message)}</p>`; return; }
@@ -5206,8 +5324,12 @@ async function loadThreadsConnect() {
     </ol>`}
     <p class="hint" id="threadsNote"></p>`;
   const q = new URLSearchParams(location.hash.split('?')[1] || '');
-  if (q.get('threads')) document.getElementById('threadsNote').textContent = q.get('threads') === 'ok'
-    ? `Threads connected${q.get('account') ? ` as @${q.get('account')}` : ''}.` : `Threads didn't connect: ${q.get('why') || 'unknown reason'}`;
+  if (q.get('threads')) {
+    document.getElementById('threadsNote').textContent = q.get('threads') === 'ok'
+      ? `Threads connected${q.get('account') ? ` as @${q.get('account')}` : ''}.` : `Threads didn't connect: ${q.get('why') || 'unknown reason'}`;
+    showSetCat('Shops and social');  // back from Threads: show the result, as for Etsy
+    box.scrollIntoView({ block: 'center' });
+  }
 }
 async function startThreadsConnect(btn) {
   const note = document.getElementById('threadsNote'), ret = document.getElementById('threadsReturn').value.trim();
@@ -5841,10 +5963,11 @@ async function loadApiCatalog() {
   let d;
   try { d = await apiCall('GET', '/api/apis'); }
   catch (e) { box.innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`; return; }
-  box.innerHTML = (d.apis || []).map(a => `<div class="set-row"><div><div class="set-label">${escapeHtml(a.name)}</div>
+  const apis = d.apis || [];  // folded to one row, like Capabilities (R&D re-shoot, 2026-10-09)
+  box.innerHTML = apis.length ? `<details class="set-adv"><summary>${apis.length} ${apis.length === 1 ? 'API' : 'APIs'}</summary>` + apis.map(a => `<div class="set-row"><div><div class="set-label">${escapeHtml(a.name)}</div>
       <div class="hint">${escapeHtml(a.category || '')} · ${escapeHtml(a.cost || '')} · ${a.local ? 'runs on your own machines' : 'cloud'}</div>
-      <div class="hint">${escapeHtml(a.how_to_use || a.notes || '')}</div></div>
-    <div class="set-input">${a.status && a.status !== 'live' ? `<code title="The catalog's own status">${escapeHtml(a.status)}</code>` : ''}</div></div>`).join('') || '<div class="empty">No APIs listed yet.</div>';
+      ${helpHtml(a.how_to_use || a.notes || '')}</div>
+    <div class="set-input">${a.status && a.status !== 'live' ? `<code title="The catalog's own status">${escapeHtml(a.status)}</code>` : ''}</div></div>`).join('') + '</details>' : '<div class="empty">No APIs listed yet.</div>';
 }
 try { _setCat = localStorage.getItem('cp-set-cat'); } catch (e) { /* not remembered */ }
 function showSetCat(g) {
@@ -5875,14 +5998,19 @@ function settingsSearch(q) {
     s.querySelectorAll('.set-row, .cred-row').forEach(r => {
       const m = whole || r.textContent.toLowerCase().includes(q);
       r.classList.toggle('set-nomatch', !m);
-      if (m) { any = true; hits++; r.closest('details') && (r.closest('details').open = true); }
+      if (m) {
+        any = true; hits++;
+        if (r.closest('details')) r.closest('details').open = true;
+        if (r.closest('.set-fold-body')) r.closest('.set-fold-body').hidden = false;
+      }
     });
     s.classList.toggle('set-nomatch', !any);
   });
   document.querySelectorAll('#setCats button').forEach(b => { b.classList.remove('active'); b.removeAttribute('aria-current'); });
   document.getElementById('setNoMatch').hidden = hits > 0;
 }
-function settingRow(it) {
+function settingRow(it, fold) {  // fold: a toggle shown before the input (image providers)
+  fold = typeof fold === 'string' ? fold : '';  // .map(settingRow) passes the row's index here: never show it
   if (it.type === 'hours') return hoursRow(it);
   if (it.type === 'info' && it.group === 'Storage on your PC') return changeableRow('storage', it.label, it.value);
   if (it.type === 'info') {
@@ -5897,8 +6025,20 @@ function settingRow(it) {
   else input = `<input type="text" value="${escAttr(v || '')}" placeholder="${it.type === 'url' ? 'https://…' : ''}" onchange="${on}" ${aria}>`;
   const preview = settingExtra(it);
   // Where it's saved is a tooltip now, not a line under every row (settings-page-review.md #5).
-  return `<div class="set-row"><div><div class="set-label" title="${escAttr(SET_WHERE[it.source] || '')}">${escapeHtml(it.label)}</div><div class="hint">${escapeHtml(it.help || '')}</div>${preview}</div>
-    <div class="set-input">${input}<span class="set-msg" id="setMsg-${escAttr(it.source)}-${escAttr(it.key)}"></span></div></div>`;
+  return `<div class="set-row"><div><div class="set-label" title="${escAttr(SET_WHERE[it.source] || '')}">${escapeHtml(it.label)}</div>${helpHtml(it.help)}${preview}</div>
+    <div class="set-input">${fold}${input}<span class="set-msg" id="setMsg-${escAttr(it.source)}-${escAttr(it.key)}"></span></div></div>`;
+}
+// A row's help shows one line; a longer one gets More (R&D: two or three lines on most rows made every section long).
+function helpHtml(text) {
+  text = String(text || '');
+  if (text.length <= 70) return `<div class="hint">${escapeHtml(text)}</div>`;
+  return `<div class="set-helpwrap" onclick="toggleHelp(this)"><div class="hint set-help">${escapeHtml(text)}</div>`
+    + '<button type="button" class="set-more" aria-expanded="false">More</button></div>';
+}
+function toggleHelp(wrap) {  // the whole help line is the tap target; the button is there for the keyboard
+  const o = wrap.classList.toggle('open'), b = wrap.querySelector('.set-more');
+  b.textContent = o ? 'Less' : 'More';
+  b.setAttribute('aria-expanded', o);
 }
 // Anything a setting row shows under its help: an owner-only part may add its own (the sharing switch's preview).
 let settingExtra = () => '';
@@ -5926,14 +6066,15 @@ async function loadCapabilitySwitches() {
   catch (e) { box.innerHTML = `<div class="empty">${loadErr('tools', e)}</div>`; return; }
   _capCats = {};
   (t.tools || []).forEach(x => (_capCats[x.category] = _capCats[x.category] || []).push(x));
-  box.innerHTML = Object.keys(_capCats).sort().map(c => {
+  const cats = Object.keys(_capCats).sort(), offN = cats.filter(c => !_capCats[c].some(x => x.enabled)).length;
+  box.innerHTML = `<details class="set-adv"><summary>${cats.length - offN} groups on, ${offN} off</summary>` + cats.map(c => {
     const tools = _capCats[c], on = tools.filter(x => x.enabled).length;
     const some = on && on < tools.length ? ` ${tools.length - on} of them switched off.` : '';
     return `<div class="set-row"><div><div class="set-label">${escapeHtml(c)} <span class="count">${tools.length} ${tools.length === 1 ? 'tool' : 'tools'}</span></div>
-        <div class="hint">${escapeHtml(tools.map(x => x.id.split('.').slice(1).join('.')).join(', '))}.${some}</div></div>
+        ${helpHtml(tools.map(x => x.id.split('.').slice(1).join('.')).join(', ') + '.' + some)}</div>
       <div class="set-input"><label class="sw"><input type="checkbox" ${on ? 'checked' : ''} onchange="switchCategory('${escAttr(c)}', this)" aria-label="${escAttr(c)} tools on or off"><span></span></label>
         <span class="set-msg" id="capMsg-${escAttr(c)}"></span></div></div>`;
-  }).join('') + '<div class="hint" style="margin-top:8px">To switch single tools on or off, use the Tools page.</div>';
+  }).join('') + '<div class="hint" style="margin-top:8px">To switch single tools on or off, use the Tools page.</div></details>';
 }
 async function switchCategory(cat, box) {
   const enable = box.checked, msg = document.getElementById('capMsg-' + cat);

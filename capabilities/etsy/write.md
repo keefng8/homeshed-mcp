@@ -5,7 +5,7 @@
 
 ## Before the first use
 1. Switch on "Let apps ask to edit your Etsy listings' details" and/or "Let apps deactivate your Etsy listings"
-   (Settings > Online shops).
+   (Settings > Shops and social).
 2. Press **Connect Etsy** again once. With a write switch on, it asks Etsy for `listings_w` (listing edits) as well
    as the read scopes; with none on, it stays read-only. The Connect Etsy card says when a reconnect is needed.
 

@@ -14,7 +14,7 @@ from typing import Any
 from tools.commerce import _http as h
 from tools.commerce import vault_name
 
-# The standard vault entry names; the owner can name others in Settings > Online shops (read on every call).
+# The standard vault entry names; the owner can name others in Settings > Shops and social (read on every call).
 API_TOKEN, SHOP_ID = "PRINTIFY_API_TOKEN", "PRINTIFY_SHOP_ID"
 SETTING = "commerce_printify_enabled"
 USER_AGENT = "HomeShed-mcp-server"

@@ -340,7 +340,7 @@ every provider and model has a switch, and each paid provider a daily cap. Paid 
 ## Online shops (Etsy, Printify)
 
 Read-only tools that let an app see your shop without holding its keys. Each is **off** until you switch it on
-(Control Panel → **Settings → Online shops**). Buyers' names, emails and addresses are left out of every answer.
+(Control Panel → **Settings → Shops and social**). Buyers' names, emails and addresses are left out of every answer.
 
 | Name | What |
 |---|---|
@@ -351,7 +351,7 @@ Read-only tools that let an app see your shop without holding its keys. Each is 
 | `PRINTIFY_SHOP_ID` | The shop the shop-level tools use (`printify.shops.list` shows the ids) |
 
 **Connect Etsy:** save your Etsy app's keystring and shared secret first. Then, in the Control Panel under
-**Settings → Online shops**, add the return address it shows to your app on Etsy's "Your Apps" page, and choose
+**Settings → Shops and social**, add the return address it shows to your app on Etsy's "Your Apps" page, and choose
 **Connect Etsy**: Etsy's own sign-in opens, read-only (`shops_r listings_r transactions_r`), and HomeShed keeps the
 connection and your shop number. If the panel isn't on https, use any https address you own as the return address
 and paste the address Etsy sends you to back into the panel. A connection lasts 90 days; connect again to renew it.
@@ -360,7 +360,7 @@ and paste the address Etsy sends you to back into the panel. A connection lasts 
 
 `threads.publish` posts text (and an optional link) to your Threads account; `threads.status` shows the connection.
 Posts are **public**, so it's **off** until you switch on "Let apps post to Threads" (Control Panel → **Settings →
-Online shops**). Connect your account there with **Connect Threads**: Threads' own sign-in, after you save your
+Shops and social**). Connect your account there with **Connect Threads**: Threads' own sign-in, after you save your
 Threads app's id and secret under the names that card shows. HomeShed keeps the connection (`THREADS_ACCESS_TOKEN`,
 `THREADS_USER_ID`) in its vault and renews it before it expires.
 

@@ -7,7 +7,7 @@ code exchange; the access token's numeric prefix is the user id; refresh tokens 
 
 Two ways back: Etsy sends the browser to the panel's own https address (/api/etsy/callback), or, when the panel isn't
 on https, to any https address the owner registered, and he pastes that address into the panel (finish_url).
-Saved on success: the refresh token (ETSY_REFRESH_TOKEN, or the name set in Settings > Online shops) and the shop's
+Saved on success: the refresh token (ETSY_REFRESH_TOKEN, or the name set in Settings > Shops and social) and the shop's
 number (ETSY_SHOP_ID). Neither, nor the code or verifier, is ever returned or logged.
 """
 from __future__ import annotations

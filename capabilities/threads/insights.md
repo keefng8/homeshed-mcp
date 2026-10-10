@@ -18,7 +18,7 @@ followers gained. Meta's numbers can lag a little; read them after about 24 hour
 
 ## Needs
 The `threads_manage_insights` permission (added to the connect scopes 2026-10-07). A connection made before that
-doesn't have it: connect again in Settings > Online shops, and add the permission to the app's Threads use case in
+doesn't have it: connect again in Settings > Shops and social, and add the permission to the app's Threads use case in
 Meta's developer site if it isn't offered.
 
 ## Errors

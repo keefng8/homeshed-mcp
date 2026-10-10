@@ -6,7 +6,7 @@
 ## Purpose
 Upload a print file (from `image.print_file`) and make an **unpublished** product in the owner's Printify shop, so
 Printify renders its mockups for review. Nothing is published, listed or sold. Off until the owner switches "Let apps
-create Printify products" on (Settings > Online shops), at most `PRINTIFY_DAILY_MAX` a day (default 20), and every one
+create Printify products" on (Settings > Shops and social), at most `PRINTIFY_DAILY_MAX` a day (default 20), and every one
 is in the client audit trail.
 
 **Publishing is not here yet.** Printify only publishes to a store connected to a sales channel (its docs). Since

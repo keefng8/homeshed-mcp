@@ -9,7 +9,7 @@ A post is two calls: a TEXT container, then threads_publish (Meta suggests a sho
 250 posts a day per profile.
 
 Kept in the vault: THREADS_ACCESS_TOKEN (the 60-day token) and THREADS_USER_ID. The app id and secret are read by the
-names set in Settings > Online shops. Nothing here returns or logs a token or the secret.
+names set in Settings > Shops and social. Nothing here returns or logs a token or the secret.
 """
 from __future__ import annotations
 
@@ -119,7 +119,7 @@ def token() -> tuple[str, str]:
     import vault
     tok, uid = h.secret(TOKEN), h.secret(USER)
     if not tok or not uid:
-        raise h.CommerceError("Threads isn't connected: press Connect Threads in Settings > Online shops")
+        raise h.CommerceError("Threads isn't connected: press Connect Threads in Settings > Shops and social")
     row = next((c for c in vault.list_credentials() if c.get("name") == TOKEN), {})
     if time.time() - float(row.get("updated") or 0) > REFRESH_AFTER_S:
         try:

@@ -6,8 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-10
+
+### Fixed
+- Control Panel: the Summary screen's cards no longer cut off, rows line up, and the Release progress card shows its
+  title, bars and next step without clipping.
+- Control Panel: Settings is tidier (shops and social have their own section) and its switches work properly on phones.
+- Control Panel: the menu's Projects icon ships with the package (it was missing from a clean install).
+- Control Panel: the Observations form's example rule ID is a generic one.
+
+## [0.1.0] - 2026-10-10
+
 ### Added
-- First public release: a self-hosted MCP server with 64 tools for memory, reasoning, git, files, network checks,
+- First public release: a self-hosted MCP server with 119 tools for memory, reasoning, git, files, network checks,
   Docker, monitoring, notifications, known bugs and release checks.
 - Built-in memory (SQLite): in Claude Code each project gets its own automatically; an app with its own key always has
   its own memory, may read the shared one (a switch per app), and its writes to the shared one wait for the owner.
