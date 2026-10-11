@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-11
+
+### Changed
+- The PyPI package description carries an ownership token for the mcprush.com directory listing. No code changes.
+
 ## [0.1.1] - 2026-10-10
 
 ### Fixed
