@@ -838,6 +838,9 @@ voice assistant with 124 one-click apps. One membership covers both. It adds:
   one step at a time, and a question before anything is installed or deleted).
 - **A curated known-bugs feed**: fixes other users already found, straight into `bugs.find`.
 - **Fair terms**: packs you've installed keep working if you stop paying.
+- **Pro tools (coming soon)**: `local_ai.decide`, `local_ai.assess`, `local_ai.summarize_file`, `knowledge.search`,
+  `signal.*`, `todo.*` and `social.youtube_*`, loaded with `uvx homeshed-mcp pro update` once they're out. The packs
+  and the known-bugs feed are available now.
 
 **[Get Pro →](https://mavis-ai.co.uk/homeshed?src=homeshed&m=readme)**
 
