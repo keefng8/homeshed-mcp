@@ -93,6 +93,14 @@
       "include": [
         "*gemini-*flash*"
       ],
+      "exclude": [
+        "*image*",
+        "*tts*",
+        "*audio*",
+        "*live*",
+        "*omni*",
+        "*embed*"
+      ],
       "cloud": true,
       "tier": 5,
       "notes": "Free tier (about 15 a minute and 1,500 a day on the free Flash models). Dormant until GEMINI_API_KEY is set; get a key at aistudio.google.com. Prompts leave your machine."

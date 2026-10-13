@@ -64,6 +64,11 @@
       "required": false,
       "default": false
     },
+    "matte": {
+      "type": "string",
+      "required": false,
+      "default": "auto"
+    },
     "watermark": {
       "type": "string",
       "required": false,

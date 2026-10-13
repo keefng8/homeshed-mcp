@@ -37,7 +37,12 @@ from paths import data_path
 LOCAL = "local-sdcpp"
 REQUEST_TIMEOUT = httpx.Timeout(120.0, connect=10.0)
 JOB_TIMEOUT_S = 300
-MAX_RUNNING = 3            # remote jobs at once; a busy agent gets a clear "busy" instead of a pile-up
+MAX_RUNNING = 3            # remote jobs at once per provider; a busy agent gets a clear "busy" instead of a pile-up
+# Google (Nano Banana) gets 6 (the owner's yes, 2026-10-10: the shop's training feed). Checked first: a job is network-
+# bound and holds one 2-3 MB image in memory, the server had 4 CPUs and ~11 GB free, and Google's quota has room
+# (RPD 126/1000, peak RPM 6/100). print_file isn't on this path.
+MAX_RUNNING_BY_PROVIDER = {"google": 6}
+MAX_RUNNING_TOTAL = 8      # every paid provider together
 MAX_JOBS_KEPT = 50         # in memory; the sidecars on disk keep the rest
 MAX_IMAGE_BYTES = 30 * 1024 * 1024
 PREVIEW_MAX_BYTES = 2 * 1024 * 1024
@@ -48,6 +53,8 @@ FLUX_SCHNELL = {"name": "Apache-2.0 (FLUX.1 [schnell] weights)", "commercial_use
                 "terms_url": "https://huggingface.co/black-forest-labs/FLUX.1-schnell"}
 XAI_TERMS = {"name": "xAI Terms of Service (Enterprise): output owned by the customer", "commercial_use": True,
              "terms_url": "https://x.ai/legal/terms-of-service-enterprise"}
+GOOGLE_TERMS = {"name": "Gemini API Terms (paid): no ownership claimed; SynthID watermark", "commercial_use": True,
+                "terms_url": "https://ai.google.dev/gemini-api/terms"}
 
 # commercial_use: True = outputs may be sold; False = never; "check" = depends on plan/terms, read them first.
 # cost_estimate_usd: approximate per 1024px image (2026-10), None when it varies too much to state; always confirm
@@ -116,13 +123,28 @@ PROVIDERS: dict[str, dict] = {
                    for m, usd in (("grok-imagine-image-2.0", 0.06),
                                   ("grok-imagine-image", 0.02))},
     },
+    "google": {
+        "label": "Google Nano Banana (Gemini API)", "key": "GEMINI_API_KEY", "paid": True,
+        "cost_note": "2K $0.050, 4K $0.113 an image; billed in AI Studio (not a Gemini app plan)",
+        "pricing_url": "https://ai.google.dev/gemini-api/docs/pricing",
+        "default_model": "gemini-nano-banana-2.1",
+        # 2026-10-13 (the owner, via the grok helper; prices verified by R&D on ai.google.dev the same day):
+        # gemini-2.5-flash-image was shut down on 2 Oct 2026. Sent at 2K by default (R&D), 4K above 2048 px.
+        # It edits too: image.generate(input_images=[...]) sends them with the prompt as the instruction.
+        "models": {
+            "gemini-nano-banana-2.1": {"license": GOOGLE_TERMS, "cost_estimate_usd": 0.0504, "cost_4k_usd": 0.113},
+            "gemini-3-pro-image": {"license": GOOGLE_TERMS, "cost_estimate_usd": None, "note": "Pro: name it per job"},
+        },
+    },
 }
+EDIT_PROVIDERS = ("google",)  # the ones that take input_images (an image to edit, or a look to copy)
+MAX_INPUT_IMAGES = 5
 # require_commercial with no provider named: the free local model first, then the cheapest paid ones.
 COMMERCIAL_ORDER = [LOCAL, "together", "fal", "replicate", "openai"]
 # Where a provider's image URLs may be fetched from (it returned them); anything else is refused.
 DOWNLOAD_HOSTS = {"xai": ("x.ai",), "replicate": ("replicate.delivery", "replicate.com"),
                   "fal": ("fal.media", "fal.run", "fal.ai"), "openai": (), "together": ("together.ai", "together.xyz"),
-                  "stability": ()}
+                  "stability": (), "google": ()}
 
 # --- switches (runtime_settings entries; the Settings page draws them) ---------------------------------------------
 
@@ -230,9 +252,9 @@ def used_today(provider: str) -> int:
     return int(_usage()["counts"].get(provider, 0) or 0)
 
 
-def _count_one(provider: str) -> None:
+def _count_one(provider: str, step: int = 1) -> None:
     data = _usage()
-    data["counts"][provider] = int(data["counts"].get(provider, 0) or 0) + 1
+    data["counts"][provider] = max(0, int(data["counts"].get(provider, 0) or 0) + step)
     f = _usage_file()
     f.parent.mkdir(parents=True, exist_ok=True)
     tmp = f.with_suffix(".tmp")
@@ -517,8 +539,51 @@ def _fal(key, model, prompt, width, height, seed, steps):
     return _download("fal", images[0]["url"])
 
 
+GOOGLE_URL = "https://generativelanguage.googleapis.com/v1beta/interactions"
+GOOGLE_ASPECTS = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]
+
+
+def google_size(width: int, height: int) -> str:
+    """2K by default (R&D: the best value per image), 4K when more than 2048 px is asked for."""
+    return "4K" if max(width or 0, height or 0) > 2048 else "2K"
+
+
+def _google(key, model, prompt, width, height, seed, steps, inputs=None):
+    parts = [{"type": "text", "text": prompt}] + [
+        {"type": "image", "mime_type": mime, "data": base64.b64encode(data).decode()} for data, mime in inputs or []]
+    resp = _send("google", key, "POST", GOOGLE_URL, headers={"x-goog-api-key": key},
+                 json={"model": model, "input": parts,
+                       # Google takes only image/jpeg here (live, 2026-10-08: "image/png" is refused with a 400)
+                       "response_format": {"type": "image", "mime_type": "image/jpeg",
+                                           "aspect_ratio": _aspect(width, height, GOOGLE_ASPECTS),
+                                           "image_size": google_size(width, height)}})
+    return google_image(resp.json())
+
+
+def google_image(body) -> tuple[bytes, str]:
+    """The first image anywhere in Google's answer. Its docs show the interaction's output_image, or the steps' content
+    blocks of type "image" (generateContent's inline_data too): a breadth-first walk finds any of them."""
+    queue = [body]
+    while queue:
+        x = queue.pop(0)
+        if isinstance(x, dict):
+            inline = x.get("inline_data") or x.get("inlineData")
+            if isinstance(inline, dict) and isinstance(inline.get("data"), str):
+                x = {**inline, "type": "image"}
+            mime = str(x.get("mime_type") or x.get("mimeType") or "")
+            if isinstance(x.get("data"), str) and (x.get("type") == "image" or mime.startswith("image/")):
+                try:
+                    return base64.b64decode(x["data"], validate=True), mime or "image/png"
+                except ValueError:
+                    raise ProviderError("google returned an image that isn't base64") from None
+            queue.extend(x.values())
+        elif isinstance(x, list):
+            queue.extend(x)
+    raise ProviderError("google returned no image (it may have refused the prompt)")
+
+
 ADAPTERS = {"openai": _openai, "stability": _stability, "replicate": _replicate, "fal": _fal,
-            "together": _together, "xai": _xai}
+            "together": _together, "xai": _xai, "google": _google}
 
 
 # --- remote jobs (same shape as the GPU service's) -----------------------------------------------------------------
@@ -561,7 +626,8 @@ def sniff_mime(data: bytes) -> str | None:
 def _run(job: dict, key: str) -> None:
     try:
         data, mime = ADAPTERS[job["provider"]](key, job["model"], job["prompt"], job["width"], job["height"],
-                                               job["seed"], job["steps"])
+                                               job["seed"], job["steps"],
+                                               **({"inputs": job["_inputs"]} if job.get("_inputs") else {}))
         if not data:
             raise ProviderError(f"{job['provider']} returned an empty image")
         mime = sniff_mime(data) or mime
@@ -573,6 +639,15 @@ def _run(job: dict, key: str) -> None:
         job.update(status="done", progress="done", saved_as=name, bytes=len(data), mime=mime)
     except ProviderError as exc:
         job.update(status="failed", progress="failed", error=str(exc))
+        if re.search(r" returned http 4\d\d\b", str(exc)):  # refused (bad key, no access, spend cap, no quota): no image,
+            job["cost_estimate_usd"] = 0.0  # nothing billed, so it doesn't use up the owner's daily cap (2026-10-08)
+            try:
+                _count_one(job["provider"], -1)
+            except OSError:
+                pass
+            import spend
+            spend.add(job.get("caller") or "owner", "image", -float(job.get("cost_counted_usd") or 0.0))  # nor the app's
+            job["cost_counted_usd"] = 0.0
     except Exception as exc:  # noqa: BLE001 - a job thread must always end in a state
         job.update(status="failed", progress="failed", error=f"unexpected error ({type(exc).__name__})")
     finally:
@@ -584,26 +659,52 @@ def _run(job: dict, key: str) -> None:
 
 
 def start_remote(provider: str, model: str, prompt: str, width: int, height: int, seed: int, steps: int,
-                 background: bool = True) -> dict:
+                 background: bool = True, inputs: list[tuple[bytes, str]] | None = None,
+                 input_names: list[str] | None = None) -> dict:
+    """inputs: (bytes, mime) of images to edit or take a look from (EDIT_PROVIDERS only); input_names: theirs, for
+    the record."""
     p = PROVIDERS[provider]
+    if inputs and provider not in EDIT_PROVIDERS:
+        raise ProviderError(f"input_images work only with {', '.join(EDIT_PROVIDERS)}")
     key = _secret(p["key"])
     if not key:
         raise ProviderError(f"{provider} isn't configured: add {p['key']} under the Control Panel's Credentials")
     m = model_info(provider, model)
+    cost = m.get("cost_4k_usd") if provider == "google" and google_size(width, height) == "4K" else None
+    cost = cost if cost is not None else m.get("cost_estimate_usd")
+    import clients
+    import spend
+    client = clients.current_client.get() or "owner"
+    priced = cost if cost is not None else spend.UNKNOWN_IMAGE_USD  # the app's cap counts an unlisted price too
     with _lock:
         why = unusable_reason(provider, model)
         if why:
             raise ProviderError(why)
-        if sum(1 for j in _jobs.values() if j["status"] == "running") >= MAX_RUNNING:
-            raise ProviderError(f"{MAX_RUNNING} paid image jobs are already running; try again shortly")
+        try:
+            if priced > 0:  # free models keep working at the cap
+                spend.check(client, "image", priced)  # the app's own daily dollar cap (the API page)
+        except spend.SpendCapReached as exc:
+            raise ProviderError(str(exc)) from None
+        running = [j for j in _jobs.values() if j["status"] == "running"]
+        mine = sum(1 for j in running if j.get("provider") == provider)
+        most = MAX_RUNNING_BY_PROVIDER.get(provider, MAX_RUNNING)
+        if mine >= most:
+            raise ProviderError(f"{most} paid {provider} image jobs are already running; try again shortly")
+        if len(running) >= MAX_RUNNING_TOTAL:
+            raise ProviderError(f"{MAX_RUNNING_TOTAL} paid image jobs are already running; try again shortly")
         try:
             _count_one(provider)
         except OSError:
             raise ProviderError("couldn't record today's image count, so the paid call wasn't made") from None
+        spend.add(client, "image", priced)
         job_id = secrets.token_hex(6)
         job = {"job_id": job_id, "status": "running", "progress": f"sent to {provider}", "provider": provider,
+               # who asked (the app's name, or "owner") and what the spend counters charged (an unlisted price counts
+               # as spend.UNKNOWN_IMAGE_USD): the shop app books its bots' paid images from these (2026-10-10)
+               "caller": client, "cost_counted_usd": priced,
                "model": model, "prompt": prompt, "width": width, "height": height, "steps": steps, "seed": seed,
-               "saved_as": None, "error": None, "paid": True, "cost_estimate_usd": m.get("cost_estimate_usd"),
+               "saved_as": None, "error": None, "paid": True, "cost_estimate_usd": cost,
+               **({"input_images": list(input_names or []), "_inputs": inputs} if inputs else {}),
                "cost_note": p["cost_note"], "pricing_url": p["pricing_url"],
                "license": m["license"]["name"], "license_info": dict(m["license"]),
                "commercial_use": m["license"]["commercial_use"], "timeout_s": JOB_TIMEOUT_S,
@@ -636,6 +737,20 @@ def remote_status(job_id: str, include_image: bool = False) -> dict | None:
         path = output_dir() / out["saved_as"]
         if path.is_file() and path.stat().st_size <= PREVIEW_MAX_BYTES:
             out["image_b64"], out["image_mime"] = base64.b64encode(path.read_bytes()).decode(), out.get("mime")
+        elif path.is_file() and (small := _preview(path.read_bytes())):  # a 2K Nano Banana PNG is ~5 MB
+            out["image_b64"], out["image_mime"], out["preview"] = small, "image/jpeg", "1024 px JPEG copy"
         else:
             out["image_note"] = f"image over {PREVIEW_MAX_BYTES // 2**20} MB: not inlined; it's at {out['saved_as']}"
     return out
+
+
+def _preview(data: bytes) -> str | None:
+    """A 1024 px JPEG copy (base64) from the image service's /image/thumb; None when it can't make one."""
+    from tools.image.generate import base_url
+    try:
+        with _http() as c:
+            r = c.post(f"{base_url()}/image/thumb", json={"image_b64": base64.b64encode(data).decode(), "px": 1024},
+                       timeout=60)
+        return r.json().get("image_b64") if r.status_code == 200 else None
+    except (httpx.HTTPError, ValueError, ProviderError):
+        return None

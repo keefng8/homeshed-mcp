@@ -94,8 +94,9 @@ def _discover(entry: dict) -> list[str]:
         ids = None
     if ids is None:  # discovery failed: keep the last good list (or nothing)
         return cached[1] if cached else []
-    include = entry.get("include") or ["*"]
-    ids = sorted(i for i in ids if any(fnmatch.fnmatch(i, pat) for pat in include))
+    include, exclude = entry.get("include") or ["*"], entry.get("exclude") or []
+    ids = sorted(i for i in ids if any(fnmatch.fnmatch(i, pat) for pat in include)
+                 and not any(fnmatch.fnmatch(i, pat) for pat in exclude))
     _discovery_cache[entry["name"]] = (now, ids)
     return ids
 
@@ -254,6 +255,42 @@ def decisions(limit: int = 20) -> list[dict]:
         return [dict(d) for d in itertools.islice(_decisions, max(0, limit))]
 
 
+HOLD_WHY = {"image": "paused for an image job: it starts again when the job ends",
+            "image-orphan": "paused for an image job that ended; it's being started again",
+            "restarting": "starting up again", "ram": "stopped for low memory on the PC: it restarts when there's room",
+            "down": "found stopped: it's being started again", "owner": "switched off on the Models page"}
+_hold_cache: tuple[float, str | None] = (0.0, None)
+
+
+def _pc_hold() -> str | None:
+    """Why the PC's agent model (llama-server) is stopped, as the GPU service's safeguards recorded it (guard.py holds:
+    an image job, low RAM, the owner...), or None. Cached 30 s; never raises (R&D, 2026-10-10: a dry run only said
+    "benched after a recent failure" while a training render had paused the model)."""
+    global _hold_cache
+    if time.time() - _hold_cache[0] < 30:
+        return _hold_cache[1]
+    why = None
+    try:
+        import vault
+        base = (os.environ.get("GPU_SERVICE_URL") or os.environ.get("LOCAL_AI_DECIDE_BASE_URL") or "").strip().rstrip("/")
+        token = vault.secret("GPU_SERVICE_TOKEN", "")
+        if base and token:
+            r = httpx.get(f"{base}/models/health", headers={"X-GPU-Token": token}, timeout=3)
+            hold = ((r.json() or {}).get("holds") or {}).get("llama-server") if r.status_code == 200 else None
+            if isinstance(hold, dict):
+                why = HOLD_WHY.get(str(hold.get("by")), f"stopped ({hold.get('by')})")
+    except Exception:  # noqa: BLE001 - only an explanation: never a reason to fail the call differently
+        why = None
+    _hold_cache = (time.time(), why)
+    return why
+
+
+def _local_why(b: dict, reason: str) -> str:
+    """A local backend's skip or failure reason, with the PC's own reason when its agent model is held."""
+    hold = None if b.get("cloud") else _pc_hold()
+    return f"{reason} ({hold})" if hold else reason
+
+
 def bench_remaining(name: str) -> int:
     """Seconds until a benched backend is tried again (0 = not benched)."""
     return max(0, round(_benched_until.get(name, 0) - time.time()))
@@ -338,7 +375,8 @@ def ask(
         elif not b["configured"]:
             skipped.append({"backend": b["name"], "reason": "not configured"})
         elif _benched_until.get(b["name"], 0) > now:
-            skipped.append({"backend": b["name"], "reason": "benched after a recent failure"})
+            skipped.append({"backend": b["name"], "reason": _local_why(
+                b, f"benched after a recent failure, tried again in {bench_remaining(b['name'])} s")})
         elif not b["cloud"] and _is_busy(b["base_url"]):
             skipped.append({"backend": b["name"], "reason": "busy"})
         else:
@@ -349,7 +387,7 @@ def ask(
                 return {**result, "skipped": skipped}
             except _BackendFailed as exc:
                 _benched_until[b["name"]] = time.time() + BENCH_S
-                skipped.append({"backend": b["name"], "reason": str(exc)})
+                skipped.append({"backend": b["name"], "reason": _local_why(b, str(exc))})
     reasons = "; ".join(f"{s['backend']}: {s['reason']}" for s in skipped) or "no models registered"
     _record("auto", order, None, skipped, started, allow_cloud, "no backend could answer")
     raise LocalAIError(f"no backend could answer ({reasons})")

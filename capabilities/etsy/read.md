@@ -32,7 +32,7 @@ every result carries a `warning` to re-authorise and store it.
 ## Tools
 | Tool | Etsy endpoint | Inputs |
 |---|---|---|
-| `etsy.shop.get` | `GET /v3/application/shops/{shop_id}` | none |
+| `etsy.shop.get` | `GET /v3/application/shops/{shop_id}`, plus `/production-partners` (shops_r) | none |
 | `etsy.listings.list` | `GET /v3/application/shops/{shop_id}/listings` (listings_r) | `state` active/inactive/sold_out/draft/expired, `limit` 1-20, `offset` |
 | `etsy.listing.get` | `GET /v3/application/listings/{listing_id}` | `listing_id` |
 | `etsy.orders.list` | `GET /v3/application/shops/{shop_id}/receipts` (transactions_r) | `limit` 1-20, `offset`, `was_paid`/`was_shipped` any/yes/no |
@@ -54,7 +54,14 @@ or token scrubbed. Client tokens reach these only when granted (`etsy.*`).
 For a check after publishing a listing:
 - `etsy.listing.get(listing_id, full=false)`: `full=true` returns up to 5,000 characters of the description, and
   `description_chars` is the untrimmed length, so the end of a long description (an AI disclosure) can be checked.
-  `images` is `{count, ranks}` (asked for with Etsy's `includes=Images`); `production_partner_ids` when Etsy gives them.
+  `images` is `{count, ranks}` (asked for with Etsy's `includes=Images`).
+- Production partners (fixed 2026-10-09): Etsy's listing names them in `production_partners`
+  (`{production_partner_id, partner_name, location}`); `production_partner_ids` is only what a write sends, so it was
+  always null before. `etsy.listing.get` returns `production_partner_ids` (sorted ids; `[]` = none linked, `null` =
+  Etsy didn't say) and `production_partners` (`[{id, name}]`). `etsy.shop.get` returns the shop's own partners as
+  `production_partners: [{id, name, location}]` (null when the shop's connection can't read them), which is what a
+  listing should name. `etsy.listing.update` compares with the same field, so a partner already linked isn't queued
+  again.
 - `etsy.shipping_destinations(shipping_profile_id)`: the profile's destinations (country or Etsy region, prices,
   delivery days) and `includes_eu` (an EU-27 country or Etsy's "eu" region), for a UK-only launch check (EU product
   safety, GPSR). It uses the shop's Etsy connection (scope `shops_r`).

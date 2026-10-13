@@ -29,7 +29,50 @@ def fake(monkeypatch, tmp_path):
     monkeypatch.setattr(pf, "get", lambda path, params=None: state["product"])
     monkeypatch.setattr(pf, "put", lambda path, body, **kw: sent.append(("PUT", path, body, kw["setting"])) or {})
     monkeypatch.setattr(pf, "publish_post", lambda path, body, **kw: sent.append(("PUBLISH", path, body, kw["setting"])) or {})
+    state["etsy"] = ["active"]  # the Etsy listing's state, read by the re-activation guard (last one repeats)
+    monkeypatch.setattr(ul, "_etsy_state", lambda p: state["etsy"].pop(0) if len(state["etsy"]) > 1 else state["etsy"][0])
+    monkeypatch.setattr(ul, "_recheck_later", lambda p, before: sent.append(("RECHECK", before)))
     return state, sent, switches
+
+
+def test_a_listing_off_on_etsy_is_held_when_asked_and_on_approval(fake):
+    """The Director's decisions item 9 (10 Oct): a re-publish switched the Black Staffy tee back on after it was off."""
+    state, sent, _ = fake
+    state["etsy"] = ["inactive"]
+    with pytest.raises(h.CommerceError, match="listing is off on Etsy: the owner turns it on first"):
+        ul.product_update_live("abc123", title="New title")
+    assert pp.list_pending() == []
+    state["etsy"] = ["active"]
+    item = ul.product_update_live("abc123", title="New title")
+    state["etsy"] = ["inactive"]  # turned off while it waited
+    with pytest.raises(h.CommerceError, match="listing is off on Etsy"):
+        pp.decide(item["id"], True)
+    assert sent == [] and pp.list_pending()[0]["last_error"].startswith("listing is off on Etsy")
+    state["etsy"] = ["active", "inactive"]  # off in the seconds between the check and the publish
+    with pytest.raises(h.CommerceError, match="saved in Printify but not published"):
+        pp.decide(item["id"], True)
+    assert [s[0] for s in sent] == ["PUT"]  # no publish
+
+
+def test_etsy_unreadable_holds_it(fake, monkeypatch):
+    def down(p):
+        raise h.CommerceError("Etsy HTTP 503")
+    monkeypatch.setattr(ul, "_etsy_state", down)
+    with pytest.raises(h.CommerceError, match="couldn't check on Etsy"):
+        ul.product_update_live("abc123", title="New title")
+
+
+@pytest.mark.parametrize("seen, pushed", [(["active", "inactive", "active", "active"], True),
+                                          (["active"] * 4, False), (["inactive"] * 4, False)])
+def test_the_backstop_pushes_when_a_listing_turned_off_meanwhile_is_back_on(monkeypatch, seen, pushed):
+    pushes = []
+    monkeypatch.setattr(ul, "_etsy_state", lambda p: seen.pop(0))
+    monkeypatch.setattr("tools.notify.send.send", lambda message, **kw: pushes.append((kw.get("title"), message)))
+    monkeypatch.setattr(ul.threading, "Thread", lambda target, **kw: type("T", (), {"start": staticmethod(target)})())
+    ul._recheck_later(dict(LIVE), "active", sleep=lambda s: None)
+    assert bool(pushes) is pushed
+    if pushed:
+        assert pushes[0][0] == "Etsy listing switched back on" and "was inactive" in pushes[0][1]
 
 
 def test_a_call_only_queues_and_approval_edits_then_publishes_the_changed_parts(fake):
@@ -43,13 +86,39 @@ def test_a_call_only_queues_and_approval_edits_then_publishes_the_changed_parts(
     assert item["action"] == "update" and item["checks"]["daily_max"] == 10
     res = pp.decide(item["id"], True)
     assert res["approved"] and res["result"]["publishing"] is True
-    (put, publish) = sent
+    (put, publish, recheck) = sent
+    assert recheck == ("RECHECK", "active")  # the backstop watches it after the publish
     assert put[0] == "PUT" and put[3] == pf.LIVE_UPDATE_SETTING and put[2]["title"] == "Retro French Bulldog Tee"
     assert [v["price"] for v in put[2]["variants"]] == [2199, 2299] and all("sku" not in v for v in put[2]["variants"])
     assert publish[2] == {"title": True, "description": False, "images": False, "variants": True, "tags": True,
                           "keyFeatures": False, "shipping_template": False}
     assert len(pp.done_today("update")) == 1 and pp.published_today() == []  # not counted as a publish
     assert pp.done_today("update")[0]["old"]["title"] == "Retro Frenchie Tee"  # kept for undo
+
+
+def test_a_size_can_be_taken_off_sale_without_touching_skus_but_never_all_of_them(fake):
+    """The shop app, 2026-10-09: three Heather Navy sizes (a cotton-poly blend) slipped onto a 100% cotton tee."""
+    state, sent, _ = fake
+    out = ul.product_update_live("abc123", variants=[{"id": 2, "enabled": False}])
+    assert out["pending"] is True and out["changed"] == ["enabled"] and "variants off: 2" in out["update"]
+    with pytest.raises(h.CommerceError, match="every variant"):
+        ul.product_update_live("abc123", variants=[{"id": 1, "enabled": False}, {"id": 2, "enabled": False}])
+    with pytest.raises(h.CommerceError, match="true or false"):
+        ul.product_update_live("abc123", variants=[{"id": 2, "enabled": "no"}])
+    [item] = pp.list_pending()
+    pp.decide(item["id"], True)
+    put = sent[0][2]
+    assert [(v["id"], v["is_enabled"]) for v in put["variants"]] == [(1, True), (2, False)]
+    assert all("sku" not in v for v in put["variants"]) and pp.done_today("update")[0]["old"]["enabled"] == {"2": True}
+
+
+def test_an_on_off_change_meanwhile_is_stale(fake):
+    state, sent, _ = fake
+    out = ul.product_update_live("abc123", variants=[{"id": 2, "enabled": False}])
+    state["product"]["variants"][1]["is_enabled"] = False  # someone switched it off in Printify meanwhile
+    with pytest.raises(h.CommerceError, match="variant 2 on/off"):
+        pp.decide(out["id"], True)
+    assert sent == []
 
 
 @pytest.mark.parametrize("product, kwargs, match", [

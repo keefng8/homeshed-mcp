@@ -87,11 +87,11 @@ def test_at_a_keyboard_numbers_switch_groups_on_and_off(fresh, monkeypatch):
 def test_doctor_names_the_hidden_groups(fresh, monkeypatch, capsys):
     toolgroups.save({"proxmox"})
     report = cli.diagnose()
-    assert report["hidden_groups"] == ["proxmox"] and report["hidden_tools"] == 9
+    assert report["hidden_groups"] == ["proxmox"] and report["hidden_tools"] == 10
     monkeypatch.setattr(cli, "diagnose", lambda: report)
     cli.cmd_doctor(SimpleNamespace(json=False))
     out = capsys.readouterr().out
-    assert "9 tool(s) the AI doesn't see: proxmox" in out and "setup" in out
+    assert "10 tool(s) the AI doesn't see: proxmox" in out and "setup" in out
 
 
 def test_a_hidden_group_is_missing_from_tools_list_over_stdio(tmp_path):

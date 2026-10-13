@@ -223,6 +223,65 @@ def set_limits(name: str, rate_per_min: int | None, expires_days: int | None) ->
     _audit("limits changed", name, rate_per_min=rate_per_min, expires_days=expires_days)
 
 
+def set_spend_cap(name: str, usd: float | None) -> None:
+    """The app's daily cap on paid images and language-model calls, in dollars (None = no cap of its own; the
+    providers' own daily caps still hold). spend.py enforces it."""
+    if usd is not None:
+        if isinstance(usd, bool) or not isinstance(usd, (int, float)) or not 0 <= float(usd) <= 10_000:
+            raise ClientError("the spend cap must be between 0 and 10000 dollars a day, or none")
+        usd = round(float(usd), 2)
+    with _lock:
+        data = _editable()
+        c = _get(data, name)
+        c["daily_spend_usd"] = usd
+        _save(data)
+    _audit("spend cap changed", name, daily_spend_usd=usd)
+
+
+def set_cap_delegated(name: str, on: bool) -> None:
+    """Whether the owner's AI sessions may set this app's spend cap with spend.cap_set (2026-10-11: the shop's
+    director sets its seat bots' caps). Off by default, so an app the owner didn't pick keeps the cap he set."""
+    with _lock:
+        data = _editable()
+        c = _get(data, name)
+        c["cap_delegated"] = bool(on)
+        _save(data)
+    _audit("spend cap delegated" if on else "spend cap delegation removed", name)
+
+
+def set_control_keys(name: str, key_names: list[str] | None) -> None:
+    """The vault entries (by name) this app may use as its key on a private tool that calls another service for it
+    (2026-10-11: a bot uses its own seat's key, never a supervisor's). None removes the binding."""
+    if key_names is not None:
+        if not isinstance(key_names, list) or not all(isinstance(k, str) and KEY_NAME_RE.match(k) for k in key_names):
+            raise ClientError("control keys must be a list of vault entry names (A-Z, 0-9, _)")
+        key_names = sorted(set(key_names))
+    with _lock:
+        data = _editable()
+        c = _get(data, name)
+        if key_names is None:
+            c.pop("control_keys", None)
+        else:
+            c["control_keys"] = key_names
+        _save(data)
+    _audit("control keys bound", name, control_keys=key_names)
+
+
+def control_keys_for(name: str | None) -> list[str] | None:
+    """None: no binding (the tool's own rules apply); a list: only those vault entries."""
+    if not name or name == "owner":
+        return None
+    keys = (_load()["clients"].get(name) or {}).get("control_keys")
+    return list(keys) if isinstance(keys, list) else None
+
+
+KEY_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
+
+
+def cap_delegated(name: str) -> bool:
+    return bool((_load()["clients"].get(name) or {}).get("cap_delegated"))
+
+
 AGENT_RE = re.compile(r"^agt-[a-z0-9]{4,40}$")
 
 
@@ -301,6 +360,14 @@ def revoke(name: str, tool_id: str, risk: str, category: str) -> None:
     _audit("revoked", name, tool=tool_id)
 
 
+def _spent(name: str) -> dict | None:
+    try:
+        import spend
+        return spend.spent(name)
+    except Exception:  # noqa: BLE001 - the list still shows without it
+        return None
+
+
 def list_clients() -> dict:
     """Every client without its token hash, plus whether the file is readable."""
     data, now = _load(), time.time()
@@ -312,6 +379,8 @@ def list_clients() -> dict:
             "suspended": bool(c.get("suspended")), "allow": c.get("allow", []), "deny": c.get("deny", []),
             "rate_per_min": c.get("rate_per_min"), "last_used": max(filter(None, [c.get("last_used"), _last_seen.get(name)]), default=None),
             "memory_agent": c.get("memory_agent"), "memory_shared_read": c.get("memory_shared_read") is not False,
+            "daily_spend_usd": c.get("daily_spend_usd"), "spend_today": _spent(name),
+            "cap_delegated": bool(c.get("cap_delegated")), "control_keys": c.get("control_keys"),
         })
     return {"clients": out, "unreadable": bool(data.get("unreadable"))}
 

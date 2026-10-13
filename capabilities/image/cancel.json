@@ -1,0 +1,39 @@
+{
+  "id": "image.cancel",
+  "name": "Cancel An Image Job",
+  "version": "1.0.0",
+  "description": "Stop one of your image jobs: a waiting one leaves the line, a running local one is stopped. An app can cancel only jobs it started; the owner any. A paid provider's job can't be stopped once sent.",
+  "category": "image",
+  "risk": "write",
+  "requires": [
+    "the local image service"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "stop image job",
+    "cancel image",
+    "drop image job"
+  ],
+  "inputs": {
+    "job_id": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.cancel.cancel"
+  },
+  "latency": {
+    "expected_ms": 300
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.generate",
+    "image.status",
+    "image.queue"
+  ]
+}

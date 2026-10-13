@@ -88,6 +88,10 @@
       "type": "boolean",
       "required": false,
       "default": true
+    },
+    "input_images": {
+      "type": "array",
+      "required": false
     }
   },
   "execution": {

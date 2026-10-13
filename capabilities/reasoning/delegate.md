@@ -73,3 +73,10 @@ Optional standing instructions or background for the local model that must **not
 only `task`, the local model gets `background` then `task`, and `background` counts toward `token_estimate` when that is 0.
 Up to 20,000 characters. Use it for an agent's preamble or rules, so words like "password" or "vault" in a rule don't
 send every task to Claude.
+
+## `force_local` (2026-10-10)
+`force_local=true` skips the routing and runs the task on a model on the owner's own machines only (`local_ai.ask` with
+`allow_cloud=false`), for example a dry run that re-runs an agent's tasks locally (R&D: a "judgement" task routed to
+Claude came back unanswered, and the dry-run item was lost). Returns `{"ok": true, "handled_by": "local", "answer",
+"model", "forced_local": true}`, or, when no local model answers, `{"ok": false, "handled_by": "none", "reason"}`: never a
+hand-off to Claude and never a cloud model. No `route` is returned, since none was asked.

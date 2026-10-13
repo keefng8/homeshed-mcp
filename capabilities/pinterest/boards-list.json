@@ -1,0 +1,34 @@
+{
+  "id": "pinterest.boards.list",
+  "name": "List Pinterest Boards",
+  "version": "1.0.0",
+  "description": "The connected Pinterest account's boards: id, name, privacy, pin count.",
+  "category": "pinterest",
+  "risk": "read",
+  "requires": [
+    "the owner's social_pinterest_enabled switch",
+    "Pinterest connected"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "pinterest boards",
+    "list pinterest boards"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "python",
+    "handler": "tools.pinterest.pins.boards_list"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "pinterest.status",
+    "pinterest.board.create",
+    "pinterest.pin.create"
+  ]
+}

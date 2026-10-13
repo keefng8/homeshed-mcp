@@ -317,11 +317,24 @@ def secret(name: str, default: str | None = None) -> str | None:
     default. Never logs or returns anything to a caller outside this process, and never one of NEVER_BY_NAME.
     An install can map a tool's name onto the name it already stores the value under (VAULT_NAME_ALIASES in its own
     private_settings.py): the tool's name is tried first, then the older one."""
-    value = _secret_one(name)
+    instead = _name_overrides().get(str(name))  # this install keeps it under another name ON PURPOSE (a new key)
+    value = _secret_one(instead) if instead else None
+    if value is None:
+        value = _secret_one(name)
     if value is None:
         older = _name_aliases().get(str(name))
         value = _secret_one(older) if older else None
     return default if value is None else value
+
+
+def _name_overrides() -> dict:
+    """VAULT_NAME_OVERRIDES in private_settings.py: {tool's name: the entry to read first} (2026-10-11: a key from a
+    new project replaces one whose project is blocked, without copying a secret). Falls back to the tool's own name."""
+    try:
+        from private_settings import VAULT_NAME_OVERRIDES
+    except ImportError:
+        return {}
+    return VAULT_NAME_OVERRIDES if isinstance(VAULT_NAME_OVERRIDES, dict) else {}
 
 
 def _name_aliases() -> dict:

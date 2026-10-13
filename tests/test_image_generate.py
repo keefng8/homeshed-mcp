@@ -109,7 +109,8 @@ def test_generate_starts_job_and_returns_fast(post_calls):
     assert url == f"{URL}/image/generate" and kw["timeout"] == 30  # never waits for the image
     assert kw["json"] == {"prompt": "a red fox", "model": "qwen-image-2.1", "width": 768,
                           "height": 768, "steps": None, "seed": -1, "upscale": False,
-                          "original_prompt": None}  # set only when the prompt was enhanced (the image's record keeps it)
+                          "original_prompt": None,  # set only when the prompt was enhanced (the image's record keeps it)
+                          "requested_by": "owner"}  # who asked: image.cancel lets an app stop only its own jobs
 
 
 def test_negative_prompt_replaces_or_drops_the_built_in_list(post_calls):

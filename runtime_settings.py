@@ -84,6 +84,12 @@ try:  # the shop proxy switches (etsy.*, printify.*; both start off) live with t
 except ImportError:
     pass
 
+try:  # the Proxmox alarms' switch and lines live with the monitor
+    from proxmox_monitor import SETTINGS as _PROXMOX_SETTINGS
+    SCHEMA.update(_PROXMOX_SETTINGS)
+except ImportError:
+    pass
+
 try:  # the to-do list's app route (off) lives with the to-do tools
     from tools.todo import SETTINGS as _TODO_SETTINGS
     SCHEMA.update(_TODO_SETTINGS)
@@ -107,6 +113,12 @@ def validate(key: str, value):
         raise ValueError(f"{spec['label']}: an address starting with http:// or https://, or empty.")
     if spec["type"] == "select" and value not in spec["options"]:
         raise ValueError(f"{spec['label']}: choose one of the listed options.")
+    if spec["type"] == "names":  # a list of names, e.g. apps: "a,b", or empty for none (2026-10-09)
+        parts = [p.strip() for p in value.split(",") if p.strip()] if isinstance(value, str) else None
+        if parts is None or len(parts) > 20 or not all(TOPIC_RE.fullmatch(p) for p in parts):
+            raise ValueError(f"{spec['label']}: names separated by commas (letters, numbers, dashes or underscores), "
+                             "or empty for none.")
+        return ",".join(parts)
     return value.strip() if isinstance(value, str) else value
 
 

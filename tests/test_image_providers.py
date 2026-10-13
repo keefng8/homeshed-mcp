@@ -22,7 +22,8 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"fakepngbytes" * 10
 B64 = base64.b64encode(PNG).decode()
 KEYS = {"OPENAI_API_KEY": "sk-dummy-openai-0000", "STABILITY_API_KEY": "sk-dummy-stability-0000",  # secret-scan: allow
         "REPLICATE_API_TOKEN": "r8_dummyreplicate0000", "FAL_KEY": "dummy-fal-0000:0000",  # secret-scan: allow
-        "TOGETHER_API_KEY": "dummy-together-0000", "XAI_API_KEY": "xai-dummy-0000"}  # secret-scan: allow
+        "TOGETHER_API_KEY": "dummy-together-0000", "XAI_API_KEY": "xai-dummy-0000",  # secret-scan: allow
+        "GEMINI_API_KEY": "dummy-gemini-0000"}  # secret-scan: allow
 
 
 class SyncThread:
@@ -64,6 +65,9 @@ class FakeAPI:
                                              "output": ["https://replicate.delivery/xezq/out-0.png"]})
         if host == "replicate.delivery":
             return httpx.Response(200, content=PNG, headers={"content-type": "image/png"})
+        if host == "generativelanguage.googleapis.com" and path == "/v1beta/interactions":
+            return httpx.Response(200, json={"id": "i1", "steps": [{"model_output": {"content": [
+                {"type": "text", "text": "Here you go"}, {"type": "image", "mime_type": "image/png", "data": B64}]}}]})
         if host == "fal.run":
             return httpx.Response(200, json={"images": [{"url": f"data:image/png;base64,{B64}", "width": 1, "height": 1}],
                                              "seed": 7})
@@ -321,10 +325,26 @@ def test_require_commercial_with_nothing_ready_names_the_keys(api):
         ig.generate("a cat", require_commercial=True)
 
 
+def _running(**per_provider):
+    return {f"{p}{i:08x}": {"status": "running", "started_at": 0, "provider": p}
+            for p, n in per_provider.items() for i in range(n)}
+
+
 def test_busy_limit(api, monkeypatch):
     _key(monkeypatch, "FAL_KEY")
-    monkeypatch.setattr(prov, "_jobs", {f"{i:012x}": {"status": "running", "started_at": 0} for i in range(3)})
-    with pytest.raises(ig.ImageError, match="already running"):
+    monkeypatch.setattr(prov, "_jobs", _running(fal=3))
+    with pytest.raises(ig.ImageError, match="3 paid fal image jobs are already running"):
+        ig.generate("a cat", provider="fal")
+
+
+def test_google_runs_six_at_once_and_all_paid_providers_eight(api, monkeypatch):
+    """The owner's yes, 2026-10-10: Nano Banana's training feed; the others stay at 3, and 8 in all."""
+    assert prov.MAX_RUNNING_BY_PROVIDER["google"] == 6 and prov.MAX_RUNNING_TOTAL == 8
+    _key(monkeypatch, "FAL_KEY")
+    monkeypatch.setattr(prov, "_jobs", _running(google=6))  # Google's own cap doesn't hold fal back
+    assert ig.generate("a cat", provider="fal")["status"] == "done"
+    monkeypatch.setattr(prov, "_jobs", _running(google=5, replicate=3))  # 8 in all: nobody else starts
+    with pytest.raises(ig.ImageError, match="8 paid image jobs are already running"):
         ig.generate("a cat", provider="fal")
 
 
@@ -496,3 +516,64 @@ def test_client_tokens_can_read_the_switches_but_not_change_them(monkeypatch):
 def test_xai_gets_the_nearest_aspect_ratio(w, h, ratio):
     """R&D, 2026-10-07: square requests came back 16:9 because no shape was sent."""
     assert prov.xai_aspect(w, h) == ratio
+
+
+def test_google_sends_the_prompt_at_2k_and_reads_the_image_from_its_steps(api, monkeypatch):
+    """Nano Banana (2026-10-13): POST /v1beta/interactions with x-goog-api-key; 2K by default, 4K above 2048 px."""
+    _key(monkeypatch, "GEMINI_API_KEY")
+    job = ig.generate("a retro sunset Staffy", provider="google", width=1024, height=1280, enhance_prompt=False)
+    assert job["status"] == "done" and job["model"] == "gemini-nano-banana-2.1" and job["cost_estimate_usd"] == 0.0504
+    assert job["commercial_use"] is True and "gemini-api/terms" in job["license_info"]["terms_url"]
+    req = api.calls[-1]
+    body = json.loads(req.content)
+    assert req.headers["x-goog-api-key"] == KEYS["GEMINI_API_KEY"] and req.url.path == "/v1beta/interactions"
+    assert body["input"] == [{"type": "text", "text": "a retro sunset Staffy"}]
+    assert body["response_format"] == {"type": "image", "mime_type": "image/jpeg", "aspect_ratio": "4:5",
+                                       "image_size": "2K"}
+    assert prov.google_size(4096, 4096) == "4K" and prov.google_size(768, 768) == "2K"
+    big = ig.generate("big", provider="google", width=4096, height=4096, enhance_prompt=False)
+    assert big["cost_estimate_usd"] == 0.113
+
+
+def test_google_edits_with_input_images_and_nobody_else_does(api, monkeypatch, tmp_path):
+    _key(monkeypatch, "GEMINI_API_KEY", "XAI_API_KEY")
+    (tmp_path / "images").mkdir(exist_ok=True)
+    (tmp_path / "images" / "winner.png").write_bytes(PNG)
+    asked = []
+    monkeypatch.setattr(ig, "ask", lambda *a, **k: asked.append(a) or {"text": "rewritten " * 20})
+    job = ig.generate("the same look, but a Beagle", provider="google", input_images=["winner.png"])
+    assert job["status"] == "done" and job["input_images"] == ["winner.png"] and "_inputs" not in job
+    assert asked == []  # an edit instruction isn't rewritten
+    parts = json.loads(api.calls[-1].content)["input"]
+    assert parts[1] == {"type": "image", "mime_type": "image/png", "data": B64}
+    with pytest.raises(ig.ImageError, match="only with provider google"):
+        ig.generate("x", provider="xai", input_images=["winner.png"])
+    with pytest.raises(ig.ImageError, match="at most 5"):
+        ig.generate("x", provider="google", input_images=["winner.png"] * 6)
+    with pytest.raises(ig.ImageError, match="give an image name"):
+        ig.generate("x", provider="google", input_images=["../secret.png"])
+
+
+def test_google_answers_without_an_image_are_named():
+    assert prov.google_image({"output_image": {"type": "image", "data": B64}})[0] == PNG
+    assert prov.google_image({"candidates": [{"content": {"parts": [{"inlineData": {"mimeType": "image/png",
+                                                                                     "data": B64}}]}}]})[0] == PNG
+    with pytest.raises(prov.ProviderError, match="no image"):
+        prov.google_image({"steps": [{"model_output": {"content": [{"type": "text", "text": "I can't draw that"}]}}]})
+
+
+def test_a_request_google_refuses_costs_nothing_and_gives_the_cap_back(api, monkeypatch):
+    """Live, 2026-10-08: six jobs failed with a 400 (a refused setting) yet counted against the cap at $0.0504 each."""
+    _key(monkeypatch, "GEMINI_API_KEY")
+    api.status["googleapis.com"] = 400
+    job = ig.generate("a retro sunset Staffy", provider="google", enhance_prompt=False)
+    assert job["status"] == "failed" and "http 400" in job["error"]
+    assert job["cost_estimate_usd"] == 0.0 and prov.used_today("google") == 0
+
+
+def test_no_quota_costs_nothing_either(api, monkeypatch):
+    """Live, 2026-10-08: a free-tier key gets a 429 ("limit: 0 ... on Free Tier") for image output."""
+    _key(monkeypatch, "GEMINI_API_KEY")
+    api.status["googleapis.com"] = 429
+    job = ig.generate("x", provider="google", enhance_prompt=False)
+    assert job["status"] == "failed" and job["cost_estimate_usd"] == 0.0 and prov.used_today("google") == 0

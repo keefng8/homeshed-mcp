@@ -1,0 +1,40 @@
+{
+  "id": "spend.cap_set",
+  "name": "Set A Delegated Spend Cap",
+  "version": "1.0.0",
+  "description": "Owner sessions only: set the daily dollar cap (0-5) of an app the owner opened to it, such as a coordinating app setting caps for the apps it runs. Other apps keep the owner-set cap.",
+  "category": "spend",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "set bot spend cap",
+    "spend limit",
+    "daily budget for a bot",
+    "limit an app spend"
+  ],
+  "inputs": {
+    "client": {
+      "type": "string",
+      "required": true
+    },
+    "usd": {
+      "type": "number",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.spend.cap_set.cap_set"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "spend.today"
+  ]
+}

@@ -30,6 +30,7 @@ generator's own name pattern, so `threads.publish(image_names=[name])` takes it 
 | `shape` | no | `"9:16"` (1080x1920, default) or `"4:5"` (1080x1350). |
 | `frame` | no | A brand frame as the background: a style name from the brand kit (`neon-gold`, `marble`, `sunset`, `gradient-glass`, `synthwave`, `halloween`, `christmas`, `valentines`; Grok-made 2026-10-07, about $0.02 each) or an image name from the `frames` folder. |
 | `cutout` | no | `false` (default, R&D's pick after the first real cards, 2026-10-07): a framed photo tile, the mockup's plain backdrop margin trimmed to the product plus 5% air. `true`: lift the mockup off its plain studio backdrop onto the scene, with a warm light behind it on a dark scene; only backdrop pixels connected to the edge go (a white tee on white can come out ragged, so proper matting would be needed there). A busy backdrop is left alone and the result says `"cutout": false`. |
+| `matte` | no | What's behind the garment (the owner's no-clash rule, 2026-10-09: a White tee sat on its own white mockup backdrop and nearly vanished). `"auto"` (default): where the garment is closer than 30 (Lab) to what's behind it (White 6, Sand 22 against Printify's white), its plain backdrop becomes a matte: image.preview's dark grey `#3e4044` for light garments, its light grey for dark ones, with the backdrop's soft shadow kept as shading; the photo's mat takes the same colour, so tile and photo read as one panel. A cut-out that would blend into a light scene goes framed on the matte instead (`"cutout": false`). Only backdrop joined to the photo's edge changes, plus a 2 px edge blend; the garment and print keep every other pixel. `"none"`: never. `"#rrggbb"`: that colour on any plain backdrop. A busy backdrop is never matted. |
 | `watermark` | no | Brand text, up to 40 characters; empty = none. |
 | `watermark_style` | no | `"tiled"` (default: faint and diagonal across the card, drawn under the text panel, words, price and button so they stay crisp; about 7% on a light card, 12% on a dark one), `"corner"` (small, under the mockup) or `"both"`. |
 
@@ -38,7 +39,8 @@ The supplier's name (Printify) in any text is refused. Claims ("premium cotton",
 the caller's to check against the live listing: the card prints only what it's given.
 
 ## Returns
-`{"name", "width", "height", "bytes", "folder": "promo", "size", "template", "hero_share", "frame", "cutout"}`.
+`{"name", "width", "height", "bytes", "folder": "promo", "size", "template", "hero_share", "frame", "cutout",
+"matte"}`; `matte` is the colour used (`"#3e4044"`) or null.
 On 9:16 cards the logo and the link stay out of the top 150 px and bottom 190 px, which Stories and Reels cover
 with their own buttons.
 `hero_share` is the mockup's height over the card's (the spec's target is 45-55%).

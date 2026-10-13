@@ -16,7 +16,8 @@ MAX_BACKGROUND = 20_000  # not "context": the tool server reserves that name
 
 
 @tool(name="delegate", category="reasoning", doc="reasoning/delegate.md")
-def delegate(task: str, token_estimate: int = 0, tool_count: int = 0, background: str = "") -> dict:
+def delegate(task: str, token_estimate: int = 0, tool_count: int = 0, background: str = "",
+             force_local: bool = False) -> dict:
     """Route a task and, if the local model is recommended, actually ask it. If Claude is
     recommended, never fakes an answer -- reports the routing decision so the caller (normally
     Claude) picks the task up directly.
@@ -30,6 +31,10 @@ def delegate(task: str, token_estimate: int = 0, tool_count: int = 0, background
             decide where the task goes (2026-10-07: an app whose agents carry a rule saying "never output a secret
             (key, token, password)" in every agent's preamble sent all their easy tasks to Claude). Routing reads
             only `task`; the local model gets background then task; it counts toward token_estimate when that is 0.
+        force_local: skip the routing and run on a model on the owner's own machines only (never a cloud model),
+            e.g. a dry run that re-runs an agent's tasks locally (R&D, 2026-10-10: a "judgement" task routed to
+            Claude came back unanswered and the dry-run item was lost). If no local model answers: {"ok": false,
+            "handled_by": "none", "reason"}, never a hand-off to Claude.
 
     Returns:
         {"handled_by": "local", "answer": str, "model": str, "route": {...}} if routed local and
@@ -49,13 +54,22 @@ def delegate(task: str, token_estimate: int = 0, tool_count: int = 0, background
         raise ValueError(f"background must be at most {MAX_BACKGROUND} characters")
     if background and not token_estimate:
         token_estimate = (len(background) + len(task)) // 4
+    prompt = "\n\n".join(p for p in (background, task) if p)
+    if force_local:
+        try:
+            result = ask(prompt, max_tokens=1024, temperature=0.2, allow_cloud=False)
+        except LocalAIError as exc:
+            return {"ok": False, "handled_by": "none", "forced_local": True,
+                    "reason": f"no local model answered: {exc}"}
+        return {"ok": True, "handled_by": "local", "answer": result["text"], "model": result["model"],
+                "forced_local": True}
+
     routing = route(text=task, token_estimate=token_estimate, tool_count=tool_count)
 
     if routing["recommendation"] != "local":
         return {"handled_by": "claude", "route": routing}
 
     try:
-        prompt = "\n\n".join(p for p in (background, task) if p)
         result = ask(prompt, max_tokens=1024, temperature=0.2)
     except LocalAIError as exc:
         return {"handled_by": "claude", "route": routing, "note": f"local model unavailable: {exc}"}

@@ -2,7 +2,7 @@
   "id": "printify.product.update",
   "name": "Edit A Printify Draft",
   "version": "1.0.0",
-  "description": "Edit an unpublished Printify draft's title, description, tags, variant prices and SKUs. Drafts only (never published, mid-publish or awaiting publish approval), never under the 30% margin floor after Etsy's fees, audited with the old values kept.",
+  "description": "Edit an unpublished Printify draft's title, description, tags, variant prices and SKUs. Drafts only (never published, mid-publish or awaiting publish approval), never under the margin floor (20%, hoodies 15%) after Etsy's fees, audited with the old values kept.",
   "category": "printify",
   "risk": "write",
   "requires": [

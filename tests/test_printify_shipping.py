@@ -49,3 +49,23 @@ def test_product_get_gives_cost_pages_and_filters(monkeypatch):
     assert [v["id"] for v in picked["variants"]] == [1001, 1002]  # a disabled one is never returned
     with pytest.raises(Exception):
         pr.product_get("abc123", variant_ids=["big"])
+
+
+def test_product_get_names_the_cost_currency_only_as_the_owner_set_it(monkeypatch):
+    """Printify's API names no currency; costs are in the account's billing currency, set in Settings (2026-10-09)."""
+    import runtime_settings
+    from tools.printify import read as pr
+    v = {"id": 1, "title": "White / S", "price": 2199, "cost": 1112, "is_enabled": True}
+    monkeypatch.setattr(pr.pf, "shop_id", lambda: "123")
+    monkeypatch.setattr(pr.pf, "get", lambda path, **k: {"id": "abc123", "variants": [v]})
+    assert runtime_settings.SCHEMA[pr.pf.BILLING_SETTING]["default"] == "not set"
+    for chosen, want in (("not set", None), ("USD", "USD"), (" gbp ", "GBP"), ("JPY", None), (None, None)):
+        monkeypatch.setattr(runtime_settings, "get", lambda key, c=chosen: c)
+        out = pr.product_get("abc123")
+        assert out["cost_currency"] == want and out["currency"] is None  # Printify's own field stays as it is
+        assert out["variants"][0]["cost"] == 11.12  # never converted
+
+    def broken(key):
+        raise OSError("no settings file")
+    monkeypatch.setattr(runtime_settings, "get", broken)
+    assert pr.product_get("abc123")["cost_currency"] is None

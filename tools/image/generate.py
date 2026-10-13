@@ -68,6 +68,12 @@ class ImageError(RuntimeError):
     """Safe-to-return failure message. Never includes the backend URL or a key."""
 
 
+def _caller() -> str:
+    """The calling app's client name, or "owner" (no client token)."""
+    import clients
+    return clients.current_client.get() or "owner"
+
+
 def base_url() -> str:
     base = os.environ.get("IMAGE_BASE_URL") or os.environ.get("LOCAL_AI_DECIDE_BASE_URL")
     if not base:
@@ -130,7 +136,7 @@ def choose(provider: str, model: str, require_commercial: bool) -> tuple[str, st
 def generate(prompt: str, width: int = 768, height: int = 768, steps: int = 0, seed: int = -1,
              model: str = "", enhance_prompt: bool = True, upscale: bool = False, provider: str = "",
              require_commercial: bool = False, folder: str = "", paid_fallback: bool = False,
-             negative_prompt: str = "", default_negative: bool = True) -> dict:
+             negative_prompt: str = "", default_negative: bool = True, input_images: list[str] | None = None) -> dict:
     """Start an image generation job. Returns in about a second with {"job_id", "status": "running", ...}; check
     it with image.status(job_id). Don't wait in a loop: tell the user it's generating. image.queue shows whether the
     image service is busy and what's waiting.
@@ -150,7 +156,8 @@ def generate(prompt: str, width: int = 768, height: int = 768, steps: int = 0, s
         enhance_prompt: first expand the prompt with the free local model delegator. If that fails, the original
             prompt is used and "enhance_error" says why.
         upscale: local only: ESRGAN 4x after generation.
-        provider: "local-sdcpp" (default) or a configured paid one: openai, stability, replicate, fal, together, xai.
+        provider: "local-sdcpp" (default) or a configured paid one: openai, stability, replicate, fal, together, xai,
+            google (Nano Banana: 2K by default, 4K above 2048 px; billed in Google AI Studio).
         require_commercial: refuse models whose outputs can't be sold (non-commercial, or "check" terms). With no
             provider named: the free local FLUX.1-schnell if installed and on, else the first usable (switched
             on, key stored, under its daily cap) of together, fal, replicate, openai (PAID; "auto_selected" is true).
@@ -165,6 +172,9 @@ def generate(prompt: str, width: int = 768, height: int = 768, steps: int = 0, s
             blurry, low quality, watermark). The paid fallback doesn't use it.
         default_negative: False drops the built-in list when no negative_prompt is given, e.g. for a design that
             should have stripes or lines (a striped sunset).
+        input_images: provider google only: 1-5 images to edit or take a look from, with the prompt as the instruction
+            (e.g. "the same style and palette, but a Beagle"). Each is an image name, "folder/name.png" or a Printify
+            mockup address, up to 10 MB. The prompt isn't rewritten for an edit.
 
     Returns:
         The job: {"job_id", "status", "progress", "provider", "model", "prompt", "width", "height", "seed",
@@ -184,6 +194,25 @@ def generate(prompt: str, width: int = 768, height: int = 768, steps: int = 0, s
         base = base_url()
     elif upscale or folder.strip() or neg:
         raise ImageError("upscale, folder and negative_prompt are only available on the local provider")
+    refs = [str(r).strip() for r in input_images or [] if str(r).strip()]
+    inputs = []
+    if refs:
+        if name not in prov.EDIT_PROVIDERS:
+            raise ImageError(f"input_images work only with provider {' or '.join(prov.EDIT_PROVIDERS)}")
+        if len(refs) > prov.MAX_INPUT_IMAGES:
+            raise ImageError(f"input_images: at most {prov.MAX_INPUT_IMAGES}")
+        from tools.commerce._http import CommerceError
+        from tools.image.refs import image_bytes
+        for r in refs:
+            try:
+                data = image_bytes(r)
+            except CommerceError as exc:
+                raise ImageError(str(exc)) from None
+            mime = prov.sniff_mime(data)
+            if mime not in ("image/png", "image/jpeg", "image/webp"):
+                raise ImageError(f"{r} isn't a PNG, JPEG or WebP")
+            inputs.append((data, mime))
+        enhance_prompt = False  # an edit instruction is used as written
     original, enhanced_by, enhance_error = prompt, None, None
     if enhance_prompt:
         rewritten, enhanced_by, enhance_error = _enhance(prompt, model)
@@ -195,7 +224,8 @@ def generate(prompt: str, width: int = 768, height: int = 768, steps: int = 0, s
                                    "the rest of this prompt is ignored")
     if name != prov.LOCAL:
         try:
-            return {**prov.start_remote(name, model, prompt, width, height, seed, steps), **extra}
+            return {**prov.start_remote(name, model, prompt, width, height, seed, steps, inputs=inputs or None,
+                                        input_names=refs or None), **extra}
         except prov.ProviderError as exc:
             raise ImageError(str(exc)) from None
     try:
@@ -206,7 +236,8 @@ def generate(prompt: str, width: int = 768, height: int = 768, steps: int = 0, s
             "original_prompt": original if enhanced_by else None,
             # no key = the service's built-in list; "" = none (striped designs, 2026-10-07)
             **({"negative_prompt": neg} if neg else {} if default_negative else {"negative_prompt": ""}),
-            **({"folder": folder.strip()} if folder.strip() else {})})
+            **({"folder": folder.strip()} if folder.strip() else {}),
+            "requested_by": _caller()})  # image.cancel lets an app stop only the jobs it asked for
     except httpx.HTTPError as exc:
         raise ImageError(f"image backend unreachable ({type(exc).__name__})") from None
     raise_for_backend(resp)

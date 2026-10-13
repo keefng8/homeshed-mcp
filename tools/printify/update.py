@@ -39,10 +39,22 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
-def floor_pence(cost_pence: int) -> int:
-    """The lowest price that still keeps PRINTIFY_MIN_MARGIN (default 30%) of it after the cost and Etsy's fees with
-    VAT. Delivery is PRINTIFY_DELIVERY_ESTIMATE_PENCE (default 400): a high guess keeps the floor on the safe side."""
-    margin = _env_float("PRINTIFY_MIN_MARGIN", 0.30)
+HOODIE_BLUEPRINTS = {77}  # Printify's Gildan 18500 hoodie
+
+
+def min_margin(blueprint_id=None) -> float:
+    """The owner, 2026-10-09 ("£53 seems a little expensive for one hoodie ... half the %"; "everything else slightly
+    lower than 30 ... 20%"): 15% on hoodies (PRINTIFY_MIN_MARGIN_HOODIE), 20% on everything else (PRINTIFY_MIN_MARGIN).
+    It was 30% for all."""
+    if blueprint_id in HOODIE_BLUEPRINTS:
+        return _env_float("PRINTIFY_MIN_MARGIN_HOODIE", 0.15)
+    return _env_float("PRINTIFY_MIN_MARGIN", 0.20)
+
+
+def floor_pence(cost_pence: int, blueprint_id=None) -> int:
+    """The lowest price that still keeps min_margin(blueprint_id) of it after the cost and Etsy's fees with VAT.
+    Delivery is PRINTIFY_DELIVERY_ESTIMATE_PENCE (default 400): a high guess keeps the floor on the safe side."""
+    margin = min_margin(blueprint_id)
     delivery = _env_float("PRINTIFY_DELIVERY_ESTIMATE_PENCE", 400)
     pct = PCT_FEES * (1 + VAT)
     fixed = FIXED_FEES_PENCE * (1 + VAT) + pct * delivery
@@ -85,10 +97,17 @@ def _not_a_draft(pid: str, product: dict) -> str | None:
     return None
 
 
+def enabled_of(variants: list[dict] | None) -> dict[int, bool]:
+    """{variant: on/off} from the asked-for variants' "enabled" (2026-10-09, the shop app: turn sizes off on a live
+    product without touching SKUs). Checked by check_input first."""
+    return {v["id"]: v["enabled"] for v in variants or [] if isinstance(v, dict) and isinstance(v.get("enabled"), bool)}
+
+
 def check_input(title: str, description: str, tags: list[str] | None, variants: list[dict] | None,
                 skus_allowed: bool = True) -> tuple[str, str, list[str] | None, dict[int, int], dict[int, str]]:
-    """The asked-for edit, checked: (title, description, tags, {variant: price}, {variant: sku}). Shared with
-    printify.product.update_live, which passes skus_allowed=False."""
+    """The asked-for edit, checked: (title, description, tags, {variant: price}, {variant: sku}); a variant's
+    "enabled" (true/false) is read by enabled_of. Shared with printify.product.update_live, which passes
+    skus_allowed=False."""
     title, description = (title or "").strip(), (description or "").strip()
     if len(title) > 140:
         raise h.CommerceError("title must be at most 140 characters")
@@ -104,9 +123,13 @@ def check_input(title: str, description: str, tags: list[str] | None, variants: 
     skus: dict[int, str] = {}
     for v in variants or []:
         vid, price, sku = (v or {}).get("id"), (v or {}).get("price_pence"), (v or {}).get("sku")
-        if not isinstance(vid, int) or (price is None and sku is None) or (
+        enabled = (v or {}).get("enabled")
+        if enabled is not None and not isinstance(enabled, bool):
+            raise h.CommerceError(f"variant {vid}: enabled is true or false")
+        if not isinstance(vid, int) or (price is None and sku is None and enabled is None) or (
                 price is not None and (not isinstance(price, int) or not 100 <= price <= 100_000)):
-            raise h.CommerceError("each variant needs an integer id and price_pence of 100-100000 (or a sku)")
+            raise h.CommerceError("each variant needs an integer id and price_pence of 100-100000, a sku, or "
+                                  "enabled (true/false)")
         if price is not None:
             prices[vid] = price
         if sku is not None:
@@ -121,9 +144,10 @@ def check_input(title: str, description: str, tags: list[str] | None, variants: 
 
 
 def changes(product: dict, title: str, description: str, tags: list[str] | None, prices: dict[int, int],
-            skus: dict[int, str]) -> tuple[dict, dict]:
+            skus: dict[int, str], enabled: dict[int, bool] | None = None) -> tuple[dict, dict]:
     """(Printify's PUT body, the old values) for what differs from the product now; ({}, {}) when it's as asked. No
-    price under the floor."""
+    price under the floor, and never every variant switched off."""
+    enabled = enabled or {}
     body, old = {}, {}
     if title and title != product.get("title"):
         body["title"], old["title"] = title, product.get("title")
@@ -132,29 +156,36 @@ def changes(product: dict, title: str, description: str, tags: list[str] | None,
     if tags is not None and tags != (product.get("tags") or []):
         body["tags"], old["tags"] = tags, product.get("tags")
     current = {v["id"]: v for v in product.get("variants") or [] if isinstance(v, dict) and isinstance(v.get("id"), int)}
-    for vid in [*prices, *skus]:
+    for vid in [*prices, *skus, *enabled]:
         if vid not in current:
             raise h.CommerceError(f"variant {vid} isn't on this product")
+    new_on = {vid: on for vid, on in enabled.items() if on != bool(current[vid].get("is_enabled", True))}
+    if new_on and not any(new_on.get(vid, bool(v.get("is_enabled", True))) for vid, v in current.items()):
+        raise h.CommerceError("that would switch off every variant: a product needs at least one on sale")
     for vid, price in prices.items():
         cost = current[vid].get("cost")
-        if isinstance(cost, (int, float)) and price < (low := floor_pence(int(cost))):
-            raise h.CommerceError(f"variant {vid}: {price}p is under the floor of {low}p (a 30% margin after the "
-                                  f"{int(cost)}p cost and Etsy's fees with VAT)")
+        bp = product.get("blueprint_id")
+        if isinstance(cost, (int, float)) and price < (low := floor_pence(int(cost), bp)):
+            raise h.CommerceError(f"variant {vid}: {price}p is under the floor of {low}p (a {min_margin(bp):.0%} "
+                                  f"margin after the {int(cost)}p cost and Etsy's fees with VAT)")
     new_prices = {vid: p for vid, p in prices.items() if p != current[vid].get("price")}
     new_skus = {vid: s for vid, s in skus.items() if s != current[vid].get("sku")}
-    if new_prices or new_skus:  # Printify takes the whole variant list on an edit: the others go back as they are
+    if new_prices or new_skus or new_on:  # Printify takes the whole variant list on an edit: the rest go back as they are
         body["variants"] = [{"id": vid, "price": new_prices.get(vid, v.get("price")),
-                             "is_enabled": v.get("is_enabled", True), **({"sku": new_skus[vid]} if vid in new_skus else {})}
+                             "is_enabled": new_on.get(vid, v.get("is_enabled", True)),
+                             **({"sku": new_skus[vid]} if vid in new_skus else {})}
                             for vid, v in current.items()]
     if new_prices:
         old["prices"] = {str(vid): current[vid].get("price") for vid in new_prices}
     if new_skus:
         old["skus"] = {str(vid): current[vid].get("sku") for vid in new_skus}
+    if new_on:
+        old["enabled"] = {str(vid): bool(current[vid].get("is_enabled", True)) for vid in new_on}
     return body, old
 
 
 def fields_of(body: dict, old: dict) -> list[str]:
-    return sorted([k for k in body if k != "variants"] + [k for k in ("prices", "skus") if k in old])
+    return sorted([k for k in body if k != "variants"] + [k for k in ("prices", "skus", "enabled") if k in old])
 
 
 @tool(name="product.update", category="printify", doc="printify/update.md")
@@ -162,7 +193,7 @@ def product_update(product_id: str, title: str = "", description: str = "", tags
                    variants: list[dict] | None = None) -> dict:
     """Edit an UNPUBLISHED Printify draft: its title, description, tags, variant prices and SKUs. Drafts only
     (anything on a sales channel, mid-publish, waiting for publish approval or published today is refused). No price
-    under the 30% margin floor after Etsy's fees. Every edit is audited and keeps the old values. Off unless the
+    under the margin floor (20%, hoodies 15%) after Etsy's fees. Every edit is audited and keeps the old values. Off unless the
     owner's switch "Let apps create and edit Printify drafts" is on. A published product: printify.product.update_live.
 
     Args:
@@ -170,8 +201,9 @@ def product_update(product_id: str, title: str = "", description: str = "", tags
         title: the new title, 1-140 characters; empty keeps it.
         description: the new description, up to 5,000 characters; empty keeps it.
         tags: the new full tag list (up to 13, each up to 20 characters: Etsy's limits); omit to keep them.
-        variants: [{"id": variant id, "price_pence": new price, "sku": new SKU}] for the variants to change (either
-            key or both; a SKU is 1-32 letters, digits, dots, dashes, slashes or underscores); the others keep theirs.
+        variants: [{"id": variant id, "price_pence": new price, "sku": new SKU, "enabled": true/false}] for the
+            variants to change (any of the keys; a SKU is 1-32 letters, digits, dots, dashes, slashes or underscores;
+            "enabled": false takes a size or colour off sale, never all of them); the others keep theirs.
 
     Returns:
         {"product_id", "changed": [fields], "old": {...the values before}, "published": false, "edits_today",
@@ -188,7 +220,7 @@ def product_update(product_id: str, title: str = "", description: str = "", tags
         raise h.CommerceError("Printify has no such product in this shop")
     if why := _not_a_draft(pid, product):
         raise h.CommerceError(f"only unpublished drafts can be edited, and this one isn't: {why}")
-    body, old = changes(product, title, description, tags, prices, skus)
+    body, old = changes(product, title, description, tags, prices, skus, enabled_of(variants))
     if not body:
         return {"product_id": pid, "changed": [], "old": {}, "published": False, "note": "already as asked: nothing sent"}
     import clients

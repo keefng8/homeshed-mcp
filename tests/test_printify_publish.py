@@ -34,7 +34,7 @@ def test_a_call_only_queues_and_approval_publishes(fake):
     assert out["pending"] is True and posts == []  # nothing published by the call itself
     assert out["publish"].startswith('Publish "Retro Frenchie Tee" (2 variants, 24.99-26.99) to your Etsy shop')
     [item] = pp.list_pending()
-    assert item["checks"]["variants_enabled"] == 2 and item["checks"]["daily_max"] == 5
+    assert item["checks"]["variants_enabled"] == 2 and item["checks"]["daily_max"] == 100
     res = pp.decide(item["id"], True)
     assert res["approved"] and res["result"]["publishing"] is True
     assert posts == [("/v1/shops/29235685/products/abc123/publish.json",
@@ -46,6 +46,22 @@ def test_decline_drops_it_and_nothing_is_published(fake):
     _, posts, _ = fake
     item = pb.product_publish("abc123")
     assert pp.decide(item["id"], False)["approved"] is False and posts == [] and pp.list_pending() == []
+
+
+def test_withdraw_drops_it_unrun_and_logs_it_as_withdrawn_not_the_owners_decline(fake, monkeypatch, tmp_path):
+    _, posts, _ = fake
+    monkeypatch.setattr(pp, "HISTORY_FILE", tmp_path / "decisions.json")
+    item = pb.product_publish("abc123")
+    with pytest.raises(pp.PendingError, match="say why"):
+        pp.withdraw(item["id"], "  ")
+    out = pp.withdraw(item["id"], "not needed: the listing's details were checked intact on Etsy")
+    assert out["withdrawn"] is True and posts == [] and pp.list_pending() == []
+    [row] = pp.history()
+    assert row["outcome"] == "withdrawn" and row["note"].startswith("not needed")
+    with pytest.raises(pp.PendingError, match="no request"):
+        pp.withdraw(item["id"], "again")
+    with pytest.raises(pp.PendingError, match="isn't a waiting request's id"):
+        pp.withdraw("../x", "bad id")
 
 
 def test_refusals(fake):

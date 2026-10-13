@@ -44,17 +44,21 @@ def station_pause() -> str | None:
 
 
 @tool(name="product.publish", category="printify", doc="printify/publish.md")
-def product_publish(product_id: str) -> dict:
+def product_publish(product_id: str, owner_approval: dict | None = None) -> dict:
     """Ask to publish a Printify draft to the owner's connected shop (Etsy). It is NOT published by this call: it's
     checked, then waits for the owner's approval in the Control Panel; only then does it go live, where buyers see it
-    and Etsy charges its listing fee. At most PRINTIFY_PUBLISH_DAILY_MAX a day (default 5). Off until the owner
+    and Etsy charges its listing fee. At most PRINTIFY_PUBLISH_DAILY_MAX a day (default 20). Off until the owner
     switches "Let apps ask to publish Printify products" on.
 
     Args:
         product_id: the draft's id (printify.product.create returned it; printify.products.list shows them).
+        owner_approval: {"id", "by", "at"}: the owner's own approval of this publish inside an app the owner trusts
+            (Settings "Apps whose own approval counts"), "at" an ISO time within the last hour, each id once. Then it
+            runs at once; otherwise it waits as usual and the reply says why. Never for an automatic actor.
 
     Returns:
-        {"pending": true, "id", "publish", "expires_in_h", "how"}: the approval request, not a published listing.
+        {"pending": true, "id", "publish", "expires_in_h", "how"}: the approval request, not a published listing; with
+        a usable owner_approval, {"pending": false, "id", "publish", "approved_in", "result"}.
     """
     import printify_pending
     h.require(pf.SETTING, "Printify")
@@ -72,7 +76,7 @@ def product_publish(product_id: str) -> dict:
               "tags": len(p.get("tags") or []), "published_last_24h": len(printify_pending.published_today()),
               "daily_max": printify_pending.daily_max()}
     try:
-        return printify_pending.add(pid, summary, checks)
+        return printify_pending.add(pid, summary, checks, owner_approval=owner_approval)
     except printify_pending.PendingError as exc:
         raise h.CommerceError(str(exc)) from None
 

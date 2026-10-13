@@ -23,7 +23,12 @@ Exactly one of:
 first; `corner` is `"br"`, `"bl"`, `"tr"`, `"tl"` or null. `"pattern": true` (only present when true) marks a drawn
 repeat (see v2): it doesn't count toward `text_found`, but is worth a look.
 
-## The rule (v2, 2026-10-08)
+## The rule (v3, 2026-10-08)
+v3: away from the corners, a read counts as text with 3+ Latin letters or digits at 0.30+, or any read at 0.65+. A
+short 1-2 character read below 0.65 no longer counts: knit motifs read as "WS" 0.64, "mm" 0.42, "2Y" 0.43. The corners
+keep the signature rule (1+ at 0.25+).
+
+v2:
 v2: a region whose reading, with spaces removed, is a single character repeated 3 or more times is a drawn pattern,
 not text. 0, O and o count as the same character, and so do 1, l, I and |. Example: a chunky diamond knit band read
 as "0000000" at 0.43. Real letters elsewhere in the image still fail it.

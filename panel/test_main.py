@@ -1357,6 +1357,30 @@ def test_connect_threads_routes_and_callback(monkeypatch):
     assert not any(p.startswith("/api/threads") for p in main.VIEWER_ROUTES)
 
 
+def test_connect_pinterest_routes_and_callback(monkeypatch):
+    """The owner's decision, 2026-10-10: Connect Pinterest, the same relay as Threads; owner only."""
+    import main
+    calls = []
+
+    async def fake_admin(method, path, body=None):
+        calls.append((method, path, body))
+        if path == "/pinterest/finish" and body.get("state") == "bad":
+            return main.JSONResponse({"error": "press Connect again"}, status_code=400)
+        return main.JSONResponse({"url": "https://www.pinterest.com/oauth/?x=1"} if method == "POST" and path == "/pinterest/connect"
+                                 else {"connected": True, "username": "kindretroco", "sandbox": True})
+    monkeypatch.setattr(main, "_mcp_admin", fake_admin)
+    monkeypatch.setattr(main, "DASHBOARD_PASSWORD", OWNER_PW)
+    c = TestClient(main.app, headers=OWNER)
+    assert c.get("/api/pinterest").json()["sandbox"] is True
+    assert c.post("/api/pinterest/connect", json={"redirect_uri": "https://p.example/api/pinterest/callback"}).json()["url"].startswith("https://www.pinterest.com/")
+    r = c.get("/api/pinterest/callback", params={"code": "abc", "state": "s1"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/#settings?pinterest=ok&account=kindretroco"
+    assert ("POST", "/pinterest/finish", {"code": "abc", "state": "s1"}) in calls
+    r = c.get("/api/pinterest/callback", params={"code": "abc", "state": "bad"}, follow_redirects=False)
+    assert "pinterest=failed" in r.headers["location"]
+    assert not any(p.startswith("/api/pinterest") for p in main.VIEWER_ROUTES)
+
+
 def test_agent_messages_list_reply_and_done_through_the_tool_server(monkeypatch):
     """The owner, 2026-10-06: agents leave him messages; he replies or marks them done from the panel."""
     import main
@@ -2304,10 +2328,49 @@ def test_release_progress_comes_from_the_tool_server(monkeypatch):
     assert TestClient(main.app, headers=OWNER).get("/api/progress").status_code == 502
 
 
+def test_release_progress_carries_each_repos_stats(monkeypatch):
+    """The owner, 2026-10-10: "stats on my dash from my github link": repo.stats for each project naming a repo; a
+    failing stats call leaves the card as it was."""
+    import main
+
+    async def fake_call(name, args, **_):
+        if name == "repo.stats":
+            if args["repo"] == "me/broken":
+                raise RuntimeError("GitHub down")
+            return {"repo": args["repo"], "stars": 5}
+        return {"projects": [{"project": "a", "repo": "me/tool"}, {"project": "b", "repo": "me/broken"},
+                             {"project": "c"}]}
+    monkeypatch.setattr(main, "_mcp_call_tool", fake_call)
+    monkeypatch.setattr(main, "DASHBOARD_PASSWORD", OWNER_PW)
+    rows = TestClient(main.app, headers=OWNER).get("/api/progress").json()["projects"]
+    assert rows[0]["stats"] == {"repo": "me/tool", "stars": 5} and "stats" not in rows[1] and "stats" not in rows[2]
+
+
+def test_start_the_next_release_resets_the_progress_record(monkeypatch):
+    """The owner, 2026-10-10: once a version is out the card "can be reset for another release"."""
+    import main
+    seen = []
+
+    async def fake_call(name, args, **_):
+        seen.append((name, args))
+        return {"project": args["project"], "percent": 0}
+    monkeypatch.setattr(main, "_mcp_call_tool", fake_call)
+    monkeypatch.setattr(main, "DASHBOARD_PASSWORD", OWNER_PW)
+    c = TestClient(main.app, headers=OWNER)
+    assert c.post("/api/progress/homeshed/next", json={"version": "v0.1.1"}).status_code == 200
+    name, args = seen[-1]
+    assert name == "repo.progress_update" and args["version"] == "v0.1.1" and args["steps"] == [] \
+        and args["waiting_on_owner"] == []
+    for bad in ("", "next", "v1", "v0.1.1; rm"):
+        assert c.post("/api/progress/homeshed/next", json={"version": bad}).status_code == 400, bad
+    assert c.post("/api/progress/Bad%20Name/next", json={"version": "v1.0.0"}).status_code == 404
+
+
 def test_a_view_only_login_cannot_read_release_progress(viewer):
     friend, _main, _ = viewer
     assert friend.get("/api/progress").status_code == 403
     assert friend.get("/api/progress/homeshed").status_code == 403
+    assert friend.post("/api/progress/homeshed/next", json={"version": "v9.9.9"}).status_code == 403
 
 
 def test_release_progress_shows_the_folder_from_the_project_list_only(monkeypatch):
@@ -2781,3 +2844,22 @@ def test_a_slow_approval_never_shows_as_failed_when_it_went_through(monkeypatch,
     r = c.post("/api/printify/waiting/ab12cd34/approve")
     assert r.status_code == status and words in json.dumps(r.json())
     assert seen[0] == ("POST", "/printify/pending/ab12cd34/approve", 60)  # a long wait first
+
+
+def test_proxmox_tab_routes_relay_to_the_tool_server_for_the_owner_only(monkeypatch):
+    """The owner, 2026-10-09: a Proxmox tab with alarms. The tool server reads the cluster; the panel relays."""
+    import main
+    calls = []
+
+    async def fake_admin(method, path, body=None, timeout=10):
+        calls.append((method, path, timeout))
+        return main.JSONResponse({"cluster": {"name": "c"}} if path == "/proxmox/monitor" else {"points": []})
+    monkeypatch.setattr(main, "_mcp_admin", fake_admin)
+    monkeypatch.setattr(main, "DASHBOARD_PASSWORD", OWNER_PW)
+    c = TestClient(main.app, headers=OWNER)
+    assert c.get("/api/proxmox/monitor").json()["cluster"]["name"] == "c" and calls[-1][2] == 45
+    c.get("/api/proxmox/history", params={"kind": "qemu", "node": "pve1", "vmid": "100", "timeframe": "day"})
+    assert calls[-1][1] == "/proxmox/monitor/history?kind=qemu&node=pve1&vmid=100&timeframe=day"
+    c.get("/api/proxmox/history", params={"node": "pve1&kind=lxc"})  # a smuggled parameter stays inside its value
+    assert calls[-1][1] == "/proxmox/monitor/history?kind=node&node=pve1%26kind%3Dlxc&timeframe=hour"
+    assert TestClient(main.app).get("/api/proxmox/monitor").status_code in (401, 403)  # not without the owner's login

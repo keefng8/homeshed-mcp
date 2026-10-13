@@ -11,7 +11,8 @@ from tools.image.generate import ImageError, base_url
 
 MAX_LIMIT = 100
 LOCAL_KEYS = ("prompt", "original_prompt", "model", "seed", "width", "height")
-PAID_KEYS = ("prompt", "provider", "model", "seed", "width", "height", "license")
+PAID_KEYS = ("prompt", "provider", "model", "seed", "width", "height", "license", "caller", "cost_estimate_usd",
+             "cost_counted_usd")  # who asked and what it cost (2026-10-10: the shop app books its bots' spend)
 
 
 def _local(limit: int) -> tuple[list[dict], str | None]:
@@ -58,8 +59,10 @@ def history(limit: int = 20) -> dict:
 
     Returns:
         {"images": [{"name", "source": "local" | "paid", "at", "prompt"?, "original_prompt"?, "model"?, "seed"?,
-        "width"?, "height"?, "provider"?, "license"?}], "count", "note"?}. Images made before records were kept
-        (2026-10-06) have no prompt.
+        "width"?, "height"?, "provider"?, "license"?, "caller"?, "cost_estimate_usd"?, "cost_counted_usd"?}], "count",
+        "note"?}. Paid images: caller is the app that asked ("owner" for the owner's own use); cost_counted_usd is what the
+        spend counters charged (an unlisted price counts as $0.20; 0 when the provider made nothing). Images made before
+        records were kept (2026-10-06) have no prompt; before 2026-10-10, no caller or cost_counted_usd.
     """
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_LIMIT:
         raise ImageError(f"limit must be a whole number from 1 to {MAX_LIMIT}")

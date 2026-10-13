@@ -82,6 +82,21 @@ def publish_post(path: str, body: dict, setting: str = PUBLISH_SETTING,
     return h.json_of("printify", resp)
 
 
+BILLING_SETTING = "commerce_printify_billing_currency"
+CURRENCIES = ("USD", "GBP", "EUR", "AUD", "CAD")  # Printify's billing currencies (its help centre, 2026-10-09)
+
+
+def cost_currency() -> str | None:
+    """The currency of Printify's product costs: the account's billing currency, which the API doesn't give, so the
+    owner names it in Settings. None = not set."""
+    try:
+        import runtime_settings
+        v = str(runtime_settings.get(BILLING_SETTING) or "").strip().upper()
+    except Exception:  # noqa: BLE001 - no settings readable: unknown
+        return None
+    return v if v in CURRENCIES else None
+
+
 def get(path: str, params: dict | None = None) -> Any:
     h.require(SETTING, "Printify")
     tok = _token()

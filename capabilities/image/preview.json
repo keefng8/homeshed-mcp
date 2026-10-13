@@ -1,0 +1,60 @@
+{
+  "id": "image.preview",
+  "name": "Garment Preview",
+  "version": "1.0.0",
+  "description": "A print file on a plain flat tee (sand, white, navy, black or any #rrggbb), front or back, at its true size: a 1024 px JPEG so the owner rates exactly what will be printed. Free, local CPU, no person or model.",
+  "category": "image",
+  "risk": "write",
+  "requires": [
+    "the local image service"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "garment preview",
+    "tee preview",
+    "preview print on shirt",
+    "show it on a t-shirt"
+  ],
+  "inputs": {
+    "image": {
+      "type": "string",
+      "required": true
+    },
+    "garment": {
+      "type": "string",
+      "required": false,
+      "default": "sand"
+    },
+    "print_area": {
+      "type": "string",
+      "required": false,
+      "default": "front"
+    },
+    "show_area": {
+      "type": "boolean",
+      "required": false,
+      "default": true
+    },
+    "include_image": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.preview.preview"
+  },
+  "latency": {
+    "expected_ms": 2000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.print_file",
+    "image.text_check",
+    "printify.product_create"
+  ]
+}

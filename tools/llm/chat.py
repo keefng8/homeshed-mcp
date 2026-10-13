@@ -50,9 +50,43 @@ def _check(messages, system: str, max_tokens, temperature) -> tuple[list[dict], 
     return clean, system.strip(), max_tokens, temperature
 
 
+MAX_IMAGES = 4  # images the model looks at with the last user message (2026-10-11: the shop's seat bots review tries)
+MAX_IMAGE_BYTES = 5 * 1024 * 1024  # each; four stay a reasonable request (xAI takes up to 20 MiB per image)
+
+
+def _with_images(msgs: list[dict], images) -> list[dict]:
+    """The messages with the named images attached to the last user message, as the Responses API takes them."""
+    if images is None or images == []:
+        return msgs
+    if not isinstance(images, list) or not all(isinstance(r, str) and r.strip() for r in images):
+        raise prov.LLMError("images must be a list of image names (as image.history or image.status give them)")
+    if len(images) > MAX_IMAGES:
+        raise prov.LLMError(f"at most {MAX_IMAGES} images")
+    last = max((i for i, m in enumerate(msgs) if m["role"] == "user"), default=None)
+    if last is None:
+        raise prov.LLMError("images go with a user message; add one")
+    import base64
+
+    from tools.commerce._http import CommerceError
+    from tools.image.providers import sniff_mime
+    from tools.image.refs import image_bytes
+    parts: list[dict] = [{"type": "input_text", "text": msgs[last]["content"]}]
+    for ref in images:
+        try:
+            data = image_bytes(ref.strip(), max_bytes=MAX_IMAGE_BYTES)
+        except CommerceError as exc:
+            raise prov.LLMError(str(exc)) from None
+        mime = sniff_mime(data)
+        if mime is None:
+            raise prov.LLMError(f"{ref} isn't a PNG, JPEG or WebP")
+        parts.append({"type": "input_image", "detail": "high",
+                      "image_url": f"data:{mime};base64,{base64.b64encode(data).decode()}"})
+    return [*msgs[:last], {"role": "user", "content": parts}, *msgs[last + 1:]]
+
+
 @tool(name="chat", category="llm", doc="llm/relay.md")
 def chat(messages: list[Message], system: str = "", model: str = "", max_tokens: int = 1024,
-         temperature: float | None = None, provider: str = "xai") -> dict:
+         temperature: float | None = None, provider: str = "xai", images: list[str] | None = None) -> dict:
     """One chat turn with a PAID language model (xAI Grok first), relayed through HomeShed: the key stays in the
     owner's vault and never reaches the caller. Off until the owner switches the provider on and gives it a daily cap
     (Control Panel > Settings > AI and tools > Language models); refused with the reason when off, keyless or capped.
@@ -66,6 +100,9 @@ def chat(messages: list[Message], system: str = "", model: str = "", max_tokens:
         max_tokens: most answer tokens, 1-2048 (default 1024). Reasoning tokens are billed on top.
         temperature: 0-2, optional (the model's default when left out).
         provider: "xai" (openai and anthropic planned).
+        images: optional, up to 4 image names for the model to look at with the last user message: a generated or
+            paid image's name, "folder/name.png" from the image store, or a Printify mockup address. Image tokens are
+            billed as input.
 
     Returns:
         {"text", "provider", "model", "truncated", "finish", "usage": {"input_tokens", "output_tokens",
@@ -80,6 +117,7 @@ def chat(messages: list[Message], system: str = "", model: str = "", max_tokens:
     if model not in p["models"]:
         raise prov.LLMError(f"{provider} has no model {model!r} here; models: {', '.join(p['models'])}")
     msgs, system, max_tokens, temperature = _check(messages, system, max_tokens, temperature)
+    msgs = _with_images(msgs, images)  # loaded before reserve(): a bad name costs nothing
     client = clients.current_client.get() or "owner"
     prov.reserve(provider, client)  # switch, key, caps; counts the request
     try:

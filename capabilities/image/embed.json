@@ -1,0 +1,46 @@
+{
+  "id": "image.embed",
+  "name": "Image Embedding",
+  "version": "1.0.0",
+  "description": "An image's SigLIP 2 embedding (768 numbers, L2-normalised; google/siglip2-base-patch16-224, Apache-2.0), for a classifier trained on the owner's ratings. Free, local CPU only, never the GPU.",
+  "category": "image",
+  "risk": "read",
+  "requires": [
+    "the local image service"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "image embedding",
+    "clip embedding",
+    "siglip vector",
+    "score a design image"
+  ],
+  "inputs": {
+    "image": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "image_b64": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.embed.embed"
+  },
+  "latency": {
+    "expected_ms": 1500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.compare",
+    "image.history",
+    "printify.mockup_fetch"
+  ]
+}

@@ -27,7 +27,7 @@ come they'll be dry-run first and queued for the owner's approval.
 | `printify.orders.list` | `GET /v1/shops/{shop_id}/orders.json` | `page`, `limit` 1-10, `status` |
 | `printify.order.get` | `GET /v1/shops/{shop_id}/orders/{id}.json` | `order_id` |
 
-Money is in the shop's currency units (Printify's cents divided by 100). **Delivery addresses and customer details
+Money is in units (Printify's cents divided by 100); for which currency, see "Which currency" below. **Delivery addresses and customer details
 are left out.** Printify's limits: 600 requests a minute overall, catalogue endpoints 100 a minute.
 
 ## Safety
@@ -55,7 +55,14 @@ machine (its listing margins count the delivery the buyer pays).
 `printify.product.get(product_id, variant_ids=[], offset=0, limit=40)`: every enabled variant now carries `cost` (what
 Printify charges, in units) next to `price`. Variants are paged (1-100 a page, `next_offset`) instead of cut at 15, and
 `variant_ids` returns just the chosen ones. `currency` is passed through only if Printify's product data has the field
-(otherwise null): Printify doesn't state the currency of product costs, so check before converting.
+(otherwise null).
+
+Which currency (2026-10-09): Printify's API names none. Its help centre says costs are charged, and converted, in the
+account's **billing currency** (Wallet > Payment details; USD unless changed; USD, GBP, EUR, AUD or CAD), while the
+retail `price` is published to the shop as is, so it's in the shop's own currency. `cost_currency` is that billing
+currency as the owner set it in **Settings > Shops and social > "Your Printify billing currency"**
+(`commerce_printify_billing_currency`); null while it's "not set", so a caller never guesses. The catalogue delivery
+table (`printify.shipping`) does label its prices (e.g. "USD").
 
 ## Mockups (2026-10-07)
 `printify.product.get` also returns `mockups` (at most 20): `src`, `position`, `camera` (Printify's camera_label),

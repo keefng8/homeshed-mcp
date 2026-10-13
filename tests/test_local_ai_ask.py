@@ -78,6 +78,15 @@ def test_discovery_adds_gateway_models_filtered_by_include():
     assert "qwen-local" not in names  # gateway aliases for local models never double-route
 
 
+def test_discovery_leaves_out_excluded_models(env, monkeypatch):
+    """2026-10-08: a Gemini key listed image, speech and live models under "*gemini-*flash*": not chat models."""
+    reg = json.loads(env.read_text())
+    reg["backends"][2]["exclude"] = ["*image*", "*tts*"]
+    env.write_text(json.dumps(reg))
+    monkeypatch.setattr(module.httpx, "get", _gateway_models([SUPER, "nvidia-flash-image", "nvidia-flash-tts"]))
+    assert {b["name"] for b in module.backends() if b.get("cloud")} == {SUPER}
+
+
 def test_new_gateway_model_is_used_without_code_changes(monkeypatch):
     monkeypatch.setattr(module.httpx, "get", _gateway_models([SUPER, ULTRA, "nvidia-brand-new-model"]))
     assert "nvidia-brand-new-model" in {b["name"] for b in module.backends()}
@@ -301,3 +310,27 @@ def test_the_warning_rides_on_the_answer_and_never_fails_it(monkeypatch):
     assert out["text"] == "OK" and out["served_model"] == "Qwen3-8B-Q6_K.gguf" and "asked for qwen3-coder-30b" in out["warning"]
     monkeypatch.setattr(module, "_served_model", lambda base: "")  # can't tell: no warning, the answer still comes
     assert "warning" not in module._call(b, "hi", 10, 0.2, False)
+
+
+def test_a_held_agent_model_says_why_it_is_down(monkeypatch):
+    """R&D, 2026-10-10: a dry run said only "benched after a recent failure" while a training render had paused the
+    PC's model. The GPU service's safeguards record why (guard.py holds), and the reason now says so."""
+    import httpx as _httpx
+
+    import vault
+    from tools.local_ai import ask as a
+    monkeypatch.setattr(a, "_hold_cache", (0.0, None))
+    monkeypatch.setenv("GPU_SERVICE_URL", "http://pc:8082")
+    monkeypatch.setattr(vault, "secret", lambda name, default=None: "tok")
+    seen = []
+
+    def fake_get(url, headers=None, timeout=None):
+        seen.append((url, headers))
+        return _httpx.Response(200, json={"holds": {"llama-server": {"by": "image", "at": 1}}})
+    monkeypatch.setattr(a.httpx, "get", fake_get)
+    assert a._local_why({"cloud": False}, "benched") == "benched (paused for an image job: it starts again when the job ends)"
+    assert a._local_why({"cloud": True}, "slow") == "slow"  # cloud backends are never explained by the PC's holds
+    assert seen == [("http://pc:8082/models/health", {"X-GPU-Token": "tok"})]  # cached: asked once
+    monkeypatch.setattr(a, "_hold_cache", (0.0, None))
+    monkeypatch.setattr(a.httpx, "get", lambda *x, **k: (_ for _ in ()).throw(_httpx.ConnectError("down")))
+    assert a._local_why({"cloud": False}, "benched") == "benched"  # the PC unreachable: just the plain reason

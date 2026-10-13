@@ -43,7 +43,8 @@ from sd.cpp: "reading prompt", "step 7/20", "decoding image"), `elapsed_s` and `
 | `steps` | integer | `0` | 1-60; `0` = model default (20). |
 | `seed` | integer | `-1` | Random if -1; reuse a returned seed to reproduce. |
 | `model` | string | `""` | Empty = the provider's default (`qwen-image-2.1` locally). Local: `qwen-image-2.1`, `flux.1-schnell`. |
-| `provider` | string | `""` | Empty = `IMAGE_DEFAULT_PROVIDER` or `local-sdcpp`. Paid: `openai`, `stability`, `replicate`, `fal`, `together`, `xai`. |
+| `provider` | string | `""` | Empty = `IMAGE_DEFAULT_PROVIDER` or `local-sdcpp`. Paid: `openai`, `stability`, `replicate`, `fal`, `together`, `xai`, `google` (Nano Banana: `gemini-nano-banana-2.1` by default at 2K, about $0.05; 4K above 2048 px, $0.113; `gemini-3-pro-image` only when named; billed in Google AI Studio, which a Gemini app plan doesn't cover; invisible SynthID watermark). |
+| `input_images` | array | none | `google` only: 1-5 images to edit or take a look from (an image name, `"folder/name.png"` or a Printify mockup address, up to 10 MB each), with the prompt as the instruction. The prompt isn't rewritten for an edit. |
 | `require_commercial` | boolean | `false` | Refuse models whose outputs can't be sold; with nothing named, auto-pick a commercial-safe one (may be PAID). |
 | `enhance_prompt` | boolean | `true` | Rewrite the prompt into a detailed 60-120 word description first, using the `local_ai.ask` delegator. Qwen's README officially recommends prompt rewriting. If it fails, the original is used and `enhance_error` says why. |
 | `upscale` | boolean | `false` | Local only. RealESRGAN x4plus (BSD-3) after generation, e.g. 1024 to 4096px, via sd.cpp `--upscale-model`. |

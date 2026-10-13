@@ -24,12 +24,12 @@ def fake(monkeypatch):
     return f
 
 
-def test_all_nine_tools_are_discovered():
+def test_all_ten_tools_are_discovered():
     from registry import discover
     ids = {f"{c.category}.{c.name}" for c in discover() if c.category == "proxmox"}
     assert ids == {"proxmox.nodes.list", "proxmox.node.status", "proxmox.vms.list", "proxmox.vm.status",
                    "proxmox.storage.list", "proxmox.tasks.list", "proxmox.vm.power", "proxmox.vm.snapshot",
-                   "proxmox.vm.create"}
+                   "proxmox.vm.create", "proxmox.health"}  # health: the monitor, 2026-10-09
 
 
 def test_read_tools_are_read_risk_and_changes_write_risk():

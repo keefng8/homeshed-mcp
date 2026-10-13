@@ -15,12 +15,13 @@ SHAPES = {"9:16": "1080x1920", "4:5": "1080x1350"}
 TEMPLATES = ("drop", "editorial")
 WATERMARK_STYLES = ("tiled", "corner", "both")
 STYLE_RE = re.compile(r"^[a-z0-9-]{1,30}$")  # a brand frame's style name, e.g. "neon-gold"
+MATTE_RE = re.compile(r"^(auto|none|#[0-9a-f]{6})$")
 
 
 @tool(name="promo_card", category="image", doc="image/promo_card.md")
 def promo_card(product_image: str, headline: str, price_gbp: float, template: str = "drop", benefit: str = "",
                link_text: str = "", kicker: str = "", shape: str = "9:16", frame: str = "", cutout: bool = False,
-               watermark: str = "", watermark_style: str = "tiled") -> dict:
+               watermark: str = "", watermark_style: str = "tiled", matte: str = "auto") -> dict:
     """Make a branded promo card around a real product mockup: the mockup is the hero (about half the card, only
     scaled, never cropped or altered), with the brand's logo, the product name as a headline, a one-line benefit, the
     £ price, a "Shop now" button and the shop link. Saved in the images "promo" folder; pass its name to
@@ -46,11 +47,15 @@ def promo_card(product_image: str, headline: str, price_gbp: float, template: st
         watermark: brand text; empty = none.
         watermark_style: "tiled" (default: faint and diagonal across the card, under the text, price and button:
             about 7% on a light card, 12% on a dark one), "corner" (small, under the mockup) or "both".
+        matte: what's behind the garment. "auto" (default): where it would blend in (a White or Sand tee on its
+            white mockup backdrop, or on a light scene), the plain backdrop becomes a dark grey matte (a light one
+            for dark garments), the garment untouched. "none": never. "#rrggbb": that colour, always.
 
     The supplier's name is refused in any text: the card never names it.
 
     Returns:
-        {"name", "width", "height", "bytes", "folder": "promo", "size", "template", "hero_share", "frame", "cutout"}.
+        {"name", "width", "height", "bytes", "folder": "promo", "size", "template", "hero_share", "frame", "cutout",
+        "matte" ("#rrggbb" or null)}.
     """
     if shape not in SHAPES:
         raise ImageError('shape is "9:16" or "4:5"')
@@ -58,6 +63,9 @@ def promo_card(product_image: str, headline: str, price_gbp: float, template: st
         raise ImageError('template is "drop" or "editorial"')
     if watermark_style not in WATERMARK_STYLES:
         raise ImageError(f"watermark_style is one of {list(WATERMARK_STYLES)}")
+    matte = (matte or "auto").strip().lower()
+    if not MATTE_RE.match(matte):
+        raise ImageError('matte is "auto", "none" or a "#rrggbb" colour')
     name = (product_image or "").strip()
     if not NAME_RE.match(name):
         raise ImageError(f"{name!r} isn't an image file name (use the image's saved name)")
@@ -75,7 +83,8 @@ def promo_card(product_image: str, headline: str, price_gbp: float, template: st
         resp = httpx.post(f"{base_url()}/image/promo-card", timeout=120, json={
             "product": product, "headline": headline or "", "price_gbp": price_gbp, "template": template,
             "size": SHAPES[shape], "benefit": benefit or "", "link_text": link_text or "", "kicker": kicker or "",
-            "frame": frame, "cutout": bool(cutout), "watermark": watermark or "", "watermark_style": watermark_style})
+            "frame": frame, "cutout": bool(cutout), "watermark": watermark or "", "watermark_style": watermark_style,
+            "matte": matte})
     except httpx.HTTPError as exc:
         raise ImageError(f"image backend unreachable ({type(exc).__name__})") from None
     raise_for_backend(resp)

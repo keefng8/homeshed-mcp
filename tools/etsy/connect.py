@@ -30,12 +30,14 @@ GRANTED_FILE = Path(os.environ.get("ETSY_CONNECTION_FILE") or data_path("usage/e
 AUTHORIZE_URL = "https://www.etsy.com/oauth/connect"
 SCOPES = "shops_r listings_r transactions_r"
 WRITE_SCOPE = "listings_w"  # asked for only while a listing write switch is on (least privilege, 2026-10-08)
+SHOP_SCOPE = "shops_w"  # asked for only while the shop edit switch is on (2026-10-10)
 
 
 def scopes() -> str:
-    """What Connect Etsy asks for: read-only, plus listing edits when the owner has switched a write tool on."""
-    on = any(h.enabled(s) for s in (etsy.WRITE_SETTING, etsy.DEACTIVATE_SETTING))
-    return f"{SCOPES} {WRITE_SCOPE}" if on else SCOPES
+    """What Connect Etsy asks for: read-only, plus listing or shop edits when the owner has switched a write tool on."""
+    extra = [WRITE_SCOPE] if any(h.enabled(s) for s in (etsy.WRITE_SETTING, etsy.DEACTIVATE_SETTING)) else []
+    extra += [SHOP_SCOPE] if h.enabled(etsy.SHOP_WRITE_SETTING) else []
+    return " ".join([SCOPES, *extra])
 PENDING_S = 600
 MAX_PENDING = 5
 ACTOR = "etsy-connect"
@@ -106,10 +108,11 @@ def finish(code: str, state: str) -> dict:
     if not user_id.isdigit():
         raise h.CommerceError("Etsy's access token didn't carry a user number")
     import vault
-    write = WRITE_SCOPE in pend.get("scopes", "")
+    got = pend.get("scopes", "").split()
+    edits = [w for s, w in ((WRITE_SCOPE, "listing"), (SHOP_SCOPE, "shop")) if s in got]
     vault.set_credential(etsy._refresh_token(), refresh, actor=ACTOR, kind="token", service="Etsy",
-                         label="Etsy shop connection" + (" (with listing edits)" if write else ""),
-                         used_by=["etsy.* tools" + ("" if write else " (read-only)")])
+                         label="Etsy shop connection" + (f" (with {' and '.join(edits)} edits)" if edits else ""),
+                         used_by=["etsy.* tools" + ("" if edits else " (read-only)")])
     _save_granted(pend.get("scopes") or SCOPES)
     etsy.forget()  # the next call uses the new connection
     shop = _shop(key, sec, access, user_id)
@@ -180,7 +183,8 @@ def status() -> dict:
     filled = fill_shop_id()
     have = {k: bool(h.secret(n)) for k, n in names.items()}
     wanted = scopes()
-    reconnect = have["refresh_token"] and WRITE_SCOPE in wanted and WRITE_SCOPE not in (granted() or "")
+    got = (granted() or "").split()
+    reconnect = have["refresh_token"] and any(s in wanted.split() and s not in got for s in (WRITE_SCOPE, SHOP_SCOPE))
     return {"names": names, "have": have, "app_ready": have["keystring"] and have["shared_secret"],
             "connected": have["refresh_token"], "enabled": h.enabled(etsy.SETTING), "scopes": wanted,
             "reconnect_for_edits": bool(reconnect),

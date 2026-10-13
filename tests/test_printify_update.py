@@ -44,11 +44,18 @@ def test_edits_text_tags_and_prices_and_keeps_the_old_values(fake):
     assert up._edits()[0]["old"] == out["old"]  # kept for undo
 
 
-def test_the_floor_keeps_a_30_percent_margin_after_etsy_fees(fake):
-    assert up.floor_pence(1112) == 2126  # an £11.12 tee: £21.26 at a 400p delivery estimate
-    with pytest.raises(h.CommerceError, match="under the floor of 2126p"):
-        up.product_update("abc123", variants=[{"id": 1, "price_pence": 2099}])
+def test_the_floor_keeps_20_percent_15_on_hoodies_after_etsy_fees(fake, monkeypatch):
+    """The owner, 2026-10-09: 20% on everything, 15% on hoodies (it was 30% for all)."""
+    tee, hoodie = up.floor_pence(1112), up.floor_pence(1112, 77)
+    assert hoodie < tee < 2126  # 2126p (£21.26) was the 30% floor for an £11.12 tee at a 400p delivery estimate
+    monkeypatch.setenv("PRINTIFY_MIN_MARGIN", "0.30")
+    assert up.floor_pence(1112) == 2126 and up.floor_pence(1112, 77) == hoodie  # each has its own setting
+    monkeypatch.delenv("PRINTIFY_MIN_MARGIN")
+    with pytest.raises(h.CommerceError, match=f"under the floor of {tee}p \\(a 20% margin"):
+        up.product_update("abc123", variants=[{"id": 1, "price_pence": tee - 1}])
     assert fake[1] == []
+    up.product_update("abc123", variants=[{"id": 1, "price_pence": tee}])  # exactly at the floor is fine
+    assert len(fake[1]) == 1
 
 
 @pytest.mark.parametrize("why, product, pending", [

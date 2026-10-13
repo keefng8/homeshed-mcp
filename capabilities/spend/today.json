@@ -1,0 +1,38 @@
+{
+  "id": "spend.today",
+  "name": "Spend Per App Today",
+  "version": "1.0.0",
+  "description": "What each app (API client) has spent today on paid images and language-model calls, in dollars, against the daily cap the owner set for it. An app at its cap gets SPEND_CAP_REACHED on its paid calls; free and local tools keep working.",
+  "category": "spend",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "bot spend",
+    "spend cap",
+    "how much has this app spent",
+    "daily spend per client"
+  ],
+  "inputs": {
+    "client": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.spend.today.today"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "llm.providers.list",
+    "image.providers.list"
+  ]
+}

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "homeshed-mcp"
-version = "0.1.2"
+version = "0.2.0"
 description = "Every tool your AI needs, in one install. mcprush.com-claim-homeshed-mcp-c922c470f2b87ad2fe63a24d"
 readme = "README.md"
 license = "Apache-2.0"
@@ -28,7 +28,7 @@ test = ["pytest>=8.0", "pytest-asyncio>=0.24"]
 # Time-zone data for tools that follow a vendor's clock. The Docker image installs it: its slim base has no zone files.
 timezones = ["tzdata>=2024.1"]
 # The optional web panel (panel/ in the public repo): uvx --from "homeshed-mcp[panel]" homeshed-mcp panel
-panel = ["fastapi>=0.115"]
+panel = ["fastapi>=0.115", "asyncssh>=2.24,<3", "websockets>=13"]  # the Terminal tab: SSH, and uvicorn's WebSocket
 
 [project.scripts]
 homeshed-mcp = "homeshed_mcp._app.cli:main"

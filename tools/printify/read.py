@@ -74,9 +74,11 @@ def product_get(product_id: str, variant_ids: list[int] | None = None, offset: i
 
     Returns:
         {..., "variants_enabled", "matches", "offset", "next_offset", "variants": [{"id", "title", "price", "cost",
-        "sku"}], "currency", "images" (count), "mockups": [{"src", "position", "camera", "variant_ids",
-        "variant_count", "is_default", "is_selected_for_publishing"}] (at most 20)}. "currency" is Printify's own field if the product data has one, else null: Printify
-        doesn't say which currency product costs are in, so check before converting.
+        "sku"}], "currency", "cost_currency", "images" (count), "mockups": [{"src", "position", "camera",
+        "variant_ids", "variant_count", "is_default", "is_selected_for_publishing"}] (at most 20)}. Printify's API
+        names no currency ("currency" is its own field if the product has one, else null). "cost_currency" is the
+        account's billing currency, which Printify charges costs in, as the owner set it in Settings (null = not set:
+        don't guess). "price" is published to the shop as is, so it's in the shop's own currency.
     """
     pid = h.check_hex_id(product_id, "product_id")
     offset, limit = h.clamp(offset, 0, 10_000, "offset"), h.clamp(limit, 1, 100, "limit")
@@ -100,6 +102,7 @@ def product_get(product_id: str, variant_ids: list[int] | None = None, offset: i
             "variants": [{"id": v.get("id"), "title": h.trim(v.get("title"), 60), "price": _cents(v.get("price")),
                           "cost": _cents(v.get("cost")), "sku": v.get("sku")} for v in page],
             "currency": p.get("currency") if isinstance(p.get("currency"), str) else None,
+            "cost_currency": pf.cost_currency(),
             "images": len(p.get("images") or []), "mockups": _mockups(p, want),
             "created": p.get("created_at"), "updated": p.get("updated_at")}
 

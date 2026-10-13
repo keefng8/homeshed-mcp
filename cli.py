@@ -516,6 +516,15 @@ def cmd_pro(args) -> int:
                     print("This install's vault can't be switched on (its key file is unreadable). See docs/configuration.md.")
                     return 1
                 st = mavis_pro.connect_key(key)
+        elif args.action == "update":  # the Pro tools package (pro_plugin.py): download, check, unpack
+            import pro_plugin
+            try:
+                out = remote("POST", "/pro/tools") if server else pro_plugin.update()
+            except pro_plugin.ProPluginError as exc:
+                print(exc)
+                return 1
+            print(f"Pro tools {out['version']}: {out['note']}")
+            return 0
         elif args.action == "disconnect":
             out = remote("DELETE", "/pro") if server else mavis_pro.disconnect()
             print("Disconnected." + (f" {out['note']}" if out.get("note") else ""))
@@ -678,7 +687,8 @@ def main(argv: list[str] | None = None) -> int:
     remote.add_argument("--server", help="a HomeShed running over HTTP (Docker); default: this machine's own install")
     remote.add_argument("--env-file", default=".env", help="with --server: where init wrote MCP_AUTH_TOKEN")
     pr = sub.add_parser("pro", parents=[remote], help="HomeShed Pro: connect with a key from the Pro website")
-    pr.add_argument("action", nargs="?", default="status", choices=["connect", "status", "disconnect"])
+    pr.add_argument("action", nargs="?", default="status", choices=["connect", "status", "update", "disconnect"],
+                    help="update: download the Pro tools package (it loads when HomeShed next starts)")
     pr.add_argument("--key-stdin", action="store_true", help="connect: read the key from stdin (for scripts)")
     pk = sub.add_parser("packs", parents=[remote], help="rule packs, and their hook in Claude Code")
     pk.add_argument("action", nargs="?", default="list",

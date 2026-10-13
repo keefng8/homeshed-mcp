@@ -1,0 +1,65 @@
+{
+  "id": "etsy.shop.update",
+  "name": "Ask To Set Etsy Shop Texts",
+  "version": "1.0.0",
+  "description": "Ask to set the Etsy shop's title, announcement, messages to buyers after a purchase and additional policies, and to add shop sections. Nothing changes until the owner reads the full new texts and approves; only what differs is sent. Etsy's API has no About section.",
+  "category": "etsy",
+  "risk": "write",
+  "requires": [
+    "the owner's commerce_etsy_enabled and commerce_etsy_shop_write_enabled switches",
+    "an Etsy connection made with shop edits (shops_w)",
+    "the owner's approval of each change"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "etsy shop announcement",
+    "etsy shop title",
+    "etsy shop sections",
+    "etsy sale message"
+  ],
+  "inputs": {
+    "title": {
+      "type": "string",
+      "required": false
+    },
+    "announcement": {
+      "type": "string",
+      "required": false
+    },
+    "sale_message": {
+      "type": "string",
+      "required": false
+    },
+    "digital_sale_message": {
+      "type": "string",
+      "required": false
+    },
+    "policy_additional": {
+      "type": "string",
+      "required": false
+    },
+    "sections": {
+      "type": "array",
+      "required": false
+    },
+    "owner_approval": {
+      "type": "object",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.etsy.shop_write.shop_update"
+  },
+  "latency": {
+    "expected_ms": 1500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "etsy.shop.get",
+    "etsy.listing.update"
+  ]
+}

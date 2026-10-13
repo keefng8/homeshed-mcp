@@ -1,0 +1,31 @@
+{
+  "id": "pinterest.status",
+  "name": "Pinterest Status",
+  "version": "1.0.0",
+  "description": "Whether Pinterest is connected and pinning is on, Trial (sandbox, only the owner sees pins) or Standard access, the account, and pins in the last 24 hours.",
+  "category": "pinterest",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "is pinterest connected",
+    "pinterest status"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "python",
+    "handler": "tools.pinterest.pins.status"
+  },
+  "latency": {
+    "expected_ms": 400
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "pinterest.boards.list",
+    "pinterest.board.create",
+    "pinterest.pin.create"
+  ]
+}

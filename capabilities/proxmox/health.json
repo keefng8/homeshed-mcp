@@ -1,0 +1,36 @@
+{
+  "id": "proxmox.health",
+  "name": "Proxmox Cluster Health",
+  "version": "1.0.0",
+  "description": "The whole Proxmox cluster at a glance: quorum, each node's CPU, RAM and system disk, storage pools, VMs and containers running, and the alarms active now (as on the Control Panel's Proxmox tab). Read-only.",
+  "category": "proxmox",
+  "risk": "read",
+  "requires": [
+    "Proxmox VE API token (PROXMOX_TOKEN_ID, or PROXMOX_API_TOKEN)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "is the proxmox cluster healthy",
+    "proxmox alarms",
+    "proxmox disk space",
+    "server health"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "http",
+    "handler": "tools.proxmox.health.health"
+  },
+  "latency": {
+    "expected_ms": 2000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "proxmox.nodes.list",
+    "proxmox.vms.list",
+    "proxmox.storage.list",
+    "proxmox.node.status"
+  ]
+}

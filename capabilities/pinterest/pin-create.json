@@ -1,0 +1,65 @@
+{
+  "id": "pinterest.pin.create",
+  "name": "Ask To Make A Pinterest Pin",
+  "version": "1.0.0",
+  "description": "Ask to make one Pinterest pin: image, title, description (with \"AI-assisted design.\" and Pinterest's AI disclosure when AI helped), alt text and a link to one of the shop's own active Etsy listings. Nothing is pinned until the owner approves THIS pin in the approvals bar; no app or AUTO mode can approve one (Pinterest's rule).",
+  "category": "pinterest",
+  "risk": "write",
+  "requires": [
+    "the owner's social_pinterest_enabled switch",
+    "Pinterest connected",
+    "the owner's approval of each pin"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "pin to pinterest",
+    "pinterest post",
+    "create pinterest pin"
+  ],
+  "inputs": {
+    "image": {
+      "type": "string",
+      "required": true
+    },
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "string",
+      "required": true
+    },
+    "link": {
+      "type": "string",
+      "required": true
+    },
+    "board": {
+      "type": "string",
+      "required": true
+    },
+    "ai_generated": {
+      "type": "boolean",
+      "required": true
+    },
+    "alt_text": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.pinterest.pins.pin_create"
+  },
+  "latency": {
+    "expected_ms": 2500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "pinterest.status",
+    "pinterest.boards.list",
+    "pinterest.board.create"
+  ]
+}

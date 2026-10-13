@@ -36,6 +36,11 @@
       "type": "integer",
       "required": false,
       "default": 0
+    },
+    "vignette": {
+      "type": "string",
+      "required": false,
+      "default": ""
     }
   },
   "execution": {

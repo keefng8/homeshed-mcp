@@ -34,6 +34,11 @@
       "type": "string",
       "required": false,
       "default": ""
+    },
+    "force_local": {
+      "type": "boolean",
+      "required": false,
+      "default": false
     }
   },
   "execution": {

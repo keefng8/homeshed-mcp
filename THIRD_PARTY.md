@@ -16,6 +16,17 @@ adapts from other open-source projects, and the optional services it can connect
 | cryptography | Apache-2.0 OR BSD-3-Clause | Encrypting stored credentials (vault) |
 | fastapi | MIT | The optional Control Panel (the `panel` extra) |
 | tzdata | Apache-2.0 | Time-zone data (the `timezones` extra; the Docker image installs it) |
+| asyncssh | EPL-2.0 OR GPL-2.0-or-later | The Control Panel's Terminal tab (SSH to your own machines; the `panel` extra) |
+| websockets | BSD-3-Clause | The Terminal tab's live connection (the `panel` extra) |
+
+## JavaScript in the optional Control Panel
+
+The panel serves these itself, unchanged; each licence file sits next to its code in `panel/static/vendor/xterm/`.
+
+| Component | Files | Licence | Copyright |
+|---|---|---|---|
+| [xterm.js](https://github.com/xtermjs/xterm.js) | `xterm.js`, `xterm.css` | [MIT](panel/static/vendor/xterm/LICENSE-xterm.txt) | 2017-2019 The xterm.js authors |
+| [xterm.js fit addon](https://github.com/xtermjs/xterm.js) | `addon-fit.js` | [MIT](panel/static/vendor/xterm/LICENSE-addon-fit.txt) | 2019 The xterm.js authors |
 
 ## Fonts in the optional Control Panel
 

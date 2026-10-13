@@ -105,3 +105,23 @@ def test_context_never_decides_the_route_and_reaches_the_local_model(monkeypatch
     assert routes[1] == ("Plain task", 0) and asked[1] == "Plain task"  # no background: exactly as before
     with pytest.raises(ValueError, match="at most"):
         d.delegate("x", background="y" * (d.MAX_BACKGROUND + 1))
+
+
+def test_force_local_skips_routing_and_never_reaches_the_cloud(monkeypatch):
+    """R&D, 2026-10-10: a dry run's "judgement" task routed to Claude came back unanswered and the item was lost."""
+    asked = []
+    monkeypatch.setattr(delegate_module, "route", lambda **k: (_ for _ in ()).throw(AssertionError("routed")))
+
+    def fake_ask(task, **kwargs):
+        asked.append(kwargs)
+        return {"text": "43", "model": "qwen-coder", "finish_reason": "stop"}
+    monkeypatch.setattr(delegate_module, "ask", fake_ask)
+    out = delegate("judge this listing from 0 to 100", force_local=True, background="rules")
+    assert out == {"ok": True, "handled_by": "local", "answer": "43", "model": "qwen-coder", "forced_local": True}
+    assert asked[0]["allow_cloud"] is False  # a local model only, never the cloud fallback
+
+
+def test_force_local_with_no_local_model_says_so_and_never_hands_to_claude(monkeypatch):
+    monkeypatch.setattr(delegate_module, "ask", lambda task, **k: (_ for _ in ()).throw(LocalAIError("all local models busy")))
+    out = delegate("judge this", force_local=True)
+    assert out["ok"] is False and out["handled_by"] == "none" and "all local models busy" in out["reason"]

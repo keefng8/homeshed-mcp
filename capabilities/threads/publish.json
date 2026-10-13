@@ -20,6 +20,10 @@
       "type": "string",
       "required": true
     },
+    "ai_generated": {
+      "type": "boolean",
+      "required": true
+    },
     "link": {
       "type": "string",
       "required": false

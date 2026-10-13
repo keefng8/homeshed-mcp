@@ -105,16 +105,16 @@ def test_token_renews_after_a_week(meta):
 def test_publish_guards(meta):
     th, pub, _, _, calls, _, mp = meta
     with pytest.raises(Exception, match="Threads posting"):
-        pub.publish("hello")
+        pub.publish("hello", ai_generated=False)
     mp.setattr(pub.h, "require", lambda setting, label: None)
     with pytest.raises(Exception, match="empty"):
-        pub.publish("  ")
+        pub.publish("  ", ai_generated=False)
     with pytest.raises(Exception, match="over 500"):
-        pub.publish("x" * 501)
+        pub.publish("x" * 501, ai_generated=False)
     with pytest.raises(Exception, match="https"):
-        pub.publish("hi", link="ftp://x")
+        pub.publish("hi", ai_generated=False, link="ftp://x")
     with pytest.raises(Exception, match="isn't connected"):
-        pub.publish("hi")
+        pub.publish("hi", ai_generated=False)
     assert not [c for c in calls if "/threads" in c.url.path]
 
 
@@ -125,14 +125,14 @@ def test_publish_posts_returns_the_link_and_counts(meta):
     mp.setenv("THREADS_USER_ID", "42")
     import time
     rows["THREADS_ACCESS_TOKEN"] = {"name": "THREADS_ACCESS_TOKEN", "updated": time.time()}
-    out = pub.publish("New designs are live!", link="https://example.com/shop")
+    out = pub.publish("New designs are live!", ai_generated=False, link="https://example.com/shop")
     assert out["posted"] and out["permalink"].endswith("/p9") and out["posted_today"] == 1
     made = parse_qs(next(c for c in calls if c.url.path == "/v1.0/42/threads").content.decode())
     assert made["media_type"] == ["TEXT"] and made["link_attachment"] == ["https://example.com/shop"]
     assert LONG not in json.dumps(out)
     mp.setenv("THREADS_DAILY_MAX", "1")
     with pytest.raises(Exception, match="daily limit"):
-        pub.publish("again")
+        pub.publish("again", ai_generated=False)
 
 
 PNG_800 = b"\x89PNG\r\n\x1a\n" + b"\0\0\0\rIHDR" + (800).to_bytes(4, "big") + (800).to_bytes(4, "big") + b"x" * 40
@@ -157,7 +157,7 @@ def test_publish_one_image_then_deletes_the_staged_copy(meta, tmp_path, monkeypa
     staged = []
     pub, calls = _ready(meta, staged)
     monkeypatch.setattr(pub, "_media", lambda n: (PNG_800, "image/png"))
-    out = pub.publish("Frenchie season", image_names=["20261007-1-xai-abc.png"], alt_text="A French bulldog design")
+    out = pub.publish("Frenchie season", ai_generated=False, image_names=["20261007-1-xai-abc.png"], alt_text="A French bulldog design")
     made = parse_qs(next(c for c in calls if c.url.path == "/v1.0/42/threads").content.decode())
     assert out["media_type"] == "IMAGE" and made["media_type"] == ["IMAGE"] and made["alt_text"] == ["A French bulldog design"]
     assert made["image_url"][0].startswith("https://acct.r2.cloudflarestorage.com/b/threads/")
@@ -169,7 +169,7 @@ def test_publish_carousel_makes_items_then_the_carousel(meta, monkeypatch):
     staged = []
     pub, calls = _ready(meta, staged)
     monkeypatch.setattr(pub, "_media", lambda n: (PNG_800, "image/png"))
-    out = pub.publish("Which one's yours?", image_names=["a.png", "b.png", "c.png"])
+    out = pub.publish("Which one's yours?", ai_generated=False, image_names=["a.png", "b.png", "c.png"])
     made = [parse_qs(c.content.decode()) for c in calls if c.url.path == "/v1.0/42/threads"]
     assert [m["media_type"][0] for m in made] == ["IMAGE", "IMAGE", "IMAGE", "CAROUSEL"]
     assert all(m["is_carousel_item"] == ["true"] for m in made[:3]) and made[3]["children"] == ["c1,c1,c1"]
@@ -180,9 +180,9 @@ def test_publish_media_failures_upload_and_post_nothing(meta, monkeypatch):
     staged = []
     pub, calls = _ready(meta, staged)
     with pytest.raises(Exception, match="at most 10"):
-        pub.publish("x", image_names=[f"{i}.png" for i in range(11)])
+        pub.publish("x", ai_generated=False, image_names=[f"{i}.png" for i in range(11)])
     with pytest.raises(Exception, match="isn't an image file name"):
-        pub.publish("x", image_names=["../etc/passwd"])
+        pub.publish("x", ai_generated=False, image_names=["../etc/passwd"])
     assert not staged and not [c for c in calls if "/threads" in c.url.path]
 
 
@@ -273,7 +273,7 @@ def test_publish_stops_on_a_failed_container(meta):
     rows["THREADS_ACCESS_TOKEN"] = {"name": "THREADS_ACCESS_TOKEN", "updated": time.time()}
     state["container"] = "ERROR"
     with pytest.raises(Exception, match="couldn't prepare"):
-        pub.publish("hi")
+        pub.publish("hi", ai_generated=False)
     assert not [c for c in calls if c.url.path.endswith("threads_publish")]
 
 
@@ -281,10 +281,10 @@ def test_topic_tag_goes_on_the_post_container_only(meta, monkeypatch):
     staged = []
     pub, calls = _ready(meta, staged)
     monkeypatch.setattr(pub, "_media", lambda n: (PNG_800, "image/png"))
-    pub.publish("Which breed next?", image_names=["a.png", "b.png"], topic_tag="#Dogs   of Threads")
+    pub.publish("Which breed next?", ai_generated=False, image_names=["a.png", "b.png"], topic_tag="#Dogs   of Threads")
     made = [parse_qs(c.content.decode()) for c in calls if c.url.path == "/v1.0/42/threads"]
     assert [m.get("topic_tag") for m in made] == [None, None, ["Dogs of Threads"]]  # carousel parent only
-    pub.publish("Plain text post", topic_tag="Dog lovers")
+    pub.publish("Plain text post", ai_generated=False, topic_tag="Dog lovers")
     last = parse_qs([c for c in calls if c.url.path == "/v1.0/42/threads"][-1].content.decode())
     assert last["media_type"] == ["TEXT"] and last["topic_tag"] == ["Dog lovers"]
 
@@ -295,7 +295,7 @@ def test_bad_topic_tag_posts_nothing(meta):
     before = len(calls)
     for bad in ("Kind Retro Co.", "Rock & Roll", "x" * 51):
         with pytest.raises(Exception, match="topic_tag"):
-            pub.publish("hi", topic_tag=bad)
+            pub.publish("hi", ai_generated=False, topic_tag=bad)
     assert len(calls) == before and not staged
 
 
@@ -305,7 +305,7 @@ def test_video_post_from_a_studio_video(meta, monkeypatch, tmp_path):
     monkeypatch.setattr(pub, "VIDEO_DIR", tmp_path)
     (tmp_path / "homeshed-x-reels.mp4").write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"v" * 100)
     (tmp_path / "homeshed-x-reels.json").write_text('{"seconds": 42.0}', encoding="utf-8")
-    out = pub.publish("HomeShed in 40 seconds", video_name="homeshed-x-reels", topic_tag="Self hosting")
+    out = pub.publish("HomeShed in 40 seconds", ai_generated=False, video_name="homeshed-x-reels", topic_tag="Self hosting")
     made = parse_qs(next(c for c in calls if c.url.path == "/v1.0/42/threads").content.decode())
     assert out["media_type"] == "VIDEO" and made["media_type"] == ["VIDEO"] and made["topic_tag"] == ["Self hosting"]
     assert made["video_url"][0].startswith("https://acct.r2.cloudflarestorage.com/b/threads/")
@@ -323,5 +323,32 @@ def test_video_post_refusals_post_nothing(meta, monkeypatch, tmp_path):
                     ({"video_name": "../etc"}, "letters, numbers"),
                     ({"video_name": "long", "image_names": ["a.png"]}, "not both")):
         with pytest.raises(Exception, match=msg):
-            pub.publish("x", **kw)
+            pub.publish("x", ai_generated=False, **kw)
+    assert len(calls) == before and not staged
+
+
+def test_ai_made_posts_say_so_in_the_caption(meta):
+    """The Director, 2026-10-08: the Threads API has no AI-label field, so an AI-made post says it in its caption."""
+    staged = []
+    pub, calls = _ready(meta, staged)
+    out = pub.publish("Which breed next?", ai_generated=True)
+    made = parse_qs(next(c for c in calls if c.url.path == "/v1.0/42/threads").content.decode())
+    assert made["text"] == ["Which breed next?\n\nMade with AI."] and out["ai_generated"] and out["ai_line"] == "Made with AI."
+    assert json.loads(pub.POSTS_FILE.read_text(encoding="utf-8"))["posts"][-1]["ai_generated"] is True
+    assert pub.ai_line("Snow dogs", "IMAGE").endswith("\n\nImage made with AI.")
+    assert pub.ai_line("Snow dogs", "VIDEO").endswith("\n\nVideo made with AI.")
+    assert pub.ai_line("Snow dogs (made with AI)", "IMAGE") == "Snow dogs (made with AI)"  # said already: nothing added
+    assert pub.publish("Plain", ai_generated=False)["ai_line"] is None
+
+
+def test_the_ai_flag_is_required_and_counts_toward_the_limit(meta):
+    staged = []
+    pub, calls = _ready(meta, staged)
+    before = len(calls)
+    with pytest.raises(TypeError):
+        pub.publish("hi")  # no flag: refused (the tool's schema marks it required too)
+    with pytest.raises(Exception, match="ai_generated is required"):
+        pub.publish("hi", ai_generated="yes")
+    with pytest.raises(Exception, match="by 9 .*includes the AI line"):
+        pub.publish("x" * 494, ai_generated=True)  # fits alone; 494 + 2 + 13 doesn't
     assert len(calls) == before and not staged

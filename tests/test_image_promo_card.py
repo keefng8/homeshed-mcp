@@ -22,6 +22,9 @@ def test_promo_card_sends_the_card_and_mockup_bytes(monkeypatch, tmp_path):
     assert "image_b64" in body["product"] and body["size"] == "1080x1350" and body["template"] == "editorial"
     assert body["price_gbp"] == 24.99 and body["watermark_style"] == "tiled" and body["frame"] == ""
     assert body["cutout"] is False  # a trimmed, framed photo tile by default (R&D's pick, 2026-10-07)
+    assert body["matte"] == "auto"  # a matte only where the garment would blend in (the owner's no-clash rule)
+    ipc.promo_card("a.png", "Tee", 20, matte=" #CC8833 ")
+    assert seen["body"]["matte"] == "#cc8833"
     ipc.promo_card("20261007-202233-788960977.png", "Tee", 20, frame="20261007-202234-1.png", cutout=True)
     assert seen["body"]["product"] == {"name": "20261007-202233-788960977.png"} and seen["body"]["cutout"] is True
     assert seen["body"]["size"] == "1080x1920" and seen["body"]["frame"] == "20261007-202234-1.png"
@@ -30,7 +33,8 @@ def test_promo_card_sends_the_card_and_mockup_bytes(monkeypatch, tmp_path):
 
 
 @pytest.mark.parametrize("args", [dict(shape="1:1"), dict(template="neon"), dict(watermark_style="diagonal"),
-                                  dict(product_image="../x.png"), dict(frame="../frame.png"), dict(frame="Neon Gold")])
+                                  dict(product_image="../x.png"), dict(frame="../frame.png"), dict(frame="Neon Gold"),
+                                  dict(matte="dark"), dict(matte="#12345")])
 def test_promo_card_refuses_bad_input_without_calling_the_service(monkeypatch, args):
     monkeypatch.setattr(ipc.httpx, "post", lambda *a, **k: pytest.fail("called the service"))
     base = dict(product_image="a.png", headline="Tee", price_gbp=20.0)

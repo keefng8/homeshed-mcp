@@ -222,10 +222,15 @@ def unusable_reason(provider: str, hint: bool = True) -> str | None:
 
 def reserve(provider: str, client: str) -> None:
     """Check the switches and caps and count one request, atomically (two calls can't both take the last one)."""
+    import spend
     with _lock:
         why = unusable_reason(provider)
         if why:
             raise LLMError(why)
+        try:
+            spend.check(client, "llm")  # the app's own daily dollar cap (the API page), on top of the provider's
+        except spend.SpendCapReached as exc:
+            raise LLMError(str(exc)) from None
         data = _daily()
         _row(data["providers"], provider)["requests"] += 1
         _row(data["clients"].setdefault(client, {}), provider)["requests"] += 1
@@ -238,6 +243,8 @@ def record(provider: str, client: str, model: str, usage: dict | None, ok: bool,
     u = usage or {}
     tokens = int(u.get("input_tokens") or 0) + int(u.get("output_tokens") or 0) + int(u.get("reasoning_tokens") or 0)
     cost = float(u.get("cost_usd") or 0.0)
+    import spend
+    spend.add(client, "llm", cost)  # never raises
     try:
         with _lock:
             data = _daily()

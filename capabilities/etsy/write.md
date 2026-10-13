@@ -1,13 +1,40 @@
-# Etsy — Listing details and deactivate
+# Etsy — Listing details, shop texts and deactivate
 
 ## IDs
-`etsy.listing.update`, `etsy.listing.deactivate` (2026-10-08, the shop's director: both behind one reconnect)
+`etsy.listing.update`, `etsy.listing.deactivate` (2026-10-08, the shop's director: both behind one reconnect),
+`etsy.shop.update` (2026-10-10, the Director's decisions item 10)
 
 ## Before the first use
-1. Switch on "Let apps ask to edit your Etsy listings' details" and/or "Let apps deactivate your Etsy listings"
-   (Settings > Shops and social).
-2. Press **Connect Etsy** again once. With a write switch on, it asks Etsy for `listings_w` (listing edits) as well
-   as the read scopes; with none on, it stays read-only. The Connect Etsy card says when a reconnect is needed.
+1. Switch on "Let apps ask to edit your Etsy listings' details", "Let apps deactivate your Etsy listings" and/or
+   "Let apps ask to edit your Etsy shop" (Settings > Shops and social).
+2. Press **Connect Etsy** again once. With a listing switch on, it asks Etsy for `listings_w` (listing edits); with the
+   shop switch on, `shops_w` (shop edits); with none on, it stays read-only. The Connect Etsy card says when a
+   reconnect is needed.
+
+## etsy.shop.update
+Sets the shop's own texts and adds shop sections. **A call never changes anything**: it's checked against the shop and
+queued in the approvals bar ("Etsy shop texts"), where "Read the full new text" shows every new text in full.
+
+| Name | Notes |
+|---|---|
+| `title` | The shop title, the heading on the shop's main page: up to 55 characters (Etsy's limit). Can't be empty. |
+| `announcement` | The announcement on the shop's homepage. |
+| `sale_message` | The message buyers get after a purchase. |
+| `digital_sale_message` | The message buyers of a digital item get. |
+| `policy_additional` | The shop's additional policies. |
+| `sections` | 1-10 section names to add, up to 24 characters each (Etsy's limit); ones the shop has are skipped. |
+
+- Texts: up to 5,000 characters each (this tool's cap); `""` clears one; omitted keeps it. Only what differs from the
+  shop (`getShop`) is sent.
+- **No About section**: Etsy's `updateShop` has no such field (OpenAPI spec 3.0.0, checked 2026-10-10). Paste it in
+  Shop Manager > Settings > About your shop.
+- **Sections**: made with `createShopSection`. On approval the shop's sections are read again and one that exists is
+  never made twice (a retry is safe). Put a listing in one with `etsy.listing.update` `shop_section_id`.
+- One shop request waits at a time. Capped: `ETSY_SHOP_EDIT_DAILY_MAX` approved edits in 24 hours (default 10).
+- On approval: `updateShop` (PUT) with the changed texts, then each new section.
+
+Returns `{"pending": true, "id", "etsy_shop": summary, "expires_in_h", "how"}`, or `{"pending": false}` when the shop is
+already as asked. When it runs: `{"fields", "sections": [{"title", "shop_section_id", "made": "now" | "earlier"}]}`.
 
 ## etsy.listing.update
 Sets the details Printify doesn't manage on one of the shop's listings. **A call never changes anything**: it checks
@@ -20,6 +47,7 @@ the change and queues it in the approvals bar ("Etsy listing details"); the owne
 | `materials` | no | The full list: up to 13, letters, digits and spaces, 45 characters each. Omit to keep. |
 | `production_partner_ids` | no | The full list of the shop's production partner ids. Omit to keep. |
 | `shipping_profile_id` | no | The delivery profile; 0 keeps it. |
+| `shop_section_id` | no | The shop section to show it in (`etsy.shop.update` makes sections); 0 keeps it. |
 | `properties` | no | `{"attribute": "value" or ["values"]}`, e.g. `{"Primary color": "Black", "Holiday": "Christmas"}`. |
 | `reapply` | no | Set again everything this tool last set on the listing; the other arguments are ignored. Photos aren't re-applied. |
 | `images` | no | 1-5 photos to add: `[{"image": ref, "alt_text"?: up to 500 characters, "rank"?: 1-10}]`. |
@@ -45,20 +73,28 @@ the change and queues it in the approvals bar ("Etsy listing details"); the owne
 - **Title, description, tags and prices stay with Printify** (`printify.product.update_live`): set on Etsy directly,
   Printify's next publish would undo them.
 - **The re-publish rule** (the director): what this tool last set on each listing is kept
-  (`usage/etsy_attributes.json`). When the owner approves a `printify.product.update_live` of that listing, the same
-  details are queued again straight after, for approval once Printify has finished (a few minutes). Its approval card
-  says so up front.
+  (`usage/etsy_attributes.json`). When the owner approves a `printify.product.update_live` of that listing that
+  re-sends its variants (a price change), images or delivery template, the same details are queued again straight
+  after, for approval once Printify has finished (a few minutes). Its approval card says so up front. A words-only
+  update (title, description, tags) doesn't queue them: on 2026-10-09 five such publishes left every detail intact
+  (category, materials, partners, delivery profile, attributes; checked on Etsy).
 - **On approval**: the listing is checked to be the shop's again, the fields are patched (`updateListing`) and each
   attribute set (`updateListingProperty`). Lists go as one comma-separated value: Etsy keeps only the last of repeated
   keys (etsy/open-api discussion #1086). All idempotent: a failed approval stays waiting with its error and can be
   approved again.
-- **Capped**: `ETSY_EDIT_DAILY_MAX` approved edits in 24 hours (default 20).
+- **Capped**: `ETSY_EDIT_DAILY_MAX` approved edits in 24 hours (default 50; 20 until 2026-10-09, when publishes went to 20 a day and each new listing
+  needs 2 edits).
 - **Processing time isn't here.** Etsy moved it to processing profiles set on each inventory offering
   (`readiness_state_id`), and writing the inventory resends every SKU and price, which can unlink Printify's orders.
   Set it in Etsy, or on the delivery profile.
 
 Returns `{"pending": true, "id", "etsy": summary, "expires_in_h", "how"}`, or `{"pending": false}` when the listing is
-already as asked.
+already as asked. The summary lists the photos queued ("photos: …"); none listed means none were queued.
+
+When it runs (on approval, or at once with an app's approval) the result has `"photos_asked"`, `"photos_landed"` and
+`"photo_results"`: `[{"image", "listing_image_id", "uploaded": "now" | "earlier"}]` ("earlier": landed on a previous try
+of the same approval, never uploaded twice). `photos_landed == photos_asked` means every photo is on the listing; an
+upload that fails raises instead, and the request stays waiting with its error.
 
 ## etsy.listing.deactivate
 Takes one active listing off sale **at once** (Etsy state `inactive`). It's a brake, not a publish, so there's no
@@ -72,3 +108,5 @@ approval step:
 Undo: Etsy > Shop Manager > Listings > Inactive, select it, Activate.
 
 Returns `{"listing_id", "title", "state": "inactive", "reason", "deactivated_today", "daily_max", "undo"}`.
+
+An app the owner trusts can pass `owner_approval` to run it at once: see `printify/publish.md`, "One approval".

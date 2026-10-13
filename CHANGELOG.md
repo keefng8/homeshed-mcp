@@ -6,6 +6,36 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-13
+
+### Breaking
+- `threads.publish` now requires `ai_generated` (true or false). Threads asks for AI-made posts to be labelled and its
+  API has no field for it, so an AI-made post ends with a short "Made with AI." line. Calls without it are refused.
+
+### Added
+- 13 new tools (132 in all):
+  - `spend.today` and `spend.cap_set`: what each app spent today on paid images and model calls, against a daily dollar
+    cap the owner sets per app; an app at its cap gets `SPEND_CAP_REACHED`, and free and local tools keep working.
+  - `repo.stats`: stars, forks, issues, release and PyPI downloads, and (with a GitHub token) views, clones and
+    referrers, with daily traffic kept past GitHub's 14 days.
+  - `proxmox.health`: the whole cluster at a glance, with the alarms active now.
+  - `image.preview`, `image.compare`, `image.embed` and `image.cancel` (local image service).
+  - `pinterest.status`, `pinterest.boards.list`, `pinterest.board.create`, `pinterest.pin.create`: every board and pin
+    waits for the owner's approval.
+  - `etsy.shop.update`: shop title, announcement and policies, applied only after the owner approves the full new text.
+- Control Panel:
+  - Terminal tab: SSH in the browser to your own machines (owner only, off by default, host keys checked, its own key).
+  - Proxmox tab: nodes, storage, VMs and containers with graphs, and alarms sent as notifications (ntfy) when
+    something fires and when it clears.
+  - Release progress card with GitHub stats, and a Released card for the live version.
+  - Per-app daily spend caps on the API access page, and a Connect Pinterest card.
+  - A new sign-in page.
+- A loader for optional HomeShed Pro tools (`homeshed-mcp pro update`): the download is checked against its size and
+  SHA-256 before it's unpacked, and a broken Pro package never stops the free tools from starting.
+
+### Changed
+- `printify.product.update` and `update_live`: the margin floor is 20% (15% for hoodies), down from 30%.
+
 ## [0.1.2] - 2026-10-11
 
 ### Changed

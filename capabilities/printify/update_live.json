@@ -2,7 +2,7 @@
   "id": "printify.product.update_live",
   "name": "Ask To Update A Live Printify Product",
   "version": "1.0.0",
-  "description": "Ask to change a published Printify product's title, description, tags or prices on the owner's Etsy shop. Nothing changes until the owner approves it in the Control Panel; then Printify edits it and re-publishes only the changed parts. SKUs never change on a live product; never under the 30% margin floor; capped and audited.",
+  "description": "Ask to change a published Printify product's title, description, tags or prices on the owner's Etsy shop. Nothing changes until the owner approves it in the Control Panel; then Printify edits it and re-publishes only the changed parts. SKUs never change on a live product; never under the margin floor (20%, hoodies 15%); capped and audited.",
   "category": "printify",
   "risk": "write",
   "requires": [
@@ -37,6 +37,10 @@
     },
     "variants": {
       "type": "array",
+      "required": false
+    },
+    "owner_approval": {
+      "type": "object",
       "required": false
     }
   },

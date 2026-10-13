@@ -1,0 +1,49 @@
+{
+  "id": "pinterest.board.create",
+  "name": "Ask To Make A Pinterest Board",
+  "version": "1.0.0",
+  "description": "Ask to make a Pinterest board. Nothing is made until the owner approves it in the approvals bar.",
+  "category": "pinterest",
+  "risk": "write",
+  "requires": [
+    "the owner's social_pinterest_enabled switch",
+    "Pinterest connected",
+    "the owner's approval of each board"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "new pinterest board",
+    "create pinterest board"
+  ],
+  "inputs": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "string",
+      "required": false
+    },
+    "privacy": {
+      "type": "string",
+      "required": false,
+      "default": "PUBLIC"
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.pinterest.pins.board_create"
+  },
+  "latency": {
+    "expected_ms": 800
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "pinterest.status",
+    "pinterest.boards.list",
+    "pinterest.pin.create"
+  ]
+}

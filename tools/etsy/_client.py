@@ -137,6 +137,7 @@ def get(path: str, params: dict | None = None, oauth: bool = True) -> Any:
 
 WRITE_SETTING = "commerce_etsy_write_enabled"
 DEACTIVATE_SETTING = "commerce_etsy_deactivate_enabled"
+SHOP_WRITE_SETTING = "commerce_etsy_shop_write_enabled"  # etsy.shop.update (shops_w), 2026-10-10
 
 
 def write(method: str, path: str, form: dict, setting: str, label: str, files: dict | None = None) -> Any:
@@ -161,11 +162,22 @@ def write(method: str, path: str, form: dict, setting: str, label: str, files: d
             if attempt == 0 and "HTTP 401" in str(exc):
                 continue  # the access token went stale early: refresh once and try again
             if "HTTP 403" in str(exc):
-                raise h.CommerceError(f"{exc}. If that's a missing scope: the shop was connected read-only; press "
-                                      "Connect Etsy again (Settings > Shops and social), which now asks for listing edits "
-                                      "(listings_w)") from None
+                raise h.CommerceError(f"{exc}. If that's a missing scope: the shop was connected before this edit was "
+                                      "switched on; press Connect Etsy again (Settings > Shops and social), which now asks "
+                                      "for the edits your switches need (listings_w, shops_w)") from None
             raise
     raise h.CommerceError("Etsy refused the refreshed token (HTTP 401)")
+
+
+def partner_ids(listing: dict) -> list[int] | None:
+    """A listing's production partner ids, sorted. Etsy's listing carries them as "production_partners" (a list of
+    {production_partner_id, partner_name, location}); "production_partner_ids" is only what a write sends (checked
+    on a live listing, 2026-10-09). None when Etsy didn't say."""
+    rows = listing.get("production_partners")
+    if not isinstance(rows, list):
+        return None
+    return sorted(p["production_partner_id"] for p in rows
+                  if isinstance(p, dict) and isinstance(p.get("production_partner_id"), int))
 
 
 def note(out: dict) -> dict:

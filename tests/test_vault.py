@@ -381,3 +381,13 @@ def test_no_alias_table_behaves_as_before(monkeypatch):
 
 def test_an_alias_never_reaches_a_denied_name(aliases):
     assert vault.secret("SAFE_NAME", "d") == "d"  # VAULT_KEY is set by the fixture, and stays unreachable
+
+
+def test_an_override_reads_another_entry_first_and_falls_back(monkeypatch):
+    import vault as v
+    vals = {"NEW_ENTRY": "new-value", "TOOL_NAME": "old-value"}
+    monkeypatch.setattr(v, "_secret_one", lambda n: vals.get(n))
+    monkeypatch.setattr(v, "_name_overrides", lambda: {"TOOL_NAME": "NEW_ENTRY"})
+    assert v.secret("TOOL_NAME") == "new-value"
+    vals.pop("NEW_ENTRY")
+    assert v.secret("TOOL_NAME") == "old-value"  # the override's entry gone: the tool's own name again

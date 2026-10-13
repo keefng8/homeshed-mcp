@@ -17,19 +17,38 @@ def _ts(v):
 
 @tool(name="shop.get", category="etsy", doc="etsy/read.md")
 def shop_get() -> dict:
-    """The configured Etsy shop (ETSY_SHOP_ID): name, title, currency, counts, reviews, vacation mode.
-    Read-only; needs the owner's commerce_etsy_enabled switch and the ETSY_* entries.
+    """The configured Etsy shop (ETSY_SHOP_ID): name, title, currency, counts, reviews, vacation mode, and its
+    production partners (what a listing's production_partner_ids should name). Read-only; needs the owner's
+    commerce_etsy_enabled switch and the ETSY_* entries.
 
     Returns:
         {"shop_id", "shop_name", "title", "currency", "active_listings", "sold", "review_average", "review_count",
-         "is_vacation", "url", "created"}
+         "is_vacation", "url", "created", "production_partners": [{"id", "name", "location"}] or null when the shop's
+         connection can't read them, "return_policies": [{"id", "accepts_returns", "accepts_exchanges",
+         "return_deadline_days"}] or null likewise}
     """
-    s = et.get(f"/v3/application/shops/{et.shop_id()}", oauth=False) or {}
+    sid = et.shop_id()
+    s = et.get(f"/v3/application/shops/{sid}", oauth=False) or {}
+    try:  # the shop's own connection (shops_r); the rest of shop.get works without it
+        rows = (et.get(f"/v3/application/shops/{sid}/production-partners") or {}).get("results")
+        partners = [{"id": p.get("production_partner_id"), "name": h.trim(p.get("partner_name"), 60),
+                     "location": h.trim(p.get("location"), 60)} for p in rows or [] if isinstance(p, dict)][:20]
+    except h.CommerceError:
+        partners = None
+    try:  # getShopReturnPolicies: what a listing's return_policy_id names (2026-10-10, the 14-day returns check)
+        rows = (et.get(f"/v3/application/shops/{sid}/policies/return") or {}).get("results")
+        returns = [{"id": r.get("return_policy_id"), "accepts_returns": r.get("accepts_returns"),
+                    "accepts_exchanges": r.get("accepts_exchanges"), "return_deadline_days": r.get("return_deadline")}
+                   for r in rows or [] if isinstance(r, dict)][:20]
+    except h.CommerceError:
+        returns = None
     return et.note({"shop_id": s.get("shop_id"), "shop_name": s.get("shop_name"), "title": h.trim(s.get("title"), 120),
+                    "return_policies": returns,
                     "currency": s.get("currency_code"), "active_listings": s.get("listing_active_count"),
                     "sold": s.get("transaction_sold_count"), "review_average": s.get("review_average"),
                     "review_count": s.get("review_count"), "is_vacation": s.get("is_vacation"),
-                    "url": s.get("url"), "created": _ts(s.get("create_date") or s.get("created_timestamp"))})
+                    "url": s.get("url"), "created": _ts(s.get("create_date") or s.get("created_timestamp")),
+                    "production_partners": partners})
 
 
 @tool(name="listings.list", category="etsy", doc="etsy/read.md")
@@ -73,13 +92,13 @@ def listing_get(listing_id: str, full: bool = False) -> dict:
 
     Args:
         listing_id: the listing's number (etsy.listings.list shows them).
-        full: the description up to 5,000 characters, e.g. to check a disclosure at its end.
+        full: the description up to 5,000 characters, e.g. to check a disclosure at its end, and the listing's
+            properties (attributes) with Etsy's exact names, property ids and value ids.
     """
     lid = h.check_id(listing_id, "listing_id")
     x = et.get(f"/v3/application/listings/{lid}", params={"includes": "Images"}, oauth=False) or {}
     desc = x.get("description") if isinstance(x.get("description"), str) else ""
     imgs = [i for i in (x.get("images") or []) if isinstance(i, dict)]
-    partners = x.get("production_partner_ids")
     return et.note({
         "listing_id": x.get("listing_id"), "shop_id": x.get("shop_id"), "title": h.trim(x.get("title"), 140),
         "description": h.trim(desc, 5000 if full else 1500), "description_chars": len(desc), "state": x.get("state"),
@@ -87,11 +106,25 @@ def listing_get(listing_id: str, full: bool = False) -> dict:
         "quantity": x.get("quantity"), "tags": (x.get("tags") or [])[:13], "materials": (x.get("materials") or [])[:13],
         "taxonomy_id": x.get("taxonomy_id"), "who_made": x.get("who_made"), "when_made": x.get("when_made"),
         "is_digital": x.get("is_digital"), "is_customizable": x.get("is_customizable"),
-        "shipping_profile_id": x.get("shipping_profile_id"),
+        "shipping_profile_id": x.get("shipping_profile_id"), "return_policy_id": x.get("return_policy_id"),
+        "shop_section_id": x.get("shop_section_id"),
         "images": {"count": len(imgs), "ranks": sorted(i.get("rank") for i in imgs if isinstance(i.get("rank"), int))},
-        "production_partner_ids": [p for p in partners if isinstance(p, int)] if isinstance(partners, list) else None,
+        "production_partner_ids": et.partner_ids(x),
+        "production_partners": [{"id": p.get("production_partner_id"), "name": h.trim(p.get("partner_name"), 60)}
+                                for p in x.get("production_partners") or [] if isinstance(p, dict)][:10],
         "views": x.get("views"), "favorites": x.get("num_favorers"), "created": _ts(x.get("created_timestamp")),
-        "updated": _ts(x.get("updated_timestamp")), "url": x.get("url")})
+        "updated": _ts(x.get("updated_timestamp")), "url": x.get("url"),
+        **({"properties": _properties(x.get("shop_id"), lid)} if full else {})})
+
+
+def _properties(shop_id, lid) -> list[dict] | str:
+    """The listing's attributes with Etsy's exact names and ids (2026-10-13: a wrong string refuses a whole update)."""
+    try:
+        res = (et.get(f"/v3/application/shops/{int(shop_id)}/listings/{lid}/properties", oauth=False) or {}).get("results")
+    except (h.CommerceError, TypeError, ValueError) as exc:
+        return f"not read: {h.trim(str(exc), 120)}"
+    return [{"property_id": p.get("property_id"), "name": p.get("property_name"), "value_ids": p.get("value_ids"),
+             "values": p.get("values")} for p in res or [] if isinstance(p, dict)][:30]
 
 
 @tool(name="shipping_destinations", category="etsy", doc="etsy/read.md")

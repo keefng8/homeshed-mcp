@@ -74,3 +74,17 @@ def test_the_limit(monkeypatch, paid):
     for bad in (0, 101, True, "5"):
         with pytest.raises(h.ImageError):
             h.history(limit=bad)
+
+
+def test_paid_rows_say_who_asked_and_what_it_cost(monkeypatch, tmp_path):
+    """2026-10-10: the shop app books its bots' paid images from caller and cost_counted_usd."""
+    import json as _json
+
+    from tools.image import history as h
+    from tools.image import providers as p
+    monkeypatch.setattr(p, "output_dir", lambda: tmp_path)
+    (tmp_path / "j1.json").write_text(_json.dumps({
+        "status": "done", "saved_as": "x.png", "finished_at": 1, "provider": "google", "model": "gemini-3-pro-image",
+        "caller": "bot-a", "cost_estimate_usd": None, "cost_counted_usd": 0.2}), encoding="utf-8")
+    row = h._paid(5)[0]
+    assert row["caller"] == "bot-a" and row["cost_counted_usd"] == 0.2 and "cost_estimate_usd" not in row

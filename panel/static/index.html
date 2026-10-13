@@ -735,6 +735,14 @@ body.ws-open { overflow: hidden; }
 .appr-item .hint { margin: 0; }
 .appr-item .appr-text { font-size: 13.5px; overflow-wrap: anywhere; }
 .appr-item .appr-act { display: flex; gap: 8px; flex-wrap: wrap; }
+.bench { padding: 12px 16px; display: grid; gap: 10px; }
+.bench .b-row { display: grid; grid-template-columns: 170px 1fr; gap: 10px; align-items: center; font-size: 13px; }
+.bench .b-bars { display: grid; gap: 4px; }
+.bench .b-bar { display: flex; align-items: center; gap: 8px; }
+.bench .b-bar i { display: block; height: 10px; border-radius: 5px; background: var(--accent, #0a84ff); min-width: 2px; }
+.bench .b-bar.old i { background: var(--text-3, #888); }
+.bench .b-bar span { white-space: nowrap; color: var(--text-2); font-size: 12px; }
+@media (max-width: 600px) { .bench .b-row { grid-template-columns: 1fr; } }
 .appr-item .appr-imgs { display: flex; gap: 6px; flex-wrap: wrap; }
 .appr-item .appr-imgs img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; background: var(--surface); }
 .appr-item .appr-act button { min-height: 0; padding: 6px 12px; }
@@ -1149,6 +1157,101 @@ body.no-anim *, body.no-anim *::before, body.no-anim *::after { animation-durati
   .set-input select, .set-input input, .set-input button, .set-tools input, .set-tools select, .cred-bar button, .cred-bar input,
   .cred-menu > summary, .cred-menu-list button, .cred-form button, .cred-kinds span { min-height: 44px; }
 }
+/* ---- Proxmox tab (the owner, 2026-10-09: "full visuals on my vm's. with alarms") ---- */
+.term-view { display: none; }
+.term-view.active { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); gap: 14px; align-items: start;
+  animation: viewIn .18s ease; }
+.term-side { display: flex; flex-direction: column; gap: 12px; }
+.term-list { display: flex; flex-direction: column; gap: 6px; }
+.term-host { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; padding: 9px 10px; border-radius: 10px;
+  background: var(--bg-2, rgba(127,127,127,.08)); }
+.term-host b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.term-host .hint { grid-column: 1 / -1; font-size: 12px; }
+.term-host-act { display: flex; gap: 6px; flex-wrap: wrap; grid-column: 1 / -1; }
+.term-host-act button { padding: 4px 10px; font-size: 12.5px; }
+.term-host form { grid-column: 1 / -1; display: flex; gap: 6px; }
+.term-host form input { flex: 1; min-width: 0; }
+.term-more summary { cursor: pointer; font-size: 13px; color: var(--text-2); }
+.term-form { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.term-form-row { display: grid; grid-template-columns: 1fr 70px; gap: 6px; }
+.term-lock { display: flex; flex-direction: column; gap: 6px; }
+.term-guide ol { margin: 6px 0; padding-left: 18px; font-size: 13px; line-height: 1.5; }
+.term-guide li { margin-bottom: 8px; }
+.term-guide code { font-size: 11px; word-break: break-all; user-select: all; }
+.term-key { display: block; font-size: 11px; word-break: break-all; padding: 8px; border-radius: 8px; margin: 6px 0;
+  background: var(--bg-2, rgba(127,127,127,.08)); }
+.term-tips { font-size: 12px; }
+.term-main { display: flex; flex-direction: column; padding: 0; overflow: hidden; min-height: 70vh; }
+.term-tabs { display: flex; gap: 2px; padding: 6px 6px 0; overflow-x: auto; border-bottom: 1px solid var(--line, rgba(127,127,127,.2)); }
+.term-tabs:empty { display: none; }
+.term-tab { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px 8px 0 0; font-size: 12.5px;
+  background: transparent; color: var(--text-2); white-space: nowrap; border: 0; }
+.term-tab.on { background: #0b0f17; color: #e2e8f0; }
+.term-tab .x { opacity: .6; padding: 0 2px; } .term-tab .x:hover { opacity: 1; }
+.term-tab i { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; } .term-tab.gone i { background: #f87171; }
+.term-screens { position: relative; flex: 1; background: #0b0f17; min-height: 66vh; }
+.term-screen { position: absolute; inset: 0; padding: 8px; display: none; } .term-screen.on { display: block; }
+.term-empty { color: #94a3b8; padding: 40px; }
+@media (max-width: 860px) { .term-view.active { grid-template-columns: 1fr; } .term-main { min-height: 60vh; } }
+.pve-view { display: none; }
+.pve-view.active { display: flex; flex-direction: column; gap: 16px; animation: viewIn .18s ease; }
+.pve-strip { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.pve-section-title { font-size: 15px; font-weight: 600; margin: 2px 0 10px; display: flex; gap: 10px; align-items: baseline; }
+.pve-nodes { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.pve-guests { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; margin-top: 10px; }
+.pve-card { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; min-width: 0;
+  transition: box-shadow .2s, transform .2s; }
+.pve-card:hover { transform: translateY(-1px); }
+.pve-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pve-card.off { opacity: .6; }
+.pve-card.alarm { box-shadow: 0 0 0 1.5px var(--bad), var(--shadow); }
+.pve-head { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+.pve-head .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pve-head .badge { margin-left: auto; }
+.pve-sub { font-size: 12px; color: var(--text-2); overflow-wrap: anywhere; }
+.pve-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-3); flex: 0 0 auto; }
+.pve-dot.on { background: var(--ok); } .pve-dot.bad { background: var(--bad); }
+.pve-meters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+.pve-meter-top { display: flex; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--text-2); }
+.pve-meter-top span:last-child { font-weight: 600; font-variant-numeric: tabular-nums; }
+.pve-bar { height: 6px; border-radius: 3px; background: var(--fill); overflow: hidden; margin: 4px 0 3px; }
+.pve-bar span { display: block; height: 100%; border-radius: 3px; background: var(--ok); transition: width .6s; }
+.pve-bar span.warn { background: var(--warn); } .pve-bar span.bad { background: var(--bad); } .pve-bar span.none { background: transparent; }
+.pve-meter-sub { font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.pve-facts { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.pve-list { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; }
+.pve-list > div { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.pve-list .muted { color: var(--text-3); }
+.pve-alarm { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 10px 0;
+  border-top: 1px solid var(--separator); }
+.pve-alarm:first-of-type { border-top: 0; }
+.pve-sev { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: var(--warn-soft); color: var(--warn); }
+.pve-sev.critical { background: var(--bad-soft); color: var(--bad); } .pve-sev.cleared { background: var(--ok-soft); color: var(--ok); }
+.pve-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.pve-modal { position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, .45); display: flex; align-items: flex-start;
+  justify-content: center; padding: 4vh 16px; overflow: auto; }
+.pve-modal[hidden] { display: none; }
+.pve-modal-box { width: min(1040px, 100%); padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+.pve-modal-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pve-modal-head h3 { margin: 0; font-size: 18px; }
+.pve-modal-head .pve-tf { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; }
+.pve-tf button.active { background: var(--accent-soft); color: var(--accent-text, var(--accent)); }
+.pve-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.pve-chart { position: relative; min-width: 0; }
+.pve-chart-title { font-size: 12.5px; font-weight: 600; display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; }
+.pve-legend { font-weight: 400; color: var(--text-2); display: inline-flex; gap: 10px; }
+.pve-legend i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+.pve-chart svg { width: 100%; height: 140px; display: block; margin-top: 4px; }
+.pve-chart .grid { stroke: var(--separator); stroke-width: 1; }
+.pve-chart path { fill: none; stroke-width: 1.8; vector-effect: non-scaling-stroke; }
+.pve-chart path.area { stroke: none; fill: var(--accent-soft); }
+.pve-chart .cursor { stroke: var(--text-3); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.pve-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.pve-tip { position: absolute; top: 0; right: 0; font-size: 11.5px; background: var(--surface); padding: 2px 8px; border-radius: 6px;
+  box-shadow: var(--shadow); pointer-events: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pve-c0 { stroke: var(--accent); background: var(--accent); } .pve-c1 { stroke: var(--warn); background: var(--warn); }
+.pve-c2 { stroke: var(--ok); background: var(--ok); } .pve-c3 { stroke: var(--bad); background: var(--bad); }
+@media (max-width: 640px) { .pve-meters { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .pve-nodes, .pve-guests { grid-template-columns: minmax(0, 1fr); } }
 /* ---- Keys and passwords (R&D batch 5: credentials-page-design.md) ---- */
 .cred-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0 10px; }
 .cred-bar input[type=search] { flex: 1 1 200px; min-width: 0; }
@@ -1232,6 +1335,68 @@ body.no-anim *, body.no-anim *::before, body.no-anim *::after { animation-durati
 .prog-wait ul { margin: 4px 0 0 1.1em; padding: 0; }
 .prog-wait li { margin-bottom: 4px; } .prog-wait a, .prog-facts a { color: var(--accent-text); }
 .prog-facts { font-size: 12.5px; color: var(--text-2); overflow-wrap: anywhere; }
+/* Released: the launch view (2026-10-10) */
+body:not(.summary) .rel-live .live-feed { max-height: none; overflow: visible; }  /* a launch shows whole */
+.rel-row { position: relative; gap: 10px; }
+.rel-hero { display: flex; align-items: center; gap: 18px; padding: 14px; border-radius: 16px; position: relative; overflow: hidden;
+  background: radial-gradient(120% 140% at 0% 0%, var(--ok-soft), transparent 60%),
+              radial-gradient(120% 140% at 100% 100%, var(--accent-soft), transparent 60%); border: 1px solid var(--sep); }
+.rel-hero::after { content: ""; position: absolute; inset: -40% -10%; pointer-events: none; opacity: .5;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.10) 50%, transparent 60%);
+  transform: translateX(-60%); animation: rel-shine 7s ease-in-out infinite; }
+@keyframes rel-shine { 0%, 55% { transform: translateX(-60%); } 85%, 100% { transform: translateX(60%); } }
+.rel-ring { position: relative; width: 104px; height: 104px; flex: none; }
+.rel-ring::before { content: ""; position: absolute; inset: 6px; border-radius: 50%; filter: blur(14px); opacity: .55;
+  background: conic-gradient(from 0deg, var(--ok), var(--accent), var(--ok)); animation: rel-spin 9s linear infinite; }
+@keyframes rel-spin { to { transform: rotate(360deg); } }
+.rel-ring svg { position: relative; width: 100%; height: 100%; transform: rotate(-90deg); }
+.rel-ring circle { fill: none; stroke-width: 9; }
+.rel-ring .track { stroke: var(--sep); }
+.rel-ring .arc { stroke-linecap: round; stroke-dasharray: 100 0; filter: drop-shadow(0 0 6px var(--ok)); }
+.rel-row.enter .rel-ring .arc { animation: rel-draw 1.4s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes rel-draw { from { stroke-dasharray: 0 100; } to { stroke-dasharray: 100 0; } }
+.rel-core { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.rel-core b { font-size: 17px; letter-spacing: .01em; font-variant-numeric: tabular-nums; }
+.rel-core span { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ok); }
+.rel-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; position: relative; z-index: 1; }
+.rel-badge { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ok); background: var(--ok-soft); }
+.rel-badge i, .rel-mini i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 var(--ok);
+  animation: rel-pulse 2.4s ease-out infinite; flex: none; }
+@keyframes rel-pulse { 0% { box-shadow: 0 0 0 0 var(--ok-soft); } 70% { box-shadow: 0 0 0 9px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.rel-name { font-size: 18px; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.rel-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.rel-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px;
+  color: var(--text); text-decoration: none; background: var(--card, rgba(127,127,127,.08)); border: 1px solid var(--sep);
+  transition: transform .15s ease, border-color .15s ease; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rel-chip span { font-weight: 700; color: var(--text-2); }
+.rel-chip em { font-style: normal; color: var(--accent-text, var(--accent)); }
+.rel-chip:hover { transform: translateY(-1px); border-color: var(--accent); }
+.rel-mini { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12.5px; padding: 6px 10px; border-radius: 10px;
+  background: var(--ok-soft); }
+.rel-mini a { color: var(--accent-text); }
+.rel-chart { display: flex; flex-direction: column; gap: 4px; }
+.rel-chart-head { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--text-2); align-items: center; }
+.rel-chart-head i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.rel-chart-head i.v { background: var(--accent); } .rel-chart-head i.c { background: var(--ok); }
+.rel-chart svg { width: 100%; height: 56px; display: block; }
+.rel-chart .area { fill: var(--accent-soft); stroke: none; }
+.rel-chart .lv, .rel-chart .lc { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.rel-chart .lv { stroke: var(--accent); } .rel-chart .lc { stroke: var(--ok); stroke-dasharray: 4 3; }
+.rel-left summary { cursor: pointer; font-size: 12.5px; color: var(--text-2); }
+.rel-older > div { display: grid; grid-template-columns: 6em 1fr auto; gap: 8px; font-size: 12.5px; padding: 4px 0;
+  border-top: 1px solid var(--sep); font-variant-numeric: tabular-nums; }
+.rel-next { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rel-next input { width: 11em; }
+.live-orb.shipped .dot { background: var(--ok); } .live-orb.shipped .ring { border-color: var(--ok); }
+@media (max-width: 480px) { .rel-hero { flex-direction: column; align-items: flex-start; } .rel-ring { width: 88px; height: 88px; } }
+@media (prefers-reduced-motion: reduce) { .rel-hero::after, .rel-ring::before, .rel-badge i, .rel-mini i, .rel-row.enter .rel-ring .arc { animation: none; } }
+.repo-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; margin: 8px 0 4px; }
+.repo-stats > div { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border-radius: 10px;
+  background: var(--fill, rgba(127, 127, 127, .08)); min-width: 0; }
+.repo-stats span { font-size: 11.5px; color: var(--text-2); }
+.repo-stats b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.repo-stats small { font-size: 11px; color: var(--text-2); overflow-wrap: anywhere; }
 .prog-next { font-size: 13px; }
 .prog-metrics { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-2); }
 .prog-metrics b { color: var(--text); font-variant-numeric: tabular-nums; }
@@ -1538,6 +1703,8 @@ body.summary .sum-bar { display: flex; align-items: center; gap: 14px; margin-bo
       <button class="tab-btn" id="tabSavings" onclick="switchTab('savings')"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Savings<span class="kbd">3</span></button>
       <button class="tab-btn" id="tabModels" onclick="switchTab('models')"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3"/></svg>Models<span class="kbd">4</span></button>
       <button class="tab-btn" id="tabReasoning" onclick="switchTab('reasoning')"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7.5 8l3.3 7.6M16.5 8l-3.3 7.6M8.5 6h7"/></svg>Reasoning<span class="kbd">5</span></button>
+      <button class="tab-btn" id="tabTerminal" onclick="switchTab('terminal')"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M7.5 10l3 2.5-3 2.5M12.5 15.5h4"/></svg>Terminal</button>
+      <button class="tab-btn" id="tabProxmox" onclick="switchTab('proxmox')"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="6.5" rx="2"/><rect x="4" y="13.5" width="16" height="6.5" rx="2"/><path d="M8 7.25h.01M8 16.75h.01M12 7.25h4M12 16.75h4"/></svg>Proxmox</button>
       <button class="tab-btn" id="tabDocker" onclick="switchTab('docker')"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>Containers<span class="kbd">9</span></button>
       <button class="tab-btn" id="tabMonitors" onclick="switchTab('monitors')"><svg viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg>Uptime</button>
       <button class="tab-btn" id="tabTools" onclick="switchTab('tools')"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Tools<span class="kbd">8</span></button>
@@ -1712,6 +1879,16 @@ body.summary .sum-bar { display: flex; align-items: center; gap: 14px; margin-bo
       <div class="live-feed" id="progFeed"><div class="empty">Connecting…</div></div>
     </section>
 
+    <section class="card live-card rel-live" id="relCard" data-card="released" hidden title="Your projects that are out: the live version, where it's published, and how it's doing (stars, downloads, views and clones, from GitHub and PyPI).">
+      <div class="live-head">
+        <div class="live-id">
+          <span class="live-orb shipped" id="relOrb"><span class="ring"></span><span class="dot"></span></span>
+          <div><div class="live-title">Released</div><div class="hint" id="relSub">What's out and how it's doing</div></div>
+        </div>
+      </div>
+      <div class="live-feed" id="relFeed"></div>
+    </section>
+
     <section class="card live-card ctx-live" id="ctxCard" data-card="context" hidden title="How full each Claude Code session's context is, live from your PC. At the alarm, Claude is told to save its memory before it compacts, and your phone can get an alert. The marker on each bar is the alarm; change it on the Settings page.">
       <div class="live-head">
         <div class="live-id">
@@ -1762,6 +1939,86 @@ body.summary .sum-bar { display: flex; align-items: center; gap: 14px; margin-bo
       <span class="toolbar-count" id="dockerCount"></span>
     </div>
     <div class="docker-grid" id="dockerGrid"><div class="loading">Loading…</div></div>
+  </div>
+
+  <div class="pve-view" id="proxmoxView">
+    <section class="card stat-strip pve-strip" id="pveStrip"><div class="loading">Reading the cluster…</div></section>
+    <section class="card pve-alarm-card" id="pveAlarms" hidden></section>
+    <div><div class="pve-section-title">Nodes</div><div class="pve-nodes" id="pveNodes"></div></div>
+    <section class="card" id="pveShared" hidden></section>
+    <div>
+      <div class="pve-section-title">VMs and containers <span class="count" id="pveGuestCount"></span></div>
+      <div class="toolbar pve-tools">
+        <input class="toolbar-search" id="pveSearch" type="search" placeholder="Search by name or ID" oninput="Pve.filter('q', this.value)">
+        <select id="pveNodeSel" aria-label="Node" onchange="Pve.filter('node', this.value)"><option value="">All nodes</option></select>
+        <select id="pveStateSel" aria-label="State" onchange="Pve.filter('state', this.value)"><option value="">Running and stopped</option><option value="running">Running</option><option value="stopped">Stopped</option></select>
+        <select id="pveSortSel" aria-label="Sort" onchange="Pve.filter('sort', this.value)"><option value="vmid">Sort by ID</option><option value="name">Sort by name</option><option value="cpu">Busiest CPU</option><option value="ram">Most RAM used</option><option value="disk">Fullest disk</option></select>
+      </div>
+      <div class="pve-guests" id="pveGuests"></div>
+    </div>
+    <section class="card" id="pveTasks" hidden></section>
+    <p class="hint" id="pveFoot"></p>
+  </div>
+  <div class="pve-modal" id="pveModal" hidden onclick="if (event.target === this) Pve.close()">
+    <section class="card pve-modal-box" role="dialog" aria-modal="true" aria-labelledby="pveModalTitle" id="pveModalBox"></section>
+  </div>
+
+  <div class="term-view" id="terminalView">
+    <aside class="card term-side">
+      <div id="termNote"></div>
+      <form class="term-lock" id="termLock" hidden onsubmit="event.preventDefault(); Term.unlock()">
+        <b>Enter your password again</b>
+        <span class="hint">You're outside your home network, so the terminal asks once every 12 hours.</span>
+        <input type="password" id="termLockPw" autocomplete="current-password" aria-label="Your Control Panel password">
+        <button type="submit">Unlock</button></form>
+      <div class="term-list" id="termHosts"></div>
+      <div id="termSuggested"></div>
+      <details class="term-more" id="termAdd"><summary>Add a machine</summary>
+        <form class="term-form" onsubmit="event.preventDefault(); Term.addHost()">
+          <input id="termAddName" placeholder="Name, e.g. Web server" aria-label="Name" maxlength="40">
+          <input id="termAddHost" placeholder="Address: a name like server.lan, or its IP" aria-label="Address" maxlength="253">
+          <div class="term-form-row"><input id="termAddUser" placeholder="User, e.g. root" aria-label="User" maxlength="32">
+            <input id="termAddPort" placeholder="22" aria-label="Port" inputmode="numeric" maxlength="5"></div>
+          <button type="submit">Save it</button><span class="set-msg" id="termAddMsg"></span></form></details>
+      <details class="term-more"><summary>This Control Panel's key</summary>
+        <p class="hint">Machines let this Control Panel in with this key. "Set up access" adds it for you; or paste it into a
+          machine's ~/.ssh/authorized_keys yourself.</p>
+        <code class="term-key" id="termKey"></code>
+        <button type="button" class="ghost" onclick="Term.copyKey(this)">Copy the key</button></details>
+      <details class="term-more term-guide"><summary>Claude Code on your machines</summary>
+        <p class="hint">The <b>Claude</b> button opens the machine and starts Claude Code in it (in the folder you give).
+          It needs a Claude Pro, Max, Team or Enterprise plan, or an API key. Each machine needs this once:</p>
+        <ol>
+          <li><b>Terminal on:</b> Settings &gt; Control Panel &gt; <b>Terminal</b> (you're here, so it's on).</li>
+          <li><b>Add the machine</b> (Add a machine, above) and press <b>Set up access</b> once with its password.
+            On Windows, see step 5 first.</li>
+          <li><b>Install Claude Code on that machine:</b> press <b>Open</b> and paste the line for its system.<br>
+            Linux or Mac: <code>curl -fsSL https://claude.ai/install.sh | bash</code><br>
+            Windows (PowerShell): <code>irm https://claude.ai/install.ps1 | iex</code><br>
+            Then type <code>exit</code>, open it again, and check with <code>claude --version</code> (it shows a version number).</li>
+          <li><b>Sign in once:</b> press <b>Claude</b>. The first time it shows a sign-in link: open it, sign in, and paste the
+            code it gives you back into the terminal. After that it starts straight away.</li>
+          <li><b>Windows machines</b> need their SSH server switched on first. On that PC, right-click Start &gt;
+            <b>Terminal (Admin)</b> and paste these one at a time:<br>
+            <code>Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0</code><br>
+            <code>Start-Service sshd; Set-Service sshd -StartupType Automatic</code><br>
+            <code>New-ItemProperty -Path "HKLM:\SOFTWARE\OpenSSH" -Name DefaultShell -Value "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -PropertyType String -Force</code>
+            (the last one makes PowerShell its shell, so folders on other drives work).<br>
+            <b>Set up access</b> only works on Linux and Mac. On Windows, add this Control Panel's key yourself: for an
+            administrator account, paste <i>This Control Panel's key</i> as one line into
+            <code>C:\ProgramData\ssh\administrators_authorized_keys</code>, then run
+            <code>icacls.exe "C:\ProgramData\ssh\administrators_authorized_keys" /inheritance:r /grant "Administrators:F" /grant "SYSTEM:F"</code>.
+            For other accounts, it goes in <code>C:\Users\<i>you</i>\.ssh\authorized_keys</code>.</li>
+        </ol>
+        <p class="hint">Claude Code runs on that machine with that user's rights, and its own permission prompts still
+          apply. Close the page and it keeps working for 30 minutes: open the Terminal tab again to pick it up.</p></details>
+      <p class="hint term-tips">Select to highlight, <b>Ctrl+C</b> copies a selection (otherwise it stops the program),
+        <b>Ctrl+V</b> or right-click pastes. Closing the page keeps a session for 5 minutes.</p>
+    </aside>
+    <section class="card term-main">
+      <div class="term-tabs" id="termTabs" role="tablist"></div>
+      <div class="term-screens" id="termScreens"><div class="empty term-empty">Pick a machine on the left to open a terminal.</div></div>
+    </section>
   </div>
 
   <div class="mdl-view" id="modelsView">
@@ -2110,12 +2367,15 @@ const TAB_IDS = {
   todo: ['todoView', 'tabTodo'], savings: ['savingsView', 'tabSavings'], tools: ['toolsView', 'tabTools'], api: ['apiView', 'tabApi'],
   settings: ['settingsView', 'tabSettings'], rules: ['rulesView', 'tabRules'], guide: ['guideView', 'tabGuide'],
   pro: ['proView', 'tabPro'], projects: ['projectsView', 'tabProjects'], run: ['runView', 'tabRun'],
+  proxmox: ['proxmoxView', 'tabProxmox'], terminal: ['terminalView', 'tabTerminal'],
 };
 const PAGES = {
   ops: ['Overview', "What's running, what it's doing, and what it has saved you."],
   models: ['Models', 'The AI models your tools use, the order they try them in, and why each answer came from where it did.'],
   reasoning: ['Reasoning', 'Try the reasoning tools by hand: solve, decompose, route and delegate.'],
   docker: ['Containers', 'Every container on the server. Restart and stop ask before they act.'],
+  terminal: ['Terminal', 'SSH in the browser to the machines on your network. Signs in with this Control Panel\'s own key; a session survives a reload for 5 minutes.'],
+  proxmox: ['Proxmox', 'Your Proxmox cluster live: each node\'s CPU, RAM and disks, every VM and container, backups and alarms. Click any card for its graphs. Refreshes every 15 seconds while open.'],
   monitors: ['Uptime', 'Uptime Kuma monitors, with anything that is down listed first.'],
   projects: ['Projects', 'Every folder your agents work in: who owns it, what is working in it now, its GitHub repo, its size, and the files pinned for agents to read.'],
   todo: ['To-do', 'Tasks for your agents. Add them here and name who does each; agents work through them, overnight too, and say how it went.'],
@@ -2159,7 +2419,7 @@ const NAV_GROUPS = [
   { id: 'overview', label: 'Overview', tabs: ['ops'], lead: true },
   { id: 'projects', label: 'Projects', tabs: ['projects'] },
   { id: 'ai', label: 'AI', tabs: ['models', 'reasoning'] },
-  { id: 'servers', label: 'Servers', tabs: ['docker', 'monitors', 'tools', 'run'] },
+  { id: 'servers', label: 'Servers', tabs: ['proxmox', 'terminal', 'docker', 'monitors', 'tools', 'run'] },
   { id: 'quality', label: 'Rules', tabs: ['rules', 'observations'], lead: true },
   { id: 'settings', label: 'Settings', tabs: ['settings', 'guide'], lead: true },
 ];
@@ -2950,24 +3210,28 @@ async function loadLocalAi() {
       return;
     }
     _sys.aiNone = false;
-    const onlineCount = d.servers.filter(s => s.online).length;
+    const tiles = d.servers.filter(s => !s.hidden);  // hidden: polled for status only, not a tile
+    const onlineCount = tiles.filter(s => s.online).length;
     const statEl = document.getElementById('statAiOnline');
-    statEl.textContent = `${onlineCount}/${d.servers.length}`;
-    statEl.className = 'stat-num ' + (onlineCount === d.servers.length ? '' : onlineCount === 0 ? 'err' : 'warn');
-    _sys.ai = { online: onlineCount, total: d.servers.length, offline: d.servers.filter(s => !s.online).map(s => s.name) };
+    statEl.textContent = `${onlineCount}/${tiles.length}`;
+    statEl.className = 'stat-num ' + (onlineCount === tiles.length ? '' : onlineCount === 0 ? 'err' : 'warn');
+    _sys.ai = { online: onlineCount, total: tiles.length, offline: tiles.filter(s => !s.online).map(s => s.name) };
     _sys.servers = d.servers;
-    Core.setModels(d.servers.map(s => ({ online: s.online, busy: (s.requests_processing || 0) > 0 })));
+    Core.setModels(tiles.map(s => ({ online: s.online, busy: (s.requests_processing || 0) > 0 })));
 
-    el.innerHTML = d.servers.map((s, i) => {
+    el.innerHTML = tiles.map((s, i) => {
       const prevTok = _prev.aiTokens[s.name];
       const changed = prevTok !== undefined && s.total_tokens != null && s.total_tokens !== prevTok;
       const thirdMetric = s.type === 'gateway'
         ? { val: s.requests_total != null ? s.requests_total.toLocaleString() : '—', lbl: 'Requests' }
         : { val: s.requests_processing != null ? s.requests_processing : '0', lbl: 'In flight' };
       const decider = s.type === 'decider';  // a decision server counts decisions, not tokens
-      const m1 = decider ? { val: s.requests_total != null ? s.requests_total.toLocaleString() : '—', lbl: 'Decisions' }
+      const images = s.type === 'images';    // Nano Banana: images today against the owner's daily cap
+      const m1 = images ? { val: s.requests_total != null ? s.requests_total.toLocaleString() : '—', lbl: 'Today' }
+               : decider ? { val: s.requests_total != null ? s.requests_total.toLocaleString() : '—', lbl: 'Decisions' }
                       : { val: s.total_tokens != null ? s.total_tokens.toLocaleString() : '—', lbl: 'Tokens' };
-      const m2 = decider ? { val: s.avg_ms != null ? s.avg_ms + ' ms' : '—', lbl: 'Average' }
+      const m2 = images ? { val: s.cap ? `of ${s.cap}` + (s.cost_today_usd ? ` · ~$${s.cost_today_usd}` : '') : 'no cap set', lbl: 'Daily cap' }
+               : decider ? { val: s.avg_ms != null ? s.avg_ms + ' ms' : '—', lbl: 'Average' }
                       : { val: s.delta_tokens_window != null ? '+' + s.delta_tokens_window.toLocaleString() : '—', lbl: 'Recent' };
       const busy = s.online && (s.requests_processing || 0) > 0;
       const tip = `${s.name}: ${s.label}. ${s.online ? 'Online' : 'Offline'}. ${m1.lbl} ${m1.val} · ${m2.lbl} ${m2.val} · ${thirdMetric.lbl} ${thirdMetric.val}`;
@@ -2975,13 +3239,13 @@ async function loadLocalAi() {
       <div class="ai-cell ${s.online ? 'online' : ''} ${busy ? 'busy' : ''} ${changed ? 'flash' : ''}" title="${escAttr(tip)}">
         <span class="dot" aria-hidden="true"></span>
         <div style="min-width:0"><div class="ai-cell-name">${escapeHtml(s.name)}</div>
-          <div class="ai-cell-sub">${escapeHtml(s.online ? s.label : 'Offline')}</div></div>
+          <div class="ai-cell-sub">${escapeHtml(s.online ? s.label : images ? 'Switched off (Settings > Image generation)' : 'Offline')}</div></div>
         <canvas id="spark-${i}" aria-hidden="true"></canvas>
         <div class="ai-cell-num">${escapeHtml(String(m1.val))}<span>${escapeHtml(m1.lbl)}</span></div>
       </div>`;
     }).join('');
-    _sparkData = d.servers.map(s => ({ data: s.sparkline, on: !!s.online }));
-    d.servers.forEach((s, i) => { drawNeon(document.getElementById(`spark-${i}`), s.sparkline, !!s.online); _prev.aiTokens[s.name] = s.total_tokens; });
+    _sparkData = tiles.map(s => ({ data: s.sparkline, on: !!s.online }));
+    tiles.forEach((s, i) => { drawNeon(document.getElementById(`spark-${i}`), s.sparkline, !!s.online); _prev.aiTokens[s.name] = s.total_tokens; });
   } catch (e) {
     el.innerHTML = `<div class="empty">${loadErr('local AI usage', e)}</div>`;
     Object.assign(document.getElementById('statAiOnline'), { textContent: 'No reply', className: 'stat-num err', title: e.message });
@@ -3068,7 +3332,7 @@ function switchTab(tab) {
   if (changed) enterView(TAB_IDS[tab][0]);
   try { history.replaceState(null, '', tab === 'ops' ? location.pathname : '#' + tab); } catch (e) { /* cosmetic */ }
   if (tab === 'ops') Core.start(); else Core.stop();
-  if (tab === 'models') loadModels();
+  if (tab === 'models') { loadModels(); (window._onModelsTab || []).forEach(f => f()); }
   if (tab === 'todo') loadTodo(); else document.getElementById('todoDrawer')?.classList.remove('show');
   if (tab === 'settings') loadSettings();
   if (tab === 'rules') loadRules();
@@ -3077,6 +3341,8 @@ function switchTab(tab) {
   if (tab === 'savings') loadSavings();
   if (tab === 'tools') loadTools();
   if (tab === 'run') loadRun();
+  Pve[tab === 'proxmox' ? 'start' : 'stop']();
+  if (tab === 'terminal') Term.show(); else Term.hide();
   if (tab === 'api') loadApi();
   if (tab === 'observations') loadObservations();
   Projects[tab === 'projects' ? 'start' : 'stop']();
@@ -3543,6 +3809,485 @@ function showToken(name, token, verb) {
 }
 // ---- Projects (to-do #38): every folder agents work in, from the helper on the owner's PC. Refreshes each minute
 // while open. Paths copy on click, so a file can be handed to an agent; pins are files or folders for agents to read.
+// --- Proxmox tab (the owner, 2026-10-09: "Monitoring my proxmox clusters. i need actual disc space, ram usages, and
+// whatever else i could use. i need full visuals on my vm's. with alarms."). Everything comes from the tool server's
+// proxmox_monitor (/api/proxmox/monitor); the graphs are Proxmox's own (rrddata). Refreshes every 15 s while open.
+// The Terminal tab (terminal.py): xterm.js, loaded the first time the tab opens. One WebSocket per open session; a session's id is kept in sessionStorage so a
+// reload picks it up again (the server keeps it 5 minutes and redraws the last screen).
+const Term = (() => {
+  let lib = null, state = null, active = null, shown = false;
+  const open = new Map();  // sid -> {term, fit, ws, el, host, name, gone}
+  const KEEP = 'termSessions';
+  function loadLib() {
+    if (lib) return lib;
+    lib = new Promise((res, rej) => {
+      const css = document.createElement('link');
+      css.rel = 'stylesheet'; css.href = '/vendor/xterm/xterm.css';
+      document.head.appendChild(css);
+      const add = (src, next) => { const s = document.createElement('script'); s.src = src; s.onload = next; s.onerror = rej; document.head.appendChild(s); };
+      add('/vendor/xterm/xterm.js', () => add('/vendor/xterm/addon-fit.js', res));
+    });
+    return lib;
+  }
+  function kept() { try { return JSON.parse(sessionStorage.getItem(KEEP) || '[]'); } catch (e) { return []; } }
+  function keep() {
+    try { sessionStorage.setItem(KEEP, JSON.stringify([...open.entries()].filter(([, s]) => !s.gone).map(([sid, s]) => ({ sid, host: s.host })))); } catch (e) { /* private mode */ }
+  }
+  async function refresh() {
+    try { state = await apiCall('GET', '/api/term/state'); } catch (e) { state = { error: e.message }; }
+    render();
+  }
+  function render() {
+    const note = document.getElementById('termNote'), lock = document.getElementById('termLock');
+    const on = state && state.enabled && !state.locked && !state.error;
+    lock.hidden = !(state && state.locked);
+    note.innerHTML = !state ? '<div class="loading">Loading…</div>'
+      : state.error ? `<div class="set-msg bad">${escapeHtml(state.error)}</div>`
+      : !state.enabled ? `<p>The terminal is off. Switch <b>Terminal</b> on in <a href="#settings" onclick="switchTab('settings')">Settings</a> (Control Panel) to use it.</p>` : '';
+    for (const id of ['termHosts', 'termSuggested']) document.getElementById(id).innerHTML = '';
+    document.querySelectorAll('#terminalView details.term-more').forEach(d => { d.hidden = !on; });
+    if (!on) return;
+    document.getElementById('termKey').textContent = state.public_key || '';
+    document.getElementById('termHosts').innerHTML = (state.hosts || []).map(h => `<div class="term-host" data-id="${escAttr(h.id)}">
+      <b title="${escAttr(h.name)}">${escapeHtml(h.name)}</b>
+      <span class="hint">${escapeHtml(h.user)}@${escapeHtml(h.host)}${h.port !== 22 ? ':' + h.port : ''}</span>
+      <div class="term-host-act"><button type="button" onclick="Term.connect('${escAttr(h.id)}')">Open</button>
+        <button type="button" class="ghost" onclick="Term.askClaude('${escAttr(h.id)}')" title="Start Claude Code on this machine">Claude</button>
+        <button type="button" class="ghost" onclick="Term.askSetup('${escAttr(h.id)}')">Set up access</button>
+        <button type="button" class="ghost" onclick="Term.forget('${escAttr(h.id)}', this)" title="Trust this machine's new identity (after a reinstall)">Forget its old key</button>
+        <button type="button" class="ghost" onclick="Term.remove('${escAttr(h.id)}')" aria-label="Remove ${escAttr(h.name)}">Remove</button></div></div>`).join('')
+      || '<p class="hint">No machines yet. Add one below, or pick a suggestion.</p>';
+    const sug = state.suggested || [];
+    document.getElementById('termSuggested').innerHTML = sug.length ? `<div class="hint">Found on your network</div>${sug.map((h, i) =>
+      `<div class="term-host"><b>${escapeHtml(h.name)}</b><span class="hint">${escapeHtml(h.user)}@${escapeHtml(h.host)} · ${escapeHtml(h.found)}</span>
+      <div class="term-host-act"><button type="button" class="ghost" onclick="Term.addSuggested(${i})">Add it</button></div></div>`).join('')}` : '';
+  }
+  async function addHost(body) {
+    const msg = document.getElementById('termAddMsg');
+    body = body || { name: v('termAddName'), host: v('termAddHost'), user: v('termAddUser'), port: v('termAddPort') || 22 };
+    try { await apiCall('POST', '/api/term/hosts', body); msg.textContent = ''; ['termAddName', 'termAddHost', 'termAddUser', 'termAddPort'].forEach(id => { document.getElementById(id).value = ''; }); }
+    catch (e) { msg.className = 'set-msg bad'; msg.textContent = e.message; return; }
+    refresh();
+  }
+  function v(id) { return document.getElementById(id).value.trim(); }
+  function askSetup(id) {
+    const row = document.querySelector(`.term-host[data-id="${CSS.escape(id)}"]`);
+    if (!row || row.querySelector('form')) return;
+    const f = document.createElement('form');
+    f.innerHTML = `<input type="password" placeholder="That machine's password" aria-label="That machine's password" autocomplete="off">
+      <button type="submit">Add key</button>`;
+    f.onsubmit = async e => {
+      e.preventDefault();
+      const pw = f.querySelector('input'), btn = f.querySelector('button');
+      btn.disabled = true; btn.textContent = 'Adding…';
+      try { await apiCall('POST', `/api/term/hosts/${encodeURIComponent(id)}/setup`, { password: pw.value }); f.outerHTML = '<span class="hint">Done: it signs in with the key now.</span>'; }
+      catch (err) { btn.disabled = false; btn.textContent = 'Add key'; f.insertAdjacentHTML('afterend', `<span class="set-msg bad">${escapeHtml(err.message)}</span>`); }
+      pw.value = '';  // used once, never kept
+    };
+    row.appendChild(f);
+    f.querySelector('input').focus();
+  }
+  function askClaude(id) {
+    const row = document.querySelector(`.term-host[data-id="${CSS.escape(id)}"]`);
+    if (!row || row.querySelector('form')) return;
+    const h = (state.hosts || []).find(x => x.id === id) || {};
+    const f = document.createElement('form');
+    f.innerHTML = `<input placeholder="Folder (optional), e.g. /home/me/project or C:\\Code\\project" aria-label="Folder to start Claude Code in" maxlength="200">
+      <button type="submit">Start Claude</button>`;
+    f.querySelector('input').value = h.claude_dir || '';
+    f.onsubmit = e => { e.preventDefault(); const dir = f.querySelector('input').value.trim(); f.remove(); connect(id, null, { run: 'claude', dir }); refresh(); };
+    row.appendChild(f);
+    f.querySelector('input').focus();
+  }
+  async function connect(hostId, sid, extra) {
+    await loadLib();
+    const h0 = (state && state.hosts || []).find(x => x.id === hostId) || { name: hostId };
+    const h = { ...h0, name: (extra && extra.run === 'claude' ? 'Claude · ' : '') + h0.name };
+    const el = document.createElement('div');
+    el.className = 'term-screen';
+    document.getElementById('termScreens').appendChild(el);
+    document.querySelector('#termScreens .term-empty')?.remove();
+    const term = new Terminal({ cursorBlink: true, fontSize: 14, scrollback: 5000, allowProposedApi: false,
+      fontFamily: '"JetBrains Mono", "Cascadia Mono", Consolas, monospace',
+      theme: { background: '#0b0f17', foreground: '#e2e8f0', cursor: '#64d2ff', selectionBackground: '#334155' } });
+    const fit = new FitAddon.FitAddon();
+    term.loadAddon(fit);
+    term.open(el);
+    const tmpId = sid || 'new-' + Math.random().toString(36).slice(2);
+    const s = { term, fit, el, host: hostId, name: h.name, gone: false, ws: null };
+    open.set(tmpId, s);
+    select(tmpId);
+    fit.fit();
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const qs = new URLSearchParams({ host: hostId, cols: term.cols, rows: term.rows, ...(sid ? { sid } : extra || {}) });
+    const ws = new WebSocket(`${proto}://${location.host}/api/term/ws?${qs}`);
+    ws.binaryType = 'arraybuffer';
+    s.ws = ws;
+    let id = tmpId;
+    ws.onmessage = ev => {
+      if (typeof ev.data !== 'string') { term.write(new Uint8Array(ev.data)); return; }
+      let msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
+      if (msg.t === 'ready' && msg.name) s.name = msg.name;
+      if (msg.t === 'ready' && msg.sid !== id) { open.delete(id); id = msg.sid; open.set(id, s); if (active === tmpId) active = id; keep(); tabs(); }
+      if (msg.t === 'error' || msg.t === 'exit') { term.write(`\r\n\x1b[33m${msg.why}\x1b[0m\r\n`); s.gone = true; keep(); tabs(); }
+    };
+    ws.onclose = ev => {
+      if (s.gone) return;
+      s.gone = true; keep(); tabs();
+      term.write(ev.code === 4403 ? `\r\n\x1b[33m${ev.reason === 'unlock' ? 'Enter your password on the left first.' : ev.reason}\x1b[0m\r\n`
+        : '\r\n\x1b[33mDisconnected. The session is kept 5 minutes: reopen the machine to pick it up.\x1b[0m\r\n');
+      if (ev.reason === 'unlock') refresh();
+    };
+    const enc = new TextEncoder();
+    const send = text => { if (ws.readyState === 1) ws.send(enc.encode(text)); };
+    term.onData(send);
+    term.onResize(({ cols, rows }) => { if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'resize', c: cols, r: rows })); });
+    new ResizeObserver(() => { if (el.classList.contains('on')) { try { fit.fit(); } catch (e) { /* hidden */ } } }).observe(el);
+    // Copy and paste like Windows Terminal: Ctrl+C copies a selection (else it's the interrupt), Ctrl+V and a right-click
+    // paste, Ctrl+Shift+C/V always copy/paste. Several lines ask first.
+    const paste = async () => {
+      let text = '';
+      try { text = await navigator.clipboard.readText(); } catch (e) { return; }
+      const lines = text.split(/\r?\n/).filter(Boolean).length;
+      if (lines > 1 && !confirm(`Paste ${lines} lines into ${s.name}?`)) return;
+      term.paste(text);
+    };
+    const copy = () => { const t = term.getSelection(); if (t) { navigator.clipboard.writeText(t).catch(() => {}); term.clearSelection(); } };
+    term.attachCustomKeyEventHandler(e => {
+      if (e.type !== 'keydown' || !e.ctrlKey) return true;
+      const k = e.key.toLowerCase();
+      if (k === 'c' && (e.shiftKey || term.hasSelection())) { copy(); return false; }
+      if (k === 'v') { e.preventDefault(); paste(); return false; }
+      return true;
+    });
+    el.addEventListener('contextmenu', e => { e.preventDefault(); if (term.hasSelection()) copy(); else paste(); });
+    term.focus();
+  }
+  function select(id) {
+    active = id;
+    for (const [sid, s] of open) s.el.classList.toggle('on', sid === id);
+    const s = open.get(id);
+    if (s) { try { s.fit.fit(); } catch (e) { /* not drawn yet */ } s.term.focus(); }
+    tabs();
+  }
+  function tabs() {
+    document.getElementById('termTabs').innerHTML = [...open.entries()].map(([sid, s]) =>
+      `<button type="button" role="tab" class="term-tab${sid === active ? ' on' : ''}${s.gone ? ' gone' : ''}" onclick="Term.select('${escAttr(sid)}')">
+        <i></i>${escapeHtml(s.name)}<span class="x" onclick="event.stopPropagation(); Term.close('${escAttr(sid)}')" aria-label="Close">×</span></button>`).join('');
+  }
+  async function close(sid) {
+    const s = open.get(sid);
+    if (!s) return;
+    if (!s.gone && /^[a-f0-9]{16}$/.test(sid)) { try { await apiCall('POST', `/api/term/sessions/${sid}/close`); } catch (e) { /* gone already */ } }
+    try { s.ws && s.ws.close(); } catch (e) { /* closed */ }
+    s.term.dispose(); s.el.remove(); open.delete(sid); keep();
+    if (active === sid) { const next = [...open.keys()].pop(); if (next) select(next); else { active = null; tabs(); document.getElementById('termScreens').innerHTML = '<div class="empty term-empty">Pick a machine on the left to open a terminal.</div>'; } }
+    else tabs();
+  }
+  return {
+    async show() {
+      shown = true;
+      await refresh();
+      if (state && state.enabled && !state.locked && !open.size) {  // after a reload: pick up the sessions still open
+        const live = new Set((state.sessions || []).map(s => s.id));
+        for (const k of kept()) if (live.has(k.sid)) await connect(k.host, k.sid);
+      }
+      const s = open.get(active); if (s) { try { s.fit.fit(); } catch (e) { /* hidden */ } }
+    },
+    hide() { shown = false; },
+    connect: id => connect(id),
+    select, close, addHost: () => addHost(),
+    addSuggested(i) { const h = (state.suggested || [])[i]; if (h) addHost(h); },
+    askSetup, askClaude,
+    async remove(id) { if (!confirm('Remove this machine from the list? (Nothing changes on the machine itself.)')) return; await apiCall('DELETE', `/api/term/hosts/${encodeURIComponent(id)}`); refresh(); },
+    async forget(id, btn) { await apiCall('POST', `/api/term/hosts/${encodeURIComponent(id)}/forget-key`); btn.textContent = 'Forgotten: it is trusted again on the next connection'; },
+    async unlock() {
+      const pw = document.getElementById('termLockPw');
+      let err = '';
+      try { await apiCall('POST', '/api/term/unlock', { password: pw.value }); } catch (e) { err = e.message; }
+      pw.value = '';
+      await refresh();
+      if (err) document.getElementById('termNote').innerHTML = `<div class="set-msg bad">${escapeHtml(err)}</div>`;
+    },
+    copyKey(btn) { navigator.clipboard.writeText(document.getElementById('termKey').textContent).then(() => { btn.textContent = 'Copied'; }); },
+  };
+})();
+
+const Pve = (() => {
+  const REFRESH_MS = 15000, TFS = ['hour', 'day', 'week', 'month', 'year'];
+  let timer = null, data = null, busy = false, open = null, tf = 'hour', openTimer = null;
+  const want = { q: '', node: '', state: '', sort: 'vmid' };
+  const charts = new Map();
+  const size = n => n == null ? '–' : n >= 1e12 ? (n / 1e12).toFixed(2) + ' TB' : n >= 1e9 ? (n / 1e9).toFixed(n >= 1e11 ? 0 : 1) + ' GB' : (n / 1e6).toFixed(0) + ' MB';
+  const pct = (u, t) => (u != null && t) ? Math.round(u * 1000 / t) / 10 : null;
+  const tone = p => p == null ? 'none' : p >= 90 ? 'bad' : p >= 75 ? 'warn' : 'ok';
+  const rate = b => b == null ? '–' : b >= 1e6 ? (b / 1e6).toFixed(1) + ' MB/s' : b >= 1e3 ? Math.round(b / 1e3) + ' KB/s' : Math.round(b) + ' B/s';
+  const dur = s => !s ? '–' : s < 3600 ? Math.round(s / 60) + ' min' : s < 172800 ? Math.round(s / 3600) + ' h' : Math.round(s / 86400) + ' days';
+  const ago = ts => ts ? dur(Date.now() / 1000 - ts) + ' ago' : 'never';
+  function meter(label, p, sub) {
+    return `<div class="pve-meter"><div class="pve-meter-top"><span>${escapeHtml(label)}</span><span class="${tone(p)}-c">${p == null ? '–' : Math.round(p) + '%'}</span></div>
+      <div class="pve-bar"><span class="${tone(p)}" style="width:${Math.min(100, p || 0)}%"></span></div><div class="pve-meter-sub">${escapeHtml(sub || '')}</div></div>`;
+  }
+  const alarmsFor = prefixes => ((data && data.alarms && data.alarms.active) || []).filter(a => prefixes.some(p => a.id.startsWith(p)));
+  // A VM's main disk: "/" or "C:\" when its guest agent lists one, else its biggest file system.
+  const mainFs = g => (g.fs || []).find(f => f.mount === '/' || /^[A-Z]:\\?$/.test(f.mount)) || (g.fs || [])[0];
+
+  function start() {
+    if (timer) return;
+    load();
+    timer = setInterval(() => { if (!document.hidden) load(); }, REFRESH_MS);
+  }
+  function stop() { clearInterval(timer); timer = null; }
+  async function load() {
+    if (busy) return;
+    busy = true;
+    try {
+      data = await apiCall('GET', '/api/proxmox/monitor');
+      render();
+    } catch (e) {
+      if (!data) document.getElementById('pveStrip').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
+      document.getElementById('pveFoot').textContent = `Couldn't refresh: ${e.message}`;
+    } finally { busy = false; }
+  }
+  function render() {
+    const d = data, cl = d.cluster || {}, guests = (d.guests || []).filter(g => !g.template);
+    const run = guests.filter(g => g.status === 'running').length, act = (d.alarms && d.alarms.active) || [];
+    const shared = (d.storage || []).filter(s => s.shared && s.total);
+    const stat = (num, label, cls = '') => `<div class="stat-box"><div class="stat-num ${cls}">${num}</div><div class="stat-label">${escapeHtml(label)}</div></div>`;
+    document.getElementById('pveStrip').innerHTML =
+      stat(escapeHtml(cl.name || 'Proxmox'), cl.quorate === false ? 'quorum LOST' : cl.quorate ? 'cluster, quorate' : 'single node', cl.quorate === false ? 'bad-c' : '')
+      + stat(`${cl.nodes_online ?? '–'}/${cl.nodes ?? '–'}`, 'nodes online', cl.nodes_online < cl.nodes ? 'bad-c' : '')
+      + stat(`${run}/${guests.length}`, 'VMs and containers running')
+      + stat(act.length, act.length === 1 ? 'alarm' : 'alarms', act.some(a => a.severity === 'critical') ? 'bad-c' : act.length ? 'warn-c' : 'ok-c');
+    renderAlarms(act, (d.alarms && d.alarms.recent) || [], d.alarms && d.alarms.enabled);
+    document.getElementById('pveNodes').innerHTML = (d.nodes || []).map(nodeCard).join('') || '<div class="empty">No nodes.</div>';
+    const sh = document.getElementById('pveShared');
+    sh.hidden = !shared.length;
+    sh.innerHTML = `<div class="panel-title">Shared storage</div><div class="pve-meters">${shared.map(s =>
+      meter(`${s.storage} (${s.type})`, pct(s.used, s.total), `${size((s.total || 0) - (s.used || 0))} free of ${size(s.total)} · on ${(s.nodes || []).length} nodes`)).join('')}</div>`;
+    const sel = document.getElementById('pveNodeSel');
+    const names = (d.nodes || []).map(n => n.node);
+    if (sel.options.length !== names.length + 1) {
+      sel.innerHTML = '<option value="">All nodes</option>' + names.map(n => `<option value="${escAttr(n)}">${escapeHtml(n)}</option>`).join('');
+      sel.value = want.node;
+    }
+    renderGuests();
+    renderTasks(d.tasks || []);
+    document.getElementById('pveFoot').textContent = `Read from ${d.host || 'Proxmox'} ${new Date(d.at * 1000).toLocaleTimeString()}. `
+      + 'Disk use inside a VM needs its QEMU guest agent; containers report theirs directly.';
+    if (open) refreshOpenHeader();
+  }
+  function renderAlarms(act, recent, enabled) {
+    const box = document.getElementById('pveAlarms');
+    box.hidden = !act.length && !recent.length && enabled !== false;
+    const row = (a, cleared) => `<div class="pve-alarm"><span class="pve-sev ${cleared ? 'cleared' : a.severity}">${cleared ? 'Cleared' : a.severity === 'critical' ? 'Urgent' : 'Warning'}</span>
+      <div><div><b>${escapeHtml(a.title)}</b></div><div class="hint">${escapeHtml(a.message || '')}</div></div>
+      <span class="hint">${cleared ? ago(a.cleared) : 'since ' + ago(a.since).replace(' ago', '')}</span></div>`;
+    box.innerHTML = `<div class="panel-title">Alarms <span class="count">${act.length ? act.length + ' active' : 'none active'}</span>
+        <button class="ghost" style="margin-left:auto" onclick="Pve.alarmSettings()">Alarm settings</button></div>
+      ${enabled === false ? '<p class="hint">Proxmox alarms are switched off: nothing is pushed to your phone. Alarm settings switches them back on.</p>' : ''}
+      ${act.map(a => row(a, false)).join('')}
+      ${recent.length ? `<details class="set-adv"><summary>Cleared in the last week (${recent.length})</summary>${recent.map(a => row(a, true)).join('')}</details>` : ''}`;
+  }
+  function nodeCard(n) {
+    const on = n.status === 'online', ram = pct(n.mem_used, n.mem_total), disk = pct(n.root_used, n.root_total);
+    const own = (data.storage || []).filter(st => !st.shared && st.node === n.node && st.total && st.status === 'available'
+      && !(st.type === 'dir' && Math.abs(st.total - (n.root_total || 0)) <= 0.01 * (n.root_total || 1)));
+    const hot = alarmsFor([`node-offline:${n.node}`, `node-ram:${n.node}`, `node-cpu:${n.node}`, `node-disk:${n.node}`, `smart:${n.node}:`, `wear:${n.node}:`, `storage:${n.node}:`]);
+    return `<section class="card pve-card${on ? '' : ' off'}${hot.length ? ' alarm' : ''}" tabindex="0" onclick="Pve.show('node', '${escAttr(n.node)}')"
+        onkeydown="if (event.key === 'Enter') Pve.show('node', '${escAttr(n.node)}')" title="Graphs for ${escAttr(n.node)}">
+      <div class="pve-head"><span class="pve-dot ${on ? 'on' : 'bad'}"></span><span class="name">${escapeHtml(n.node)}</span>
+        <span class="badge">${on ? escapeHtml(n.ip || 'online') : 'OFFLINE'}</span></div>
+      ${n.error ? `<div class="pve-sub bad-c">${escapeHtml(n.error)}</div>` : ''}
+      <div class="pve-sub">${escapeHtml([n.cpu_model, n.threads ? n.threads + ' threads' : (n.cpus ? n.cpus + ' CPUs' : ''), n.pve ? 'PVE ' + n.pve : ''].filter(Boolean).join(' · '))}</div>
+      <div class="pve-meters">
+        ${meter('CPU', n.cpu_pct, `load ${(n.load || []).map(v => v == null ? '–' : v.toFixed(2)).join(' / ') || '–'}`)}
+        ${meter('RAM', ram, `${size(n.mem_used)} of ${size(n.mem_total)}`)}
+        ${meter('System disk', disk, `${size(n.root_avail ?? ((n.root_total || 0) - (n.root_used || 0)))} free of ${size(n.root_total)}`)}
+        ${meter('Swap', pct(n.swap_used, n.swap_total), `${size(n.swap_used)} of ${size(n.swap_total)}`)}
+        ${own.map(s => meter(`${s.storage} (${s.type})`, pct(s.used, s.total), `${size((s.total || 0) - (s.used || 0))} free of ${size(s.total)}`)).join('')}
+      </div>
+      <div class="pve-facts"><span>Up ${dur(n.uptime_s)}</span>${n.iowait != null ? `<span>IO wait ${(n.iowait * 100).toFixed(1)}%</span>` : ''}${n.kernel ? `<span>kernel ${escapeHtml(n.kernel)}</span>` : ''}</div>
+      ${(n.disks || []).length ? `<div class="pve-list">${n.disks.map(k => `<div><span>${escapeHtml(k.dev || '')} ${escapeHtml(k.model || '')} <span class="muted">${size(k.size)}</span></span>
+        <span><span class="${/PASSED|OK/i.test(k.health || '') ? 'ok-c' : k.health ? 'bad-c' : 'muted'}">${escapeHtml(k.health || 'no SMART')}</span>${k.wear_left != null ? ` · <span class="${k.wear_left <= 20 ? 'bad-c' : k.wear_left <= 40 ? 'warn-c' : ''}">${k.wear_left}% life left</span>` : ''}</span></div>`).join('')}</div>` : ''}
+    </section>`;
+  }
+  function guestDisk(g) {
+    if (g.kind === 'lxc') return g.disk != null ? [pct(g.disk, g.maxdisk), `${size((g.maxdisk || 0) - g.disk)} free of ${size(g.maxdisk)}`] : [null, `${size(g.maxdisk)} disk (stopped)`];
+    const f = mainFs(g);
+    if (f) return [pct(f.used, f.total), `${f.mount}: ${size((f.total || 0) - (f.used || 0))} free of ${size(f.total)}${g.fs.length > 1 ? ` · ${g.fs.length} file systems` : ''}`];
+    if (g.status !== 'running') return [null, `${size(g.maxdisk)} disk (stopped)`];
+    return [null, `${size(g.maxdisk)} disk · ${g.fs_note === 'guest agent not answering' ? 'its guest agent isn\'t answering' : 'use needs the guest agent'}`];
+  }
+  function guestCard(g) {
+    const on = g.status === 'running', [dp, dsub] = guestDisk(g), ram = pct(g.mem, g.mem_total || g.maxmem);
+    const hot = alarmsFor([`stopped:${g.vmid}`, `guest-ram:${g.vmid}`, `guest-disk:${g.vmid}:`, `backup:${g.vmid}`]);
+    const backup = g.last_backup ? `last backup ${ago(g.last_backup)}` : 'no backups';
+    const old = g.last_backup && Date.now() / 1000 - g.last_backup > 2 * 86400;
+    return `<section class="card pve-card${on ? '' : ' off'}${hot.length ? ' alarm' : ''}" tabindex="0" onclick="Pve.show('${g.kind}', ${g.vmid})"
+        onkeydown="if (event.key === 'Enter') Pve.show('${g.kind}', ${g.vmid})" title="Graphs for ${escAttr(g.name || '')}">
+      <div class="pve-head"><span class="pve-dot ${on ? 'on' : hot.length ? 'bad' : ''}"></span><span class="name">${escapeHtml(g.name || 'unnamed')}</span>
+        <span class="badge">${g.kind === 'lxc' ? 'CT' : 'VM'} ${g.vmid}</span></div>
+      <div class="pve-sub">${escapeHtml(g.node)} · ${on ? 'running ' + dur(g.uptime_s) : escapeHtml(g.status || '')} · ${g.cpus || '?'} CPU${(g.tags || []).length ? ' · ' + g.tags.map(escapeHtml).join(', ') : ''}</div>
+      ${on ? `<div class="pve-meters">
+        ${meter('CPU', g.cpu_pct, `of ${g.cpus || '?'} CPU${g.cpus === 1 ? '' : 's'}`)}
+        ${g.mem_basis === 'host' ? meter('RAM', null, `node holds ${size(g.mem)} of ${size(g.maxmem)} · real use needs the balloon device`)
+          : meter('RAM', ram, `${size(g.mem)} of ${size(g.mem_total || g.maxmem)}${g.mem_basis === 'guest' ? ' · incl. cache' : g.mem_basis === 'available' ? ' · real use' : ''}`)}
+        ${meter(g.kind === 'lxc' ? 'Disk' : 'Disk (inside)', dp, dsub)}
+        <div class="pve-meter"><div class="pve-meter-top"><span>Network</span></div><div class="pve-meter-sub" style="margin-top:6px">↓ ${rate(g.net_in_bps)}<br>↑ ${rate(g.net_out_bps)}</div></div>
+      </div>
+      <div class="pve-facts"><span>Disk read ${rate(g.disk_read_bps)}</span><span>write ${rate(g.disk_write_bps)}</span></div>` : `<div class="pve-sub">${escapeHtml(dsub)} · ${size(g.maxmem)} RAM</div>`}
+      <div class="pve-facts"><span class="${old ? 'warn-c' : ''}">${backup}</span></div>
+    </section>`;
+  }
+  function renderGuests() {
+    const q = want.q.trim().toLowerCase();
+    let gs = (data.guests || []).filter(g => (!want.node || g.node === want.node)
+      && (!want.state || (want.state === 'running' ? g.status === 'running' : g.status !== 'running'))
+      && (!q || String(g.vmid).includes(q) || String(g.name || '').toLowerCase().includes(q) || (g.tags || []).some(t => t.includes(q))));
+    const by = { name: g => String(g.name || ''), cpu: g => -(g.cpu_pct || 0), ram: g => -(g.mem_basis === 'host' ? 0 : pct(g.mem, g.mem_total || g.maxmem) || 0),
+      disk: g => -(guestDisk(g)[0] || 0), vmid: g => g.vmid };
+    const key = by[want.sort] || by.vmid;
+    gs = gs.slice().sort((a, b) => (a.template - b.template) || (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
+    document.getElementById('pveGuestCount').textContent = `${gs.length} shown`;
+    document.getElementById('pveGuests').innerHTML = gs.map(guestCard).join('') || '<div class="empty">Nothing matches.</div>';
+  }
+  function renderTasks(tasks) {
+    const box = document.getElementById('pveTasks');
+    box.hidden = !tasks.length;
+    box.innerHTML = `<div class="panel-title">Backups and failed tasks <span class="count">from Proxmox's task log</span></div>
+      <div class="pve-list">${tasks.slice(0, 12).map(t => `<div><span>${escapeHtml(t.type === 'vzdump' ? 'Backup' : t.type)}${t.id ? ' ' + escapeHtml(t.id) : ''} on ${escapeHtml(t.node || '')}
+        <span class="muted">${t.start ? new Date(t.start * 1000).toLocaleString() : ''}${t.end && t.start ? ' · ' + dur(t.end - t.start) : ''}</span></span>
+        <span class="${!t.status ? 'muted' : t.status === 'OK' ? 'ok-c' : 'bad-c'}">${escapeHtml(t.status || 'running')}</span></div>`).join('')}</div>`;
+  }
+  function filter(k, v) { want[k] = v; if (data) renderGuests(); }
+
+  // --- the detail window: Proxmox's own graphs, an hour to a year ---
+  function show(kind, id) {
+    open = { kind, id };
+    document.getElementById('pveModal').hidden = false;
+    document.body.style.overflow = 'hidden';
+    drawOpen();
+    clearInterval(openTimer);
+    openTimer = setInterval(() => { if (!document.hidden && tf === 'hour') drawOpen(true); }, 60000);
+  }
+  function close() {
+    open = null;
+    clearInterval(openTimer);
+    document.getElementById('pveModal').hidden = true;
+    document.body.style.overflow = '';
+  }
+  function setTf(t) { tf = t; drawOpen(); }
+  function subject() {
+    if (!open || !data) return null;
+    return open.kind === 'node' ? (data.nodes || []).find(n => n.node === open.id) : (data.guests || []).find(g => g.vmid === open.id);
+  }
+  function factsHtml(s) {
+    const facts = open.kind === 'node' ? [s.status, s.ip, s.pve && 'PVE ' + s.pve, 'up ' + dur(s.uptime_s),
+      s.mem_total && `RAM ${Math.round(pct(s.mem_used, s.mem_total))}%`, s.root_total && `system disk ${Math.round(pct(s.root_used, s.root_total))}%`]
+      : [s.status, 'on ' + s.node, `${s.cpus} CPU`, size(s.maxmem) + ' RAM', size(s.maxdisk) + ' disk',
+        s.status === 'running' && 'up ' + dur(s.uptime_s), s.last_backup ? 'last backup ' + ago(s.last_backup) : 'no backups'];
+    return facts.filter(Boolean).map(f => `<span>${escapeHtml(String(f))}</span>`).join('');
+  }
+  function headHtml(s) {
+    const title = open.kind === 'node' ? `Node ${s.node}` : `${s.name || 'unnamed'} (${s.kind === 'lxc' ? 'container' : 'VM'} ${s.vmid})`;
+    return `<div class="pve-modal-head"><h3 id="pveModalTitle">${escapeHtml(title)}</h3>
+        <div class="pve-tf" role="group" aria-label="Time span">${TFS.map(t => `<button class="ghost ${t === tf ? 'active' : ''}" onclick="Pve.setTf('${t}')">${t[0].toUpperCase() + t.slice(1)}</button>`).join('')}</div>
+        <button class="ghost" onclick="Pve.close()" aria-label="Close">Close</button></div>
+      <div class="pve-facts" id="pveModalFacts">${factsHtml(s)}</div>`;
+  }
+  function refreshOpenHeader() {  // the live numbers under the title, on every refresh
+    const s = subject(), el = document.getElementById('pveModalFacts');
+    if (s && el) el.innerHTML = factsHtml(s);
+  }
+  async function drawOpen(quiet) {
+    const s = subject(), box = document.getElementById('pveModalBox');
+    if (!s) { box.innerHTML = '<div class="empty">Not found any more.</div>'; return; }
+    if (!quiet) box.innerHTML = headHtml(s) + '<div class="loading">Loading graphs…</div>';
+    const isNode = open.kind === 'node';
+    const q = new URLSearchParams({ kind: open.kind, node: s.node, timeframe: tf });
+    if (!isNode) q.set('vmid', s.vmid);
+    let h;
+    try { h = await apiCall('GET', '/api/proxmox/history?' + q); }
+    catch (e) { box.innerHTML = headHtml(s) + `<div class="empty">${escapeHtml(e.message)}</div>`; return; }
+    const pts = h.points || [], P = v => v * 100;
+    const pc = v => v.toFixed(1) + '%';
+    const parts = isNode ? [
+      chart('pc1', 'CPU and IO wait', pts, [{ key: 'cpu', label: 'CPU', f: P, area: true }, { key: 'iowait', label: 'IO wait', f: P }], pc, 100),
+      chart('pc2', 'RAM', pts, [{ key: 'memused', label: 'used', area: true }, { key: 'memtotal', label: 'total' }], size),
+      chart('pc3', 'System disk', pts, [{ key: 'rootused', label: 'used', area: true }, { key: 'roottotal', label: 'size' }], size),
+      chart('pc4', 'Network', pts, [{ key: 'netin', label: 'in', area: true }, { key: 'netout', label: 'out' }], rate),
+      chart('pc5', 'Load', pts, [{ key: 'loadavg', label: 'load', area: true }], v => v.toFixed(2)),
+      chart('pc6', 'Swap', pts, [{ key: 'swapused', label: 'used', area: true }, { key: 'swaptotal', label: 'size' }], size),
+    ] : [
+      chart('pc1', 'CPU', pts, [{ key: 'cpu', label: 'CPU', f: P, area: true }], pc, 100),
+      chart('pc2', 'RAM', pts, [{ key: 'mem', label: 'used', area: true }, { key: 'maxmem', label: 'size' }], size),
+      chart('pc3', 'Network', pts, [{ key: 'netin', label: 'in', area: true }, { key: 'netout', label: 'out' }], rate),
+      chart('pc4', 'Disk reads and writes', pts, [{ key: 'diskread', label: 'read', area: true }, { key: 'diskwrite', label: 'write' }], rate),
+      ...(s.kind === 'lxc' ? [chart('pc5', 'Disk use', pts, [{ key: 'disk', label: 'used', area: true }, { key: 'maxdisk', label: 'size' }], size)] : []),
+    ];
+    const fsRows = !isNode && (s.fs || []).length ? `<div><div class="panel-title">File systems inside the VM</div><div class="pve-meters">${s.fs.map(f =>
+      meter(`${f.mount} (${f.type || '?'})`, pct(f.used, f.total), `${size((f.total || 0) - (f.used || 0))} free of ${size(f.total)}`)).join('')}</div></div>`
+      : !isNode && s.kind === 'qemu' ? `<p class="hint">Disk use inside this VM needs the QEMU guest agent: in the VM, install it (Debian/Ubuntu: <code>apt install qemu-guest-agent</code>), then in Proxmox switch on Options &gt; QEMU Guest Agent and restart the VM.</p>` : '';
+    const disks = isNode && (s.disks || []).length ? `<div><div class="panel-title">Physical disks</div><div class="pve-list">${s.disks.map(k =>
+      `<div><span>${escapeHtml(k.dev || '')} ${escapeHtml(k.model || '')} (${escapeHtml(k.type || '')}, ${size(k.size)})</span><span>${escapeHtml(k.health || 'no SMART')}${k.wear_left != null ? ` · ${k.wear_left}% life left` : ''}</span></div>`).join('')}</div></div>` : '';
+    box.innerHTML = headHtml(s) + `<div class="pve-charts">${parts.join('')}</div>${fsRows}${disks}`;
+  }
+  function tlabel(t) {
+    const d = new Date(t * 1000);
+    return tf === 'hour' || tf === 'day' ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+  }
+  function chart(id, title, pts, series, fmt, fixedMax) {
+    const W = 600, H = 140, PAD = 6;
+    const rows = pts.filter(p => p.time);
+    const vals = series.map(s => rows.map(p => { const v = p[s.key]; return v == null || isNaN(v) ? null : (s.f ? s.f(v) : v); }));
+    const all = vals.flat().filter(v => v != null);
+    const legend = series.map((s, i) => `<span><i class="pve-c${i}"></i>${escapeHtml(s.label)}</span>`).join('');
+    if (rows.length < 2 || !all.length) return `<div class="pve-chart"><div class="pve-chart-title">${escapeHtml(title)}</div><div class="empty">No data for this span yet.</div></div>`;
+    const max = fixedMax || Math.max(...all) * 1.12 || 1, x0 = rows[0].time, x1 = rows[rows.length - 1].time;
+    const X = t => PAD + (W - 2 * PAD) * (t - x0) / ((x1 - x0) || 1), Y = v => PAD + (H - 2 * PAD) * (1 - Math.min(v, max) / max);
+    const path = vs => { let d = '', pen = false; vs.forEach((v, j) => { if (v == null) { pen = false; return; } d += `${pen ? 'L' : 'M'}${X(rows[j].time).toFixed(1)},${Y(v).toFixed(1)}`; pen = true; }); return d; };
+    const lines = vals.map((vs, i) => {
+      const d = path(vs);
+      if (!d) return '';
+      const first = vs.findIndex(v => v != null), last = vs.length - 1 - [...vs].reverse().findIndex(v => v != null);
+      const area = series[i].area ? `<path class="area" d="${d}L${X(rows[last].time).toFixed(1)},${H - PAD}L${X(rows[first].time).toFixed(1)},${H - PAD}Z"/>` : '';
+      return area + `<path class="pve-c${i}" d="${d}"/>`;
+    }).join('');
+    charts.set(id, { rows, vals, series, fmt, x0, x1, W, PAD });
+    const now = vals.map((vs, i) => { const v = [...vs].reverse().find(x => x != null); return v == null ? '' : `${series[i].label} ${fmt(v)}`; }).filter(Boolean).join(' · ');
+    return `<div class="pve-chart" id="${id}" onmousemove="Pve.hover(event, '${id}')" onmouseleave="Pve.hover(null, '${id}')">
+      <div class="pve-chart-title">${escapeHtml(title)} <span class="pve-legend">${legend}</span></div>
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="${escAttr(title + ': ' + now)}" role="img">
+        ${[0.25, 0.5, 0.75].map(f => `<line class="grid" x1="0" x2="${W}" y1="${(PAD + (H - 2 * PAD) * f).toFixed(1)}" y2="${(PAD + (H - 2 * PAD) * f).toFixed(1)}"/>`).join('')}
+        ${lines}<line class="cursor" x1="-9" x2="-9" y1="0" y2="${H}"/></svg>
+      <div class="pve-axis"><span>${tlabel(x0)}</span><span>top ${fmt(max)}</span><span>${tlabel(x1)}</span></div>
+      <div class="pve-tip">${escapeHtml(now)}</div></div>`;
+  }
+  function hover(e, id) {
+    const c = charts.get(id), el = document.getElementById(id);
+    if (!c || !el) return;
+    const tip = el.querySelector('.pve-tip'), cur = el.querySelector('.cursor'), svg = el.querySelector('svg');
+    if (!e) {
+      cur.setAttribute('x1', -9); cur.setAttribute('x2', -9);
+      tip.textContent = c.vals.map((vs, i) => { const v = [...vs].reverse().find(x => x != null); return v == null ? '' : `${c.series[i].label} ${c.fmt(v)}`; }).filter(Boolean).join(' · ');
+      return;
+    }
+    const r = svg.getBoundingClientRect(), frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    const t = c.x0 + frac * (c.x1 - c.x0);
+    let j = 0;
+    c.rows.forEach((p, k) => { if (Math.abs(p.time - t) < Math.abs(c.rows[j].time - t)) j = k; });
+    const x = c.PAD + (c.W - 2 * c.PAD) * (c.rows[j].time - c.x0) / ((c.x1 - c.x0) || 1);
+    cur.setAttribute('x1', x); cur.setAttribute('x2', x);
+    tip.textContent = `${new Date(c.rows[j].time * 1000).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })} · `
+      + c.vals.map((vs, i) => vs[j] == null ? '' : `${c.series[i].label} ${c.fmt(vs[j])}`).filter(Boolean).join(' · ');
+  }
+  function alarmSettings() { _setCat = sectionOf('Proxmox alarms'); switchTab('settings'); }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && open) close(); });
+  return { start, stop, filter, show, close, setTf, hover, alarmSettings };
+})();
+
 const Projects = (() => {
   let _items = [], _sort = 'recent', _timer = null, _loaded = false;
   const GH = '<svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.88.87 2.34.66.07-.52.28-.87.51-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>';
@@ -3723,6 +4468,7 @@ async function loadApi() {
         <span><b>${granted}</b> of ${_apiTools.length} tools granted</span>
         <span><b>${(u.calls || 0).toLocaleString()}</b> calls, <b>${u.errors || 0}</b> errors, <b>${u.refused || 0}</b> refused</span>
         <span>limit <b>${c.rate_per_min ? c.rate_per_min + '/min' : 'none'}</b></span>
+        <span${c.daily_spend_usd != null && c.spend_today && c.spend_today.total >= c.daily_spend_usd ? ' style="color:var(--bad)"' : ''}>paid today <b>$${((c.spend_today || {}).total || 0).toFixed(2)}</b>${c.daily_spend_usd != null ? ` of a <b>$${Number(c.daily_spend_usd).toFixed(2)}</b> cap` : ', no cap'}</span>
         <span>${c.expires ? (c.expired ? 'expired ' : 'expires ') + new Date(c.expires * 1000).toLocaleDateString() : 'never expires'}</span>
         <span>last used ${c.last_used ? agoText(new Date(c.last_used * 1000).toISOString()) : 'never'}</span>
         <span>memory: its own${c.memory_shared_read === false ? ', <b>no</b> shared reads' : ', reads shared'}</span>
@@ -3735,6 +4481,7 @@ async function loadApi() {
         <button class="ghost" onclick="clientPreset('${escAttr(c.name)}', 'all')">Everything</button>
         <button class="ghost" onclick="clientPreset('${escAttr(c.name)}', 'none')">No tools</button>
         <button class="ghost" onclick="clientLimits('${escAttr(c.name)}', ${c.rate_per_min || 0})">Limits</button>
+        <button class="ghost" onclick="clientSpendCap('${escAttr(c.name)}', ${c.daily_spend_usd ?? 'null'})">Spend cap</button>
         <button class="ghost" onclick="clientAction('${escAttr(c.name)}', '${c.suspended ? 'resume' : 'suspend'}')">${c.suspended ? 'Resume' : 'Suspend'}</button>
         <button class="ghost" onclick="clientAction('${escAttr(c.name)}', '${c.memory_shared_read === false ? 'shared-read-on' : 'shared-read-off'}')">${c.memory_shared_read === false ? 'Allow shared memory reads' : 'Stop shared memory reads'}</button>
         <button class="ghost" onclick="rotateClient('${escAttr(c.name)}')">New token</button>
@@ -3812,6 +4559,16 @@ async function clientLimits(name, rate) {
   const e = prompt(`Expire ${name} in how many days? (blank = never)`, '');
   if (e === null) return;
   try { await apiCall('POST', `/api/clients/${encodeURIComponent(name)}/limits`, { rate_per_min: parseInt(r, 10) || null, expires_days: parseInt(e, 10) || null }); loadApi(); }
+  catch (err) { alert(err.message); }
+}
+// A daily dollar cap on the app's paid images and model calls (2026-10-10: one client per shop-app bot). At the cap its
+// paid calls are refused (SPEND_CAP_REACHED); its free and local tools keep working. spend.today shows the numbers.
+async function clientSpendCap(name, cap) {
+  const v = prompt(`Most ${name} may spend a day on paid images and AI models, in US dollars (blank = no cap of its own; the providers' own daily caps still apply):`, cap ?? '');
+  if (v === null) return;
+  const usd = v.trim() === '' ? null : Number(v.replace(/[$£,\s]/g, ''));
+  if (usd !== null && !(usd >= 0)) { alert('Enter a number of dollars, for example 2.50, or leave it blank.'); return; }
+  try { await apiCall('POST', `/api/clients/${encodeURIComponent(name)}/spend-cap`, { usd }); loadApi(); }
   catch (err) { alert(err.message); }
 }
 async function grantTool(name, tool, box) {
@@ -4526,9 +5283,13 @@ async function loadProgress() {
     const metrics = Object.entries(p.metrics || {}).filter(([k]) => k !== 'readiness')
       .map(([k, v]) => `<span>${escapeHtml(k.replace(/_/g, ' '))}: <b>${escapeHtml(v)}</b></span>`).join('');
     const id = escAttr(p.project);
+    const rel = releaseState(p);
+    if (rel && rel.mode === 'live') return shippedRow(p, rel);  // out: this card waits for the next version
     return `<div class="prog-row">
       <div class="prog-title"><b>${escapeHtml(p.title)}</b><span class="hint">${escapeHtml(p.agent || 'an agent')}, ${agoText(p.updated * 1000)}</span></div>
+      ${rel ? relMini(p, rel, outLink) : ''}
       ${facts.length ? `<div class="prog-facts">${facts.join(' · ')}</div>` : ''}
+      ${rel ? '' : repoStats(p.stats) + trafficChart(p.stats)}
       ${p.folder ? `<div class="prog-facts">Made in <code>${escapeHtml(p.folder)}</code></div>` : ''}
       ${progBar('Release', p.percent, `${p.done} of ${p.total} gates`)}
       ${ready && +ready[2] ? progBar('Readiness', Math.round(100 * ready[1] / ready[2]), `${ready[1]} of ${ready[2]} checks`) : ''}
@@ -4541,7 +5302,118 @@ async function loadProgress() {
       <div class="prog-gates" id="progGates-${id}" hidden></div>
     </div>`;
   }).join('');
+  const out = list.filter(p => releaseState(p));
+  const relCard = document.getElementById('relCard');
+  relCard.hidden = !out.length;
+  document.getElementById('relSub').textContent = out.length === 1 ? `${out[0].stats.releases[0].tag} is out` : `${out.length} projects out`;
+  document.getElementById('relFeed').innerHTML = out.map(p => releasedRow(p, p.stats.releases[0], outLink)).join('');
+  list.forEach(p => _relSeen.add(p.project));
   list.filter(p => _progOpen.has(p.project)).forEach(p => showProgGates(p.project, p.updated));  // keep them open
+}
+// The owner, 2026-10-10: "the release progress panel is not 100% even though its released now ... handle the release
+// differently". Released = the repo is public and GitHub has a release whose tag is the reported version. Then the
+// row turns into the launch view; a newer version being prepped shows its progress with the live one beside it.
+const _relSeen = new Set();  // rows already drawn once: their entrance animation plays only the first time
+function releaseState(p) {
+  const s = p.stats;
+  if (!s || s.private || !(s.releases || []).length) return null;
+  const norm = v => String(v || '').trim().replace(/^v/i, '');
+  const shipped = p.version ? s.releases.find(r => norm(r.tag) === norm(p.version)) : s.releases[0];
+  return shipped ? { mode: 'live', rel: shipped } : { mode: 'next', rel: s.releases[0] };
+}
+function relDate(iso) {
+  const t = Date.parse(iso || '');
+  return isNaN(t) ? null : { day: new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }), ago: agoText(t) };
+}
+function relMini(p, rel, outLink) {
+  const d = relDate(rel.rel.published);
+  const url = p.repo_url ? `${p.repo_url}/releases/tag/${encodeURIComponent(rel.rel.tag)}` : '';
+  return `<div class="rel-mini"><i></i><b>${escapeHtml(rel.rel.tag)}</b> is live${d ? ` since ${escapeHtml(d.day)}` : ''}${url ? ' · ' + outLink(url, 'release notes') : ''}
+    <span class="hint">· this card now follows ${escapeHtml(p.version || 'the next version')}</span></div>`;
+}
+// Release progress, once its version is out: nothing in progress until the next one starts (the owner's reset)
+function shippedRow(p, rel) {
+  const id = escAttr(p.project), tag = rel.rel.tag;
+  const m = /^(v?)(\d+)\.(\d+)\.(\d+)/.exec(tag || '');
+  const next = m ? `${m[1]}${m[2]}.${m[3]}.${+m[4] + 1}` : '';
+  return `<div class="prog-row rel-done">
+    <div class="prog-title"><b>${escapeHtml(p.title)}</b><span class="hint">${escapeHtml(p.agent || 'an agent')}, ${agoText(p.updated * 1000)}</span></div>
+    <div class="rel-mini"><i></i><b>${escapeHtml(tag)}</b> is out<span class="hint">· shipped with ${p.done} of ${p.total} gates · it's in Released below</span></div>
+    <div class="hint">Nothing in progress. Start the next release to track it here: it clears the old gates and waiting
+      items, and the agent prepping it reports the new ones.</div>
+    <form class="rel-next" onsubmit="event.preventDefault(); startNextRelease('${id}', this)">
+      <input name="v" value="${escAttr(next)}" placeholder="Next version, e.g. v0.1.1" aria-label="Next version" maxlength="40">
+      <button type="submit">Start the next release</button><span class="set-msg"></span></form>
+  </div>`;
+}
+async function startNextRelease(project, form) {
+  const msg = form.querySelector('.set-msg'), btn = form.querySelector('button');
+  btn.disabled = true;
+  try { await apiCall('POST', `/api/progress/${encodeURIComponent(project)}/next`, { version: form.v.value.trim() }); loadProgress(); }
+  catch (e) { msg.className = 'set-msg bad'; msg.textContent = e.message; btn.disabled = false; }
+}
+function releasedRow(p, r, outLink) {
+  const s = p.stats, d = relDate(r.published), id = escAttr(p.project);
+  const enter = _relSeen.has(p.project) ? '' : ' enter';
+  const relUrl = p.repo_url ? `${p.repo_url}/releases/tag/${encodeURIComponent(r.tag)}` : '';
+  const chips = [
+    p.repo_url && [p.repo_url, 'GitHub', p.repo],
+    relUrl && [relUrl, 'Release', `${r.tag} · ${Number(r.downloads || 0).toLocaleString()} downloads`],
+    s.pypi && [s.pypi.url, 'PyPI', `${s.pypi.package} ${s.pypi.version || ''}`],
+  ].filter(Boolean).map(([url, k, v]) => /^https:\/\//.test(url)
+    ? `<a class="rel-chip" href="${escAttr(url)}" target="_blank" rel="noopener noreferrer"><span>${k}</span>${escapeHtml(v)}<em aria-hidden="true">↗</em></a>` : '').join('');
+  const older = (s.releases || []).slice(1);
+  return `<div class="prog-row rel-row${enter}">
+    <div class="rel-hero">
+      <div class="rel-ring" aria-hidden="true">
+        <svg viewBox="0 0 120 120"><defs><linearGradient id="relg-${id}" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="var(--ok)"/><stop offset="1" stop-color="var(--accent)"/></linearGradient></defs>
+          <circle class="track" cx="60" cy="60" r="52"/><circle class="arc" cx="60" cy="60" r="52" pathLength="100" stroke="url(#relg-${id})"/></svg>
+        <div class="rel-core"><b>${escapeHtml(r.tag)}</b><span>Live</span></div>
+      </div>
+      <div class="rel-info">
+        <div class="rel-badge"><i></i>Released</div>
+        <div class="rel-name">${escapeHtml(p.title)}</div>
+        <div class="hint">${d ? `Published ${escapeHtml(d.day)} · ${escapeHtml(d.ago)}` : 'Published'}${p.licence ? ' · ' + escapeHtml(p.licence) : ''}</div>
+        <div class="rel-chips">${chips}</div>
+      </div>
+    </div>
+    ${repoStats(s)}${trafficChart(s)}
+    ${older.length ? `<details class="rel-left"><summary>Earlier releases (${older.length})</summary><div class="rel-older">${older.map(o => {
+      const od = relDate(o.published);
+      return `<div><b>${escapeHtml(o.tag)}</b><span class="hint">${od ? escapeHtml(od.day) : ''}</span><span>${Number(o.downloads || 0).toLocaleString()} downloads</span></div>`;
+    }).join('')}</div></details>` : ''}
+  </div>`;
+}
+// Views and clones a day for the last 14 days: a small area chart, drawn from repo.stats' kept history
+function trafficChart(s) {
+  const days = (s && s.traffic && s.traffic.daily) || [];
+  if (days.length < 2) return '';
+  const W = 280, H = 56, max = Math.max(1, ...days.map(x => Math.max(x.views, x.clones)));
+  const pts = k => days.map((x, i) => [(i / (days.length - 1)) * W, H - 4 - (x[k] / max) * (H - 10)]);
+  const line = ps => ps.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`).join('');
+  const v = pts('views'), c = pts('clones');
+  const quiet = days.every(x => !x.views && !x.clones);
+  return `<div class="rel-chart"><div class="rel-chart-head"><span><i class="v"></i>Views</span><span><i class="c"></i>Clones</span>
+      <span class="hint">last ${days.length} days${quiet ? ' · none yet (GitHub counts a few hours late)' : ''}</span></div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Views and clones a day, last ${days.length} days">
+      <path class="area" d="${line(v)}L${W},${H}L0,${H}Z"/><path class="lv" d="${line(v)}"/><path class="lc" d="${line(c)}"/></svg></div>`;
+}
+// The owner, 2026-10-10: "stats on my dash from my github link" (repo.stats): GitHub, PyPI, and traffic with a token
+function repoStats(s) {
+  if (!s) return '';
+  const n = v => v == null ? '–' : Number(v).toLocaleString();
+  const t = s.traffic, py = s.pypi;
+  const since = t && !isNaN(Date.parse(t.since)) ? new Date(t.since).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
+  const tiles = [['Stars', n(s.stars), s.stars_week ? `+${s.stars_week} this week` : ''], ['Forks', n(s.forks), ''],
+    ['Release downloads', n(s.release_downloads), (s.releases || [])[0] ? `${n(s.releases[0].downloads)} on ${s.releases[0].tag}` : ''],
+    py ? ['PyPI downloads', py.week != null ? n(py.week) : '–', py.week != null ? `this week · ${n(py.month)} this month` : 'no figures yet'] : null,
+    t ? ['Views', n(t.views_14d), `14 days · ${n(t.views_total)} since ${since}`] : null,
+    t ? ['Clones', n(t.clones_14d), `14 days · ${n(t.clones_total)} since ${since}`] : null,
+    ['Watching', n(s.watchers), `${n(s.open_issues)} open issues`]].filter(Boolean);
+  const refs = t && (t.referrers || []).length ? `<div class="hint">Visitors came from: ${t.referrers.map(r => `${escapeHtml(r.from)} (${n(r.views)})`).join(', ')}</div>` : '';
+  return `<div class="repo-stats">${tiles.map(([k, v, sub]) => `<div><span>${k}</span><b>${v}</b>${sub ? `<small>${escapeHtml(sub)}</small>` : ''}</div>`).join('')}</div>
+    ${refs}${s.traffic_note ? `<div class="hint">Views and clones: ${escapeHtml(s.traffic_note)}.</div>` : ''}`;
 }
 // "Show the gates": every gate with its state and evidence, fetched when opened, again only after a new report
 function toggleProgGates(project, updated) {
@@ -5088,6 +5960,7 @@ const SET_INTRO = {
   'Rules and monitoring': "Rules keep Claude using your own machines first. Choose how strictly they're enforced.",
   'AI models': 'How the local AI chooses between your own model and cloud models.',
   'Notifications': 'Alerts sent to your phone through ntfy.',
+  'Proxmox alarms': "Your phone hears once when something on the Proxmox cluster crosses a line below, and once when it's back to normal. The Proxmox tab shows the same alarms.",
   'API access': 'Defaults for apps and projects that use HomeShed.',
   'Image generation': "Which image providers and models Claude may use. Your PC's own models are free; every paid provider is off until you switch it on, give it a daily cap and add its key under Keys and passwords. Licences: image.providers.list.",
   'Language models': "Let apps (such as a shop agent) use a paid model such as Grok through HomeShed, so they never hold the key. Off until you switch a provider on and give it a daily cap; spend per app: llm.providers.list.",
@@ -5096,6 +5969,7 @@ const SET_INTRO = {
   'Printify': "Let apps read your Printify account, make drafts, publish and update products. Publishing and live changes wait for your approval, unless an app is trusted under Approvals.",
   'Approvals': "Where your approval comes from. By default every publish and live change waits for you in the approvals bar.",
   'Threads': "Let apps post to the Threads account you connect here. Every post is public.",
+  'Pinterest': "Let apps ask to pin to the Pinterest account you connect here. Every pin and board waits for your yes in the approvals bar.",
   'Capabilities': 'Switch whole groups of tools on or off. A switched-off tool answers with a clear message instead of running.',
   'Sharing': 'What people with a view-only login can see, and the address they use.',
   'Control Panel': 'How this Control Panel behaves on your devices.',
@@ -5121,10 +5995,10 @@ const SET_SECTIONS = [
   ['Claude', ['Claude context', 'Claude plan usage', 'Rules and monitoring']],
   ['Agents', ['To-do list']],
   ['AI and tools', ['AI models', 'Language models', 'Capabilities', 'Known bugs', 'APIs you can use']],
-  ['Shops and social', ['Etsy', 'Printify', 'Approvals', 'Threads', 'Online shops']],
+  ['Shops and social', ['Etsy', 'Printify', 'Approvals', 'Threads', 'Pinterest', 'Online shops']],
   ['Images and video', ['Image generation']],
   ['Keys and passwords', ['Credentials']],
-  ['Alerts', ['Notifications']],
+  ['Alerts', ['Notifications', 'Proxmox alarms']],
   ['Account and sharing', ['Pro membership', 'Sharing', 'API access']],
   ['System', ['Control Panel', 'Connections', 'Storage on your PC']],
 ];
@@ -5132,10 +6006,10 @@ const SET_LABEL = { 'Credentials': 'Keys and passwords' };  // shown names
 // Numbers that fine-tune a choice go under "Advanced", so the choices come first; so do the shops' vault entry names.
 const _vaultName = it => /_name$/.test(it.key || '');
 const SET_ADVANCED = { 'Rules and monitoring': it => it.type === 'int', 'Etsy': _vaultName, 'Printify': _vaultName,
-  'Threads': _vaultName, 'Online shops': _vaultName };
+  'Threads': _vaultName, 'Pinterest': _vaultName, 'Online shops': _vaultName };
 // The tool server sends one "Online shops" group; the page splits it into a card per service (first match wins).
 const SHOP_CARDS = [['Approvals', k => k.startsWith('approvals_')], ['Printify', k => k.includes('printify')],
-  ['Threads', k => k.includes('threads')], ['Etsy', k => k.includes('etsy')]];
+  ['Threads', k => k.includes('threads')], ['Pinterest', k => k.includes('pinterest')], ['Etsy', k => k.includes('etsy')]];
 function splitGroup(groups, from, cards) {
   const items = groups[from];
   if (!items) return;
@@ -5246,6 +6120,7 @@ async function loadSettings() {
   loadApiCatalog();
   loadEtsyConnect();
   loadThreadsConnect();
+  loadPinterestConnect();
 }
 let _setCat = null;
 
@@ -5350,6 +6225,69 @@ async function finishThreadsConnect(btn) {
     const msg = `Threads connected${d.username ? ` as @${d.username}` : ''}.`;
     await loadThreadsConnect();
     document.getElementById('threadsNote').textContent = msg;
+    loadCredentials();
+  } catch (e) { note.textContent = e.message; btn.disabled = false; }
+}
+// Connect Pinterest (the owner's decision, 2026-10-10): the Threads card's steps. Trial access (sandbox) and Standard
+// access each have their own sign-in, so the card says which one a Connect makes.
+async function loadPinterestConnect() {
+  const rows = document.getElementById('set-pinterest-rows');
+  if (!rows || _viewer) return;
+  let box = document.getElementById('pinterestConnect');
+  if (!box) {
+    box = document.createElement('div'); box.id = 'pinterestConnect'; box.className = 'etsy-connect';
+    rows.insertBefore(box, rows.querySelector(':scope > details.set-adv'));
+  }
+  let d;
+  try { d = await apiCall('GET', '/api/pinterest'); }
+  catch (e) { box.innerHTML = `<p class="hint">Connect Pinterest: ${escapeHtml(e.message)}</p>`; return; }
+  const own = location.protocol === 'https:' ? `${location.origin}/api/pinterest/callback` : '';
+  let saved = ''; try { saved = localStorage.getItem('cp-pinterest-return') || ''; } catch (e) { /* not kept */ }
+  const missing = ['app_id', 'app_secret'].filter(k => !d.have[k]).map(k => d.names[k]);
+  const env = d.sandbox ? 'Trial access (sandbox: only you see the pins)' : 'Standard access (pins are public)';
+  box.classList.toggle('on', !!d.connected);
+  box.innerHTML = `<div class="panel-title" style="margin-top:14px">Connect Pinterest ${d.connected ? '<span class="etsy-on">● Connected</span>' : ''}</div>
+    ${missing.length ? `<p class="hint">First make a free Pinterest business account and an app at developers.pinterest.com (My apps), then save the app's ID and secret key under Credentials: ${missing.map(escapeHtml).join(' and ')}.</p>` : `
+    <p class="hint">Now: ${escapeHtml(env)}. ${d.connected ? (d.enabled ? 'Apps can ask to pin; each pin waits for your yes.' : 'Connected. Pinning stays off until you switch on "Let apps ask to pin to Pinterest" above.') + ' The connection renews itself.' : (d.connected_other_env ? 'Connected for the other kind of access only: press Connect Pinterest for this one.' : 'Sign in on Pinterest once; HomeShed keeps the connection.')}</p>
+    <ol class="hint etsy-steps">
+      <li>In your Pinterest app's settings, add this as a redirect URI (exactly):
+        <div class="msg-cmd"><code id="pinterestReturnShow">${escapeHtml(own || saved || 'type an https address below')}</code><button type="button" class="ghost" onclick="navigator.clipboard.writeText(document.getElementById('pinterestReturn').value)">Copy</button></div>
+        ${own ? '' : '<span>This panel isn\'t on https, so Pinterest can\'t come back to it. Use any https address you own; you\'ll paste the address Pinterest sends you to below.</span>'}
+        <input id="pinterestReturn" type="url" value="${escAttr(own || saved)}" placeholder="https://…" aria-label="Return address"
+          oninput="document.getElementById('pinterestReturnShow').textContent = this.value; try { localStorage.setItem('cp-pinterest-return', this.value); } catch (e) {}"${own ? ' hidden' : ''}></li>
+      <li><button type="button" onclick="startPinterestConnect(this)">${d.connected ? 'Connect again' : 'Connect Pinterest'}</button> opens Pinterest's sign-in in a new tab.</li>
+      ${own ? '' : `<li>After you allow it, paste the address Pinterest sent you to:
+        <span style="display:flex;gap:6px;margin-top:4px"><input id="pinterestPasted" type="url" placeholder="https://…?code=…&state=…" aria-label="Address Pinterest sent you to" style="flex:1">
+        <button type="button" onclick="finishPinterestConnect(this)">Finish</button></span></li>`}
+    </ol>`}
+    <p class="hint" id="pinterestNote"></p>`;
+  const q = new URLSearchParams(location.hash.split('?')[1] || '');
+  if (q.get('pinterest')) {
+    document.getElementById('pinterestNote').textContent = q.get('pinterest') === 'ok'
+      ? `Pinterest connected${q.get('account') ? ` as ${q.get('account')}` : ''}.` : `Pinterest didn't connect: ${q.get('why') || 'unknown reason'}`;
+    showSetCat('Shops and social');
+    box.scrollIntoView({ block: 'center' });
+  }
+}
+async function startPinterestConnect(btn) {
+  const note = document.getElementById('pinterestNote'), ret = document.getElementById('pinterestReturn').value.trim();
+  btn.disabled = true;
+  try {
+    const d = await apiCall('POST', '/api/pinterest/connect', { redirect_uri: ret });
+    window.open(d.url, '_blank', 'noopener');
+    note.textContent = 'Pinterest opened in a new tab. Allow access there (within 10 minutes).';
+  } catch (e) { note.textContent = e.message; }
+  btn.disabled = false;
+}
+async function finishPinterestConnect(btn) {
+  const note = document.getElementById('pinterestNote'), url = document.getElementById('pinterestPasted').value.trim();
+  if (!url) { document.getElementById('pinterestPasted').focus(); return; }
+  btn.disabled = true;
+  try {
+    const d = await apiCall('POST', '/api/pinterest/finish', { url });
+    const msg = `Pinterest connected${d.username ? ` as ${d.username}` : ''}.`;
+    await loadPinterestConnect();
+    document.getElementById('pinterestNote').textContent = msg;
     loadCredentials();
   } catch (e) { note.textContent = e.message; btn.disabled = false; }
 }
@@ -5684,6 +6622,7 @@ async function saveCred(form) {
   await loadCredentials();
   loadEtsyConnect();  // the owner: the Connect button appeared only after a page refresh
   loadThreadsConnect();
+  loadPinterestConnect();
   const row = document.querySelector(`#credList .cred-row[data-name="${CSS.escape(name)}"]`);
   if (row) { row.classList.add('flash'); row.scrollIntoView({ block: 'nearest' }); }
 }
@@ -5699,6 +6638,7 @@ async function deleteCred(btn) {
   loadCredentials();
   loadEtsyConnect();
   loadThreadsConnect();
+  loadPinterestConnect();
 }
 // --- HomeShed Pro (branding-and-pro-review.md; facts from .claude/pro-and-paid-plan.md): plan badge, Pro page and
 // Settings > Pro membership. On sale from the first public release (the owner, 2026-10-01: "its live from publish").
@@ -6052,6 +6992,7 @@ async function saveSetting(source, key, el) {
     if (source === 'panel') applyUiSettings();  // refresh speed, animations and viewer pages apply at once
     if (/^commerce_etsy/.test(key)) loadEtsyConnect();  // a renamed Etsy entry shows on the Connect card at once
     if (/^social_threads/.test(key)) loadThreadsConnect();
+    if (/^social_pinterest/.test(key)) loadPinterestConnect();  // a renamed entry or the Trial switch shows at once
   } catch (e) {
     msg.textContent = e.message; msg.className = 'set-msg bad';
     if (el.type === 'checkbox') el.checked = !el.checked;
@@ -6496,8 +7437,9 @@ function renderApprovals() {
   list.innerHTML = _appr.items.map(i => {
     const k = APPROVAL_KINDS[i.kind], when = i.at ? `, ${agoText(new Date(i.at * 1000).toISOString())}` : '';
     return `<div class="appr-item">
-      <p class="hint"><b>${({ update: 'Update on Etsy', etsy: 'Etsy listing details' })[i.action] || k.label}</b>${i.from ? ` from ${escapeHtml(i.from)}` : ''}${when}</p>
+      <p class="hint"><b>${({ update: 'Update on Etsy', etsy: 'Etsy listing details', etsy_shop: 'Etsy shop texts', pinterest_pin: 'Pinterest pin', pinterest_board: 'Pinterest board' })[i.action] || k.label}</b>${i.from ? ` from ${escapeHtml(i.from)}` : ''}${when}</p>
       <div class="appr-text">${escapeHtml(i.title || '')}</div>
+      ${i.detail ? `<details class="appr-detail"><summary>Read the full new text</summary><div class="appr-text" style="white-space:pre-wrap;max-height:40vh;overflow:auto">${escapeHtml(i.detail)}</div></details>` : ''}
       ${(i.images || []).length ? `<div class="appr-imgs">${i.images.map(m => m.thumb
         ? `<a href="${escAttr(m.thumb)}" target="_blank" rel="noopener"><img src="${escAttr(m.thumb)}" alt="${escAttr(m.label)}" title="${escAttr(m.label)}" loading="lazy"></a>`
         : `<span class="hint">${escapeHtml(m.label)}</span>`).join('')}</div>` : ''}

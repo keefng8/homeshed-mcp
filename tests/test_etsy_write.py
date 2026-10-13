@@ -14,7 +14,8 @@ from tools.etsy import write as ew
 
 SHOP = "29235685"
 LISTING = {"listing_id": 4412, "shop_id": int(SHOP), "title": "Retro Frenchie Tee", "state": "active",
-           "taxonomy_id": 449, "materials": ["cotton"], "shipping_profile_id": 111, "production_partner_ids": [7]}
+           "taxonomy_id": 449, "materials": ["cotton"], "shipping_profile_id": 111,
+           "production_partners": [{"production_partner_id": 7, "partner_name": "Print Co", "location": "UK"}]}
 PROPS = {"results": [
     {"property_id": 200, "name": "primary_color", "display_name": "Primary color", "supports_attributes": True,
      "is_multivalued": False, "possible_values": [{"value_id": 1, "name": "Black"}, {"value_id": 2, "name": "White"}]},
@@ -74,6 +75,15 @@ def test_an_update_only_queues_what_differs_and_approval_sets_it(fake):
     assert len(pp.done_today("etsy")) == 1
 
 
+def test_production_partners_compare_with_etsys_listing_field(fake):
+    """Etsy's listing names its partners in "production_partners" (2026-10-09): one already linked isn't re-queued."""
+    state, _, _, _ = fake
+    assert ew.listing_update("4412", production_partner_ids=[7])["pending"] is False
+    state["listing"]["production_partners"] = []  # none linked, as on the live tees
+    out = ew.listing_update("4412", production_partner_ids=[7])
+    assert out["pending"] is True and "production partners: 7" in out["etsy"]
+
+
 @pytest.mark.parametrize("kwargs, match", [
     (dict(properties={"Colour wheel": "Black"}), "isn't an attribute of category 449; it has: Holiday, Primary color"),
     (dict(properties={"Primary color": "Mauve"}), r"isn't one of Etsy's values \(Black, White\)"),
@@ -117,7 +127,9 @@ def test_reapply_queues_the_saved_set(fake):
     assert ew.queue_reapply("9999") is None
 
 
-def test_a_printify_re_publish_queues_the_etsy_details_again(fake, monkeypatch):
+def test_a_printify_price_re_publish_queues_the_etsy_details_again_a_words_one_doesnt(fake, monkeypatch):
+    """The director, 2026-10-09: a title, description or tags publish left every Etsy detail intact (5 listings,
+    checked on Etsy), so only a publish that re-sends variants, images or the delivery template queues them again."""
     from tools.printify import _client as pf
     from tools.printify import update_live as ul
     first = ew.listing_update("4412", properties={"Primary color": "Black"})
@@ -125,13 +137,20 @@ def test_a_printify_re_publish_queues_the_etsy_details_again(fake, monkeypatch):
     live = {"id": "abc123", "title": "Retro Frenchie Tee", "description": "A tee.", "tags": ["dog"],
             "external": {"id": "4412"}, "variants": [{"id": 1, "price": 2199, "cost": 1112, "is_enabled": True}]}
     fake[2].update({pf.SETTING: True, pf.LIVE_UPDATE_SETTING: True})
+    published = []
     monkeypatch.setattr(pf, "shop_id", lambda: "1")
     monkeypatch.setattr(pf, "get", lambda path, params=None: live)
     monkeypatch.setattr(pf, "put", lambda path, body, **kw: {})
-    monkeypatch.setattr(pf, "publish_post", lambda path, body, **kw: {})
-    ask = ul.product_update_live("abc123", title="Retro French Bulldog Tee")
-    assert ask["update"].endswith("its Etsy details are queued again after")
-    res = pp.decide(ask["id"], True)
+    monkeypatch.setattr(pf, "publish_post", lambda path, body, **kw: published.append(body) or {})
+    words = ul.product_update_live("abc123", title="Retro French Bulldog Tee", tags=["dog", "frenchie"])
+    assert "queued again" not in words["update"]
+    res = pp.decide(words["id"], True)
+    assert "etsy_reapply" not in res and "reapply_etsy" not in res["result"] and pp.list_pending() == []
+    assert published[-1]["title"] and not published[-1]["variants"] and not published[-1]["images"]
+    live["title"], live["tags"] = "Retro French Bulldog Tee", ["dog", "frenchie"]  # as Printify has it now
+    price = ul.product_update_live("abc123", variants=[{"id": 1, "price_pence": 2299}])
+    assert price["update"].endswith("its Etsy details are queued again after")
+    res = pp.decide(price["id"], True)
     assert res["etsy_reapply"]["pending"] is True and "Re-apply" in pp.list_pending()[0]["summary"]
 
 
@@ -208,8 +227,12 @@ def test_a_changed_photo_is_refused_and_a_retry_never_uploads_twice(photos):
         pp.decide(item["id"], True)
     assert len(writes) == 2  # the first went up, the second failed
     state["fail_on"] = None
-    pp.decide(item["id"], True)
+    res = pp.decide(item["id"], True)["result"]
     assert [w[3]["image"][0] for w in writes] == ["krc-staffy-artwork-2400.png", "size-guide.png", "size-guide.png"]
+    # every photo's outcome by name (the shop app read "done" for a request that had no photos at all)
+    assert (res["photos_asked"], res["photos_landed"], res["photos"]) == (2, 2, 1)
+    assert [(r["image"], r["uploaded"]) for r in res["photo_results"]] == [
+        ("listing/krc-staffy-artwork-2400.png", "earlier"), ("listing/size-guide.png", "now")]
     ew.listing_update("4412", images=[{"image": "listing/size-guide.png"}])
     [again] = pp.list_pending()
     store["listing/size-guide.png"] = PNG + b"edited meanwhile"

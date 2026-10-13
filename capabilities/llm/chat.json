@@ -46,6 +46,11 @@
       "type": "string",
       "required": false,
       "default": "xai"
+    },
+    "images": {
+      "type": "array",
+      "required": false,
+      "default": null
     }
   },
   "execution": {

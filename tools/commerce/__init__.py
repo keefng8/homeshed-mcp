@@ -24,6 +24,8 @@ VAULT_NAMES = {
     "commerce_printify_shop_id_name": ("PRINTIFY_SHOP_ID", "Printify shop number"),
     "social_threads_app_id_name": ("THREADS_APP_ID", "Threads app ID"),
     "social_threads_app_secret_name": ("THREADS_APP_SECRET", "Threads app secret"),
+    "social_pinterest_app_id_name": ("PINTEREST_APP_ID", "Pinterest app ID"),
+    "social_pinterest_app_secret_name": ("PINTEREST_APP_SECRET", "Pinterest app secret key"),
 }
 
 SETTINGS = {
@@ -39,7 +41,7 @@ SETTINGS = {
         "help": "The etsy.listing.update tool: an app can ASK to set a listing's category, materials, production "
                 "partners, delivery profile and attributes (colour, occasion, recipient, holiday); nothing changes "
                 "until you approve that one in the approvals bar. Title, tags and prices stay with Printify. At most "
-                "ETSY_EDIT_DAILY_MAX a day (default 20). After switching on, press Connect Etsy again once: it then "
+                "ETSY_EDIT_DAILY_MAX a day (default 50). After switching on, press Connect Etsy again once: it then "
                 "asks Etsy for listing edits (listings_w). Off until you switch it on.",
     },
     "commerce_etsy_deactivate_enabled": {
@@ -49,6 +51,15 @@ SETTINGS = {
                 "e.g. for a listing that fails a safety or delivery check), and sends you a push with the reason. At "
                 "most ETSY_DEACTIVATE_DAILY_MAX a day (default 5). Etsy's Shop Manager re-activates it. Needs Connect "
                 "Etsy with listing edits too. Off until you switch it on.",
+    },
+    "commerce_etsy_shop_write_enabled": {
+        "type": "bool", "default": False, "group": "Online shops",
+        "label": "Let apps ask to edit your Etsy shop",
+        "help": "The etsy.shop.update tool: an app can ASK to set your shop title, announcement, the messages buyers "
+                "get after a purchase and your additional policies, and to add shop sections; nothing changes until "
+                "you read the new texts and approve them in the approvals bar. The About section isn't in Etsy's API: "
+                "paste that in Shop Manager. After switching on, press Connect Etsy again once: it then asks Etsy for "
+                "shop edits (shops_w). Off until you switch it on.",
     },
     "commerce_printify_enabled": {
         "type": "bool", "default": False, "group": "Online shops",
@@ -69,7 +80,7 @@ SETTINGS = {
         "label": "Let apps create and edit Printify drafts (unpublished)",
         "help": "printify.product.create uploads a print file and makes an UNPUBLISHED product in your Printify shop, "
                 "so you see Printify's mockups (at most PRINTIFY_DAILY_MAX a day, default 20). printify.product.update "
-                "edits a draft's title, description, tags, prices and SKUs, never a published one and never under the 30% "
+                "edits a draft's title, description, tags, prices and SKUs, never a published one and never under the margin floor (20%, hoodies 15%) "
                 "margin floor, keeping the old values (at most 50 edits a day). Nothing reaches your shop's buyers. "
                 "Needs the read switch above too. Off until you switch it on.",
     },
@@ -78,7 +89,7 @@ SETTINGS = {
         "label": "Let apps ask to publish Printify products to your shop",
         "help": "The printify.product.publish tool: an app can ASK to publish a draft; nothing goes live until you "
                 "approve that one in the approvals bar. It then appears on your Etsy shop, where buyers see it and "
-                "Etsy charges its listing fee. At most PRINTIFY_PUBLISH_DAILY_MAX a day (default 5). Needs the read "
+                "Etsy charges its listing fee. At most PRINTIFY_PUBLISH_DAILY_MAX a day (default 20). Needs the read "
                 "switch above too. Off until you switch it on.",
     },
     "commerce_printify_live_update_enabled": {
@@ -87,15 +98,57 @@ SETTINGS = {
         "help": "The printify.product.update_live tool: an app can ASK to change a published product's title, "
                 "description, tags or prices; nothing changes on your shop until you approve that one in the approvals "
                 "bar. Printify then edits it and re-publishes just those parts to Etsy. SKUs never change on a live "
-                "product (Printify matches Etsy orders by SKU), and no price goes under the 30% margin floor. At most "
+                "product (Printify matches Etsy orders by SKU), and no price goes under the margin floor (20%, hoodies 15%). At most "
                 "PRINTIFY_LIVE_UPDATE_DAILY_MAX a day (default 10). Needs the read switch above too. Off until you "
                 "switch it on.",
+    },
+    "approvals_trusted_clients": {
+        "type": "names", "default": "", "group": "Online shops",
+        "label": "Apps whose own approval counts",
+        "help": "Client names from the API page, separated by commas. When one of these apps sends a publish, a live "
+                "update or an Etsy details edit with your own approval from inside the app (owner_approval), it runs "
+                "at once instead of waiting in the approvals bar. The daily limits stay and each one is logged; your "
+                "phone hears about publishes and anything that couldn't run. An approval only works once, within an "
+                "hour. Anything sent without one still waits here. This trusts the app's word that you approved. "
+                "Empty: no app.",
+    },
+    "approvals_trusted_auto_clients": {
+        "type": "names", "default": "", "group": "Online shops",
+        "label": "Apps whose AUTO mode counts as your approval",
+        "help": "Client names from the API page, separated by commas. While one of these apps runs in AUTO or FULL AUTO, "
+                "its publishes, live updates and Etsy details edits run with no tap from you: the app's own managers "
+                "are in control. The daily limits stay and each one is logged; your phone hears only when something "
+                "is published or couldn't run. An app named here also counts for \"Apps whose own approval counts\". "
+                "This trusts the app's word. Empty: no app.",
+    },
+    "commerce_printify_billing_currency": {
+        "type": "select", "default": "not set", "group": "Online shops",
+        "options": ["not set", "USD", "GBP", "EUR", "AUD", "CAD"],
+        "label": "Your Printify billing currency",
+        "help": "The currency Printify charges you in: on Printify, Wallet > Payment details (USD unless you changed "
+                "it). Printify's product costs are in it, but its API doesn't say which, so printify.product.get "
+                "reports this as cost_currency. Retail prices are in your shop's own currency.",
     },
     "social_threads_enabled": {
         "type": "bool", "default": False, "group": "Online shops",
         "label": "Let apps post to Threads",
         "help": "The threads.publish tool: text posts to the Threads account you connect below, at most "
                 "THREADS_DAILY_MAX a day (default 25). Each post is public. Off until you switch it on.",
+    },
+    "social_pinterest_enabled": {
+        "type": "bool", "default": False, "group": "Online shops",
+        "label": "Let apps ask to pin to Pinterest",
+        "help": "The pinterest.* tools: an app can ASK to make a pin (one image, a title, a description that says "
+                "\"AI-assisted design\" when AI helped, and a link to one of your own Etsy listings) or a board; "
+                "nothing is made until you approve that one in the approvals bar. At most PINTEREST_DAILY_MAX pins a "
+                "day (default 5). Off until you switch it on.",
+    },
+    "social_pinterest_sandbox": {
+        "type": "bool", "default": True, "group": "Online shops",
+        "label": "Pinterest: Trial access (pins only you can see)",
+        "help": "A new Pinterest app has Trial access: its pins go to Pinterest's sandbox and only you see them on "
+                "your profile. Switch this off only once Pinterest has given your app Standard access; then press "
+                "Connect Pinterest again (each kind of access has its own sign-in).",
     },
     **{key: {"type": "str", "default": standard, "group": "Online shops",
              "label": f"Vault entry for the {what}",

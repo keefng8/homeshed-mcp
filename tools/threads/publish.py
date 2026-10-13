@@ -139,15 +139,28 @@ def _wait(cid: str, tok: str, limit_s: int = WAIT_S, step_s: float | None = None
         waited += max(step, 1)
 
 
+AI_LINES = {"TEXT": "Made with AI.", "IMAGE": "Image made with AI.", "VIDEO": "Video made with AI."}
+
+
+def ai_line(text: str, kind: str) -> str:
+    """The caption with its AI disclosure (the Director, 2026-10-08: the Threads API has no AI-label field, so the
+    caption says it). Nothing added when the text already says "made with AI"."""
+    if "made with ai" in text.lower():
+        return text
+    return f"{text}\n\n{AI_LINES[kind]}"
+
+
 @tool(name="publish", category="threads", doc="threads/publish.md")
-def publish(text: str, link: str = "", image_names: list[str] | None = None, alt_text: str = "",
+def publish(text: str, ai_generated: bool, link: str = "", image_names: list[str] | None = None, alt_text: str = "",
             topic_tag: str = "", video_name: str = "") -> dict:
     """Post to the owner's connected Threads account: text, one image, or a carousel. PUBLIC, and can't be unposted
     from here: only call it for a post that has been approved for publishing. Off until the owner switches "Let apps
     post to Threads" on.
 
     Args:
-        text: the post, 1-500 characters.
+        text: the post, 1-500 characters (with the AI line when ai_generated).
+        ai_generated: required. True when any of it was made by AI (image, video, voice or text): a last line
+            "Image made with AI." / "Video made with AI." / "Made with AI." is added (Threads has no AI-label field).
         link: an optional https:// link shown as a preview card (text posts only; Threads ignores it with images).
         image_names: images by their saved_as name (image.generate / image.status): 1 = an image post, 2-10 = a
             carousel. Local images go as a JPEG up to 1440 px; paid ones as they are (JPEG or PNG, 320-1440 px wide,
@@ -159,14 +172,23 @@ def publish(text: str, link: str = "", image_names: list[str] | None = None, alt
             no "." or "&" (Meta's rules); a leading # is dropped. Keeps the text free of #tags.
 
     Returns:
-        {"posted": true, "id", "permalink", "media_type", "posted_today", "daily_max"}.
+        {"posted": true, "id", "permalink", "media_type", "posted_today", "daily_max", "ai_generated", "ai_line"}.
     """
     h.require(th.SETTING, "Threads posting")
+    if not isinstance(ai_generated, bool):
+        raise h.CommerceError("ai_generated is required: true when any of the post was made by AI, else false")
     text = (text or "").strip()
     if not text:
         raise h.CommerceError("the post is empty")
+    added, kind_of = False, ""
+    if ai_generated:
+        kind_of = "VIDEO" if (video_name or "").strip() else "IMAGE" if any(str(n).strip() for n in image_names or []) else "TEXT"
+        with_line = ai_line(text, kind_of)
+        added, text = with_line != text, with_line
     if len(text.encode("utf-8")) > MAX_CHARS:  # Meta counts emoji by their UTF-8 bytes
-        raise h.CommerceError(f"the post is over {MAX_CHARS} characters (emoji count as several)")
+        over = len(text.encode("utf-8")) - MAX_CHARS
+        raise h.CommerceError(f"the post is over {MAX_CHARS} characters by {over} (emoji count as several"
+                              + ("; that includes the AI line" if added else "") + ")")
     link = (link or "").strip()
     if link and (not link.startswith("https://") or len(link) > 500 or any(c.isspace() for c in link)):
         raise h.CommerceError("link must be a single https:// address")
@@ -228,7 +250,8 @@ def publish(text: str, link: str = "", image_names: list[str] | None = None, alt
                                                  secrets=(tok,), data={"creation_id": cid, "access_token": tok})).get("id")
             if not pid:
                 raise h.CommerceError("Threads didn't publish the post")
-            _record({"at": time.time(), "id": str(pid), "by": who, "media_type": kind, **top})
+            _record({"at": time.time(), "id": str(pid), "by": who, "media_type": kind, "ai_generated": ai_generated,
+                     **top})
         finally:
             if staged:
                 import r2
@@ -246,9 +269,12 @@ def publish(text: str, link: str = "", image_names: list[str] | None = None, alt
                                                   params={"fields": "topic_tag", "access_token": tok})).get("topic_tag")
         except h.CommerceError:
             seen = None
-    clients._audit("threads post", None if who == "owner" else who, post=str(pid), **({"topic_tag": tag} if tag else {}))
+    clients._audit("threads post", None if who == "owner" else who, post=str(pid), ai_generated=ai_generated,
+                   **({"topic_tag": tag} if tag else {}))
     return {"posted": True, "id": str(pid), "permalink": link_out, "media_type": kind, "posted_today": today + 1,
-            "daily_max": _daily_max(), **({"topic_tag": tag, "topic_tag_on_post": seen} if tag else {})}
+            "daily_max": _daily_max(), "ai_generated": ai_generated,
+            "ai_line": AI_LINES[kind_of] if added else None,
+            **({"topic_tag": tag, "topic_tag_on_post": seen} if tag else {})}
 
 
 INSIGHT_METRICS = ("views", "likes", "replies", "reposts", "quotes", "shares")

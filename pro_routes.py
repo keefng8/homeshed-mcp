@@ -64,6 +64,18 @@ async def bugs_sync_route(request: Request) -> JSONResponse:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
 
+async def tools_route(request: Request) -> JSONResponse:
+    """GET: the Pro tools package installed here and whether it loaded. POST: download and unpack the latest one
+    (pro_plugin.update); it loads at the next restart."""
+    import pro_plugin
+    if request.method == "GET":
+        return JSONResponse({"installed": pro_plugin.installed(), "loaded": pro_plugin.load()})
+    try:
+        return JSONResponse(await asyncio.to_thread(pro_plugin.update))
+    except pro_plugin.ProPluginError as exc:  # it says what to do, and never contains the key
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
 ROUTES = [
     ("/pro", ["GET"], status_route),
     ("/pro/connect", ["POST"], connect_route),
@@ -71,6 +83,7 @@ ROUTES = [
     ("/pro/packs", ["GET"], packs_route),
     ("/pro/packs/{slug}", ["GET"], pack_route),
     ("/pro/bugs/sync", ["POST"], bugs_sync_route),
+    ("/pro/tools", ["GET", "POST"], tools_route),
 ]
 
 

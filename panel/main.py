@@ -143,6 +143,10 @@ PANEL_SCHEMA = {
                      "label": "Stay signed in for (days)",
                      "help": "How long a login lasts before the password is asked for again. "
                              "Ticking 'remember me' keeps it for 30 days."},
+    "terminal_enabled": {"type": "bool", "default": False, "group": "Control Panel",
+                         "label": "Terminal",
+                         "help": "SSH in the browser to the machines on your network (the Terminal tab). Owner only; "
+                                 "from outside your home network it asks for your password again."},
     "client_default_rate": {"type": "int", "min": 1, "max": 100000, "default": 120, "group": "API access",
                             "label": "Calls per minute for a new client",
                             "help": "The limit filled in when you add an app or project on the API access page. "
@@ -1019,6 +1023,14 @@ async def _poll_local_ai_once(client: httpx.AsyncClient) -> None:
                 sample["requests_processing"] = None
                 sample["requests_deferred"] = None
                 sample["requests_total"] = None
+                if server["type"] == "images":  # a paid image provider: images today against its daily cap
+                    stats = resp.json()
+                    sample.update(online=bool(stats.get("enabled")), requests_total=stats.get("used_today"),
+                                  cap=stats.get("daily_cap"), cost_today_usd=stats.get("cost_today_usd"))
+                    hist = _local_ai_history[server["name"]]
+                    hist.append(sample)
+                    del hist[: len(hist) - LOCAL_AI_HISTORY_LEN]
+                    continue
                 if server["type"] == "decider":  # a decision server: counts decisions, not tokens
                     stats = resp.json()
                     sample["online"] = stats.get("status") == "ok"
@@ -1493,8 +1505,11 @@ async def local_ai_usage():
                 "delta_tokens_window": delta_tokens,
                 "window_seconds": (latest["timestamp"] - first_online["timestamp"]) if first_online else 0,
                 "avg_ms": latest.get("avg_ms"),
-                # A decision server counts decisions, the others tokens: each sparkline follows its own counter.
-                "sparkline": [s.get("requests_total" if server["type"] == "decider" else "total_tokens")
+                **({"cap": latest.get("cap"), "cost_today_usd": latest.get("cost_today_usd")}
+                   if server["type"] == "images" else {}),
+                **({"hidden": True} if server.get("hidden") else {}),  # polled for status, not shown as a tile
+                # Decisions or images are counted, the others tokens: each sparkline follows its own counter.
+                "sparkline": [s.get("requests_total" if server["type"] in ("decider", "images") else "total_tokens")
                               for s in hist if s.get("online")],
             }
         )
@@ -2285,7 +2300,8 @@ async def tools_switch(tool_id: str, action: str):
 
 _CLIENT_NAME = re.compile(r"[a-z][a-z0-9-]{1,31}")
 _CLIENT_ACTIONS = {"rotate", "suspend", "resume", "limits", "preset-none", "preset-read", "preset-all",
-                   "shared-read-on", "shared-read-off"}  # reading the shared memory, per app (2026-10-01)
+                   "shared-read-on", "shared-read-off",  # reading the shared memory, per app (2026-10-01)
+                   "spend-cap"}  # a daily dollar cap on paid images and models, per app (2026-10-10)
 
 
 MCP_UNREACHABLE = "mcp-server unreachable"
@@ -2303,6 +2319,30 @@ async def _mcp_admin(method: str, path: str, body: dict | None = None, timeout: 
 @app.get("/api/clients")
 async def clients_list():
     return await _mcp_admin("GET", "/clients")
+
+
+# The Proxmox tab (the owner, 2026-10-09: "Monitoring my proxmox clusters ... with alarms"): the tool server's
+# proxmox_monitor reads the cluster; this page only shows it. Owner only (not in VIEWER_ROUTES). The first look after a
+# restart asks every VM's guest agent, so it may take a while.
+@app.get("/api/proxmox/monitor")
+async def proxmox_monitor():
+    resp = await _mcp_admin("GET", "/proxmox/monitor", timeout=45)
+    if resp.status_code != 200:
+        return resp
+    data = json.loads(resp.body)
+    try:  # real memory use from inside each VM that's saved in the Terminal tab (terminal.real_memory)
+        import terminal
+        await terminal.real_memory(data.get("guests") or [])
+    except Exception:  # noqa: BLE001 - no figure from inside: the tab shows Proxmox's own
+        _log.exception("real VM memory")
+    return data
+
+
+@app.get("/api/proxmox/history")
+async def proxmox_history(kind: str = "node", node: str = "", vmid: str = "", timeframe: str = "hour"):
+    from urllib.parse import urlencode
+    q = urlencode({k: v[:64] for k, v in {"kind": kind, "node": node, "vmid": vmid, "timeframe": timeframe}.items() if v})
+    return await _mcp_admin("GET", f"/proxmox/monitor/history?{q}", timeout=20)
 
 
 # --- Credentials (the owner, 2026-09-29: "Any ssh, any credentials to access anything, should be available in the control
@@ -2446,6 +2486,13 @@ async def release_progress():
         for r in rows:
             if folders.get(r.get("workspace")):
                 r["folder"] = folders[r["workspace"]]
+    # the owner, 2026-10-10: "can we get stats on my dash from my github link?" (repo.stats, cached 30 min there)
+    with_repo = [r for r in rows or [] if r.get("repo")]
+    got = await asyncio.gather(*(_mcp_call_tool("repo.stats", {"repo": r["repo"]}, quiet=True) for r in with_repo),
+                               return_exceptions=True)
+    for r, s in zip(with_repo, got):
+        if isinstance(s, dict):
+            r["stats"] = s
     return data
 
 
@@ -2457,6 +2504,26 @@ async def _project_folders() -> dict:
         return {}
     return {r["name"]: r["path"] for r in got.get("projects") or []
             if status == 200 and isinstance(r, dict) and r.get("name") and r.get("path")}
+
+
+@app.post("/api/progress/{project}/next")
+async def release_progress_next(project: str, request: Request):
+    """The owner, 2026-10-10: once a version is out, the Release progress card "can be reset for another release". Sets
+    the next version and clears the shipped release's gates and waiting items; the agent prepping it reports the new
+    gates. The shipped release itself lives on in the Released card (from GitHub, not from this record)."""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,39}", project):
+        return JSONResponse({"error": "no such project"}, status_code=404)
+    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    version = str((body or {}).get("version") or "").strip()
+    if not re.fullmatch(r"v?\d+(?:\.\d+){1,3}(?:[-+.][A-Za-z0-9.]{1,20})?", version):
+        return JSONResponse({"error": "Give the next version, like v0.1.1."}, status_code=400)
+    try:
+        return await _mcp_call_tool("repo.progress_update", {
+            "project": project, "version": version, "steps": [], "waiting_on_owner": [],
+            "next_step": f"Prep {version}: the agent reports its gates", "note": f"started {version} from the panel"},
+            quiet=True)
+    except RuntimeError as exc:
+        return JSONResponse({"error": _tool_message(exc)}, status_code=502)
 
 
 @app.get("/api/progress/{project}")
@@ -2584,6 +2651,9 @@ async def clients_action(name: str, action: str, request: Request):
     if action == "limits":
         raw = await request.json()
         body = {"rate_per_min": raw.get("rate_per_min"), "expires_days": raw.get("expires_days")}
+    elif action == "spend-cap":
+        raw = await request.json()
+        body = {"usd": raw.get("usd")}
     return await _mcp_admin("POST", f"/clients/{name}/{action}", body)
 
 
@@ -2824,6 +2894,41 @@ async def threads_callback(code: str = "", state: str = "", error: str = "", err
     return RedirectResponse(f"/#settings?threads=failed&why={quote(str(data.get('error') or 'unknown')[:200])}", status_code=303)
 
 
+# Connect Pinterest (the owner's decision, 2026-10-10), the same relay as Connect Threads. Owner only.
+@app.get("/api/pinterest")
+async def pinterest_status():
+    return await _mcp_admin("GET", "/pinterest/connect")
+
+
+@app.post("/api/pinterest/connect")
+async def pinterest_connect(request: Request):
+    body = await _json_body(request)
+    return await _mcp_admin("POST", "/pinterest/connect", {"redirect_uri": str((body or {}).get("redirect_uri") or "")[:300]})
+
+
+@app.post("/api/pinterest/finish")
+async def pinterest_finish(request: Request):
+    body = await _json_body(request)
+    return await _mcp_admin("POST", "/pinterest/finish", {"url": str((body or {}).get("url") or "")[:2000]})
+
+
+@app.get("/api/pinterest/callback")
+async def pinterest_callback(code: str = "", state: str = "", error: str = "", error_description: str = ""):
+    """Where Pinterest sends the browser back (the panel on https)."""
+    from urllib.parse import quote
+    if error or not code:
+        why = error_description or error or "Pinterest sent no code"
+        return RedirectResponse(f"/#settings?pinterest=failed&why={quote(why[:200])}", status_code=303)
+    resp = await _mcp_admin("POST", "/pinterest/finish", {"code": code[:600], "state": state[:200]})
+    try:
+        data = json.loads(resp.body)
+    except (ValueError, AttributeError):
+        data = {}
+    if resp.status_code == 200:
+        return RedirectResponse(f"/#settings?pinterest=ok&account={quote(str(data.get('username') or '')[:60])}", status_code=303)
+    return RedirectResponse(f"/#settings?pinterest=failed&why={quote(str(data.get('error') or 'unknown')[:200])}", status_code=303)
+
+
 @app.get("/api/approvals")
 async def approvals():
     """Everything waiting for the owner's yes, in one list for the panel's approvals bar (the owner, 2026-10-06, to-do
@@ -2866,7 +2971,10 @@ async def approvals():
                       **({"images": shown} if shown else {}),
                       "from": i.get("client") or "", "at": i.get("at"),
                       # a live product's update, or an Etsy listing's details, share Printify's approval queue
-                      "action": i.get("action") if i.get("action") in ("update", "etsy") else "publish",
+                      "action": i.get("action") if i.get("action") in ("update", "etsy", "etsy_shop", "pinterest_pin",
+                                                                       "pinterest_board") else "publish",
+                      # the shop's new texts in full (etsy.shop.update): the owner reads them before approving
+                      **({"detail": pay["detail"][:20000]} if isinstance(pay.get("detail"), str) else {}),
                       **({"error": str(i["last_error"])[:300]} if i.get("last_error") else {})})
     items.sort(key=lambda x: -float(x.get("at") or 0))
     return {"items": items, "count": len(items), "unavailable": unavailable}
@@ -3112,6 +3220,9 @@ except ImportError:
     pass
 else:
     private_routes.register(app)
+
+import terminal  # noqa: E402 - the Terminal tab (terminal.py): SSH in the browser, owner only, off by default
+app.include_router(terminal.router)
 
 mimetypes.add_type("application/manifest+json", ".webmanifest")  # the app manifest's own type (not in every OS's table)
 for _type, _ext in (("video/webm", ".webm"), ("video/mp4", ".mp4"), ("image/webp", ".webp")):  # the background art

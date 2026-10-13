@@ -33,6 +33,11 @@ try:  # the shop proxy switches come with the shop tools
     PRIVATE = {**PRIVATE, **{key: spec["default"] for key, spec in _COMMERCE_SETTINGS.items()}}
 except ImportError:
     pass
+try:  # the Proxmox alarms come with the monitor
+    from proxmox_monitor import SETTINGS as _PROXMOX_SETTINGS
+    PRIVATE = {**PRIVATE, **{key: spec["default"] for key, spec in _PROXMOX_SETTINGS.items()}}
+except ImportError:
+    pass
 try:  # the to-do list's app route (off) comes with the to-do tools
     from tools.todo import SETTINGS as _TODO_SETTINGS
     PRIVATE = {**PRIVATE, **{key: spec["default"] for key, spec in _TODO_SETTINGS.items()}}

@@ -429,7 +429,7 @@ async def clients_delete(request: Request) -> JSONResponse:
 
 @mcp.custom_route("/clients/{name}/{action}", methods=["POST"])
 async def clients_action(request: Request) -> JSONResponse:
-    """rotate | suspend | resume | limits (JSON rate_per_min, expires_days) | memory (JSON agent_id, or null: its own,
+    """rotate | suspend | resume | limits (JSON rate_per_min, expires_days) | spend-cap (JSON usd, or null) | memory (JSON agent_id, or null: its own,
     made on first use) | shared-read-on|off (reading the shared memory) | preset-none|read|all."""
     name, action = request.path_params["name"], request.path_params["action"]
     try:
@@ -440,6 +440,9 @@ async def clients_action(request: Request) -> JSONResponse:
         elif action == "limits":
             body = await _body(request)
             clients.set_limits(name, body.get("rate_per_min"), body.get("expires_days"))
+        elif action == "spend-cap":  # JSON usd: dollars a day, or null for no cap of its own
+            body = await _body(request)
+            clients.set_spend_cap(name, body.get("usd"))
         elif action == "memory":
             body = await _body(request)
             clients.set_memory_agent(name, body.get("agent_id"))
@@ -548,6 +551,40 @@ async def threads_finish_route(request: Request) -> JSONResponse:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
 
+@mcp.custom_route("/pinterest/connect", methods=["GET", "POST"])
+async def pinterest_connect_route(request: Request) -> JSONResponse:
+    """Connect Pinterest (tools/pinterest/_client.py), same shape as /threads/connect. Owner only."""
+    from tools.commerce._http import CommerceError
+    from tools.pinterest import _client as pinterest_client
+    try:
+        if request.method == "GET":
+            return JSONResponse(pinterest_client.status())
+        body = await request.json()
+        return JSONResponse(pinterest_client.start(str((body or {}).get("redirect_uri") or "")))
+    except ValueError:
+        return JSONResponse({"error": "send JSON: {\"redirect_uri\": ...}"}, status_code=400)
+    except CommerceError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@mcp.custom_route("/pinterest/finish", methods=["POST"])
+async def pinterest_finish_route(request: Request) -> JSONResponse:
+    from tools.commerce._http import CommerceError
+    from tools.pinterest import _client as pinterest_client
+    try:
+        body = await request.json() or {}
+        if body.get("url"):
+            result = await asyncio.to_thread(pinterest_client.finish_url, str(body["url"]))
+        else:
+            result = await asyncio.to_thread(pinterest_client.finish, str(body.get("code") or ""),
+                                             str(body.get("state") or ""))
+        return JSONResponse(result)
+    except (ValueError, AttributeError):
+        return JSONResponse({"error": "send JSON: {\"code\", \"state\"} or {\"url\"}"}, status_code=400)
+    except CommerceError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
 @mcp.custom_route("/inbox", methods=["GET"])
 async def inbox_list(request: Request) -> JSONResponse:
     """Agents' messages waiting for the owner (owner_inbox.py), for the panel's Messages pill. Owner only, as every
@@ -603,6 +640,38 @@ async def proxmox_pending_decide(request: Request) -> JSONResponse:
         return JSONResponse({"error": str(exc)}, status_code=404)
     except ProxmoxError as exc:  # it stays waiting, with the error
         return JSONResponse({"error": f"not done, still waiting: {exc}"}, status_code=502)
+
+
+@mcp.custom_route("/proxmox/monitor", methods=["GET"])
+async def proxmox_monitor_route(request: Request) -> JSONResponse:
+    """The Control Panel's Proxmox tab (proxmox_monitor.py): nodes, storage, guests and alarms. Owner only, as every
+    custom route. Read-only."""
+    import proxmox_monitor
+    from tools.proxmox._client import ProxmoxError
+    try:
+        return JSONResponse(await asyncio.to_thread(proxmox_monitor.snapshot))
+    except ProxmoxError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=502)
+
+
+@mcp.custom_route("/proxmox/monitor/history", methods=["GET"])
+async def proxmox_monitor_history(request: Request) -> JSONResponse:
+    """?kind=node|qemu|lxc&node=&vmid=&timeframe=hour|day|week|month|year: Proxmox's own graph points. Read-only."""
+    import proxmox_monitor
+    from tools.proxmox._client import ProxmoxError
+    q = request.query_params
+    try:
+        vmid = int(q["vmid"]) if q.get("vmid") else None
+    except ValueError:
+        return JSONResponse({"error": "vmid must be a number"}, status_code=400)
+    kind = q.get("kind") or "node"
+    if kind not in ("node", "qemu", "lxc"):
+        return JSONResponse({"error": "kind must be node, qemu or lxc"}, status_code=400)
+    try:
+        return JSONResponse(await asyncio.to_thread(proxmox_monitor.history, kind, q.get("node") or "", vmid,
+                                                    q.get("timeframe") or "hour"))
+    except ProxmoxError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400 if "must" in str(exc) else 502)
 
 
 @mcp.custom_route("/printify/pending", methods=["GET"])
@@ -995,6 +1064,10 @@ def serve_http(port: int | None = None) -> None:
         signals.start()
     except ImportError:
         pass
+    import proxmox_monitor  # the Proxmox alarms, every minute (nothing without a Proxmox token)
+    proxmox_monitor.start()
+    import printify_pending  # approved requests a daily limit held back run once there's room (every 10 minutes)
+    printify_pending.start()
     # This machine only, unless MCP_BIND says otherwise (release v1, 2026-09-30: it listened on every interface). The
     # Docker image sets MCP_BIND=0.0.0.0 inside the container, and docker-compose.yml publishes the port on 127.0.0.1.
     host = os.environ.get("MCP_BIND") or "127.0.0.1"

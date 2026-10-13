@@ -347,3 +347,41 @@ def test_settings_reject_values_off_the_list():
         rs.validate("llm_daily_cap_xai", "7")
     with pytest.raises(ValueError):
         rs.validate("llm_provider_xai_enabled", "yes")
+
+
+# --- images (2026-10-11: the shop's seat bots look at their training tries) ----------------------------------------
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+
+
+def test_named_images_go_with_the_last_user_message(fake, monkeypatch):
+    on()
+    from tools.image import refs
+    seen = []
+    monkeypatch.setattr(refs, "image_bytes", lambda ref, max_bytes=0: seen.append((ref, max_bytes)) or PNG)
+    out = ask(messages=[{"role": "user", "content": "first"}, {"role": "assistant", "content": "ok"},
+                        {"role": "user", "content": "Rate this try"}], images=["20261010-a.png", "tries/b.png"])
+    assert out["text"] == "Hello from Grok."
+    msgs = fake.body()["input"]
+    assert msgs[0] == {"role": "user", "content": "first"} and msgs[1]["content"] == "ok"
+    parts = msgs[2]["content"]
+    assert parts[0] == {"type": "input_text", "text": "Rate this try"}
+    assert [p["type"] for p in parts[1:]] == ["input_image", "input_image"]
+    assert parts[1]["image_url"].startswith("data:image/png;base64,")
+    assert seen == [("20261010-a.png", lc.MAX_IMAGE_BYTES), ("tries/b.png", lc.MAX_IMAGE_BYTES)]
+
+
+def test_bad_images_are_refused_before_anything_is_counted(fake, monkeypatch):
+    on()
+    from tools.commerce._http import CommerceError
+    from tools.image import refs
+    monkeypatch.setattr(refs, "image_bytes", lambda ref, max_bytes=0: (_ for _ in ()).throw(CommerceError("gone")))
+    for images, why in ((["a.png"] * 5, "at most 4"), ("a.png", "list of image names"), (["x.png"], "gone")):
+        with pytest.raises(prov.LLMError, match=why):
+            ask(images=images)
+    monkeypatch.setattr(refs, "image_bytes", lambda ref, max_bytes=0: b"not an image")
+    with pytest.raises(prov.LLMError, match="isn't a PNG"):
+        ask(images=["x.png"])
+    with pytest.raises(prov.LLMError, match="user message"):
+        ask(messages=[{"role": "system", "content": "hi"}], images=["x.png"])
+    assert fake.calls == [] and prov.today("xai")["requests"] == 0

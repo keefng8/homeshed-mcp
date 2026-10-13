@@ -1,0 +1,38 @@
+{
+  "id": "repo.stats",
+  "name": "Repo Stats",
+  "version": "1.0.0",
+  "description": "How a public GitHub repository is doing: stars, forks, watchers, open issues, release downloads, PyPI downloads, and views, clones and referrers when a GitHub token can read its traffic. Daily traffic is kept past GitHub's 14 days.",
+  "category": "repo",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "github stats",
+    "repo stars",
+    "how many downloads",
+    "repo traffic",
+    "views and clones"
+  ],
+  "inputs": {
+    "repo": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.repo.stats.stats"
+  },
+  "latency": {
+    "expected_ms": 1500
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "30_minutes"
+  },
+  "related": [
+    "repo.progress",
+    "repo.readiness"
+  ]
+}

@@ -8,8 +8,9 @@ action "etsy"); the owner approves it in the Control Panel. Title, description, 
 (printify.product.update_live): set here, Printify's next publish would undo them.
 
 The director's rule: details are set after a listing's last publish, and a re-publish never leaves them undone. What
-was last set on each listing is kept (ATTRS_FILE). An approved printify.product.update_live of that listing queues
-them again straight after (queue_reapply), for the owner to approve once Printify has finished publishing.
+was last set on each listing is kept (ATTRS_FILE). An approved printify.product.update_live of that listing that
+re-sends its variants, images or delivery template queues them again straight after (queue_reapply), for the owner to
+approve once Printify has finished publishing; a words-only one doesn't (update_live.RESETS_ETSY_DETAILS).
 
 etsy.listing.deactivate takes a listing off sale at once (state inactive). It's a brake, not a publish, so it runs
 without an approval, behind its own switch, capped, audited, and the owner gets a push each time. Etsy's Shop Manager
@@ -28,7 +29,6 @@ import re
 import threading
 import time
 from pathlib import Path
-from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -46,8 +46,6 @@ MAX_NEW_IMAGES = 5                  # per request
 MAX_LISTING_IMAGES = 10             # Etsy's limit per listing
 MAX_IMAGE_BYTES = 10 * 1024 * 1024  # this tool's cap
 IMAGE_MIMES = ("image/jpeg", "image/png", "image/gif")
-FOLDER_REF = re.compile(r"^([A-Za-z0-9][A-Za-z0-9 _-]{0,39})/([A-Za-z0-9][A-Za-z0-9._-]{0,100}\.(?:png|jpg|jpeg))$")
-NAME_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,100}\.(?:png|jpg|jpeg)$")
 _lock = threading.Lock()
 
 
@@ -59,7 +57,7 @@ def _env_int(name: str, default: int) -> int:
 
 
 def edit_daily_max() -> int:
-    return _env_int("ETSY_EDIT_DAILY_MAX", 20)
+    return _env_int("ETSY_EDIT_DAILY_MAX", 50)  # 20 until 2026-10-09: a new listing needs 2 edits (the owner's OK)
 
 
 def deactivate_daily_max() -> int:
@@ -101,9 +99,10 @@ def _positive(value, what: str) -> int | None:
     return value
 
 
-def _check_fields(taxonomy_id, materials, production_partner_ids, shipping_profile_id) -> dict:
+def _check_fields(taxonomy_id, materials, production_partner_ids, shipping_profile_id, shop_section_id=0) -> dict:
     fields: dict = {}
-    for name, value in (("taxonomy_id", taxonomy_id), ("shipping_profile_id", shipping_profile_id)):
+    for name, value in (("taxonomy_id", taxonomy_id), ("shipping_profile_id", shipping_profile_id),
+                        ("shop_section_id", shop_section_id)):
         if (v := _positive(value, name)) is not None:
             fields[name] = v
     if materials is not None:
@@ -157,44 +156,9 @@ def _resolve(taxonomy_id: int, wanted: dict) -> list[dict]:
 
 
 def _image(ref: str) -> bytes:
-    """One image's bytes: a Printify mockup (on Printify's image host only), an image saved in a folder of the image
-    store under its own name ("listing/krc-staffy-artwork-2400.png"), one the tool server keeps (mockup copies, paid
-    designs), or a generated one by its name."""
-    from tools.image import providers as prov
-    from tools.image.generate import base_url
-    from tools.printify.mockup import MOCKUP_HOSTS
-    ref = (ref or "").strip()
-    headers: dict = {}
-    if ref.startswith("https://"):
-        u = urlsplit(ref)
-        if u.hostname not in MOCKUP_HOSTS or u.username or u.password or len(ref) > 1000:
-            raise h.CommerceError(f"{h.trim(ref, 80)}: only Printify mockup addresses (printify.product.get lists them)")
-        url, headers = ref, {"User-Agent": "HomeShed-mcp-server"}
-    elif m := FOLDER_REF.match(ref):
-        url = f"{base_url()}/image/folder-files/{quote(m[1])}/{m[2]}"
-    elif NAME_REF.match(ref):
-        kept = prov.output_dir() / ref
-        if kept.is_file():
-            if kept.stat().st_size > MAX_IMAGE_BYTES:
-                raise h.CommerceError(f"{ref} is over {MAX_IMAGE_BYTES // 2**20} MB")
-            return kept.read_bytes()
-        url = f"{base_url()}/image/files/{ref}"
-    else:
-        raise h.CommerceError(f'{h.trim(ref, 80)!r}: give an image name, "folder/name.png" or a Printify mockup address')
-    try:
-        with httpx.stream("GET", url, timeout=60, follow_redirects=False, headers=headers) as r:
-            if r.status_code == 404:
-                raise h.CommerceError(f"there's no image {ref}")
-            if r.status_code != 200:
-                raise h.CommerceError(f"couldn't get {ref} (HTTP {r.status_code})")
-            data = b""
-            for chunk in r.iter_bytes():
-                data += chunk
-                if len(data) > MAX_IMAGE_BYTES:
-                    raise h.CommerceError(f"{ref} is over {MAX_IMAGE_BYTES // 2**20} MB")
-    except httpx.HTTPError as exc:
-        raise h.CommerceError(f"couldn't get {ref} ({type(exc).__name__})") from None
-    return data
+    """One photo's bytes (tools/image/refs.py: a Printify mockup, "folder/name.png", a kept or a generated image)."""
+    from tools.image.refs import image_bytes
+    return image_bytes(ref, MAX_IMAGE_BYTES)
 
 
 def _thumb(data: bytes) -> str | None:
@@ -235,7 +199,8 @@ def _short_ref(ref: str) -> str:
 def _said(x: dict, fields: dict, props: list[dict]) -> str:
     """The change in a few words, for the owner's approval card."""
     parts = []
-    for k, label in (("taxonomy_id", "category"), ("shipping_profile_id", "delivery profile")):
+    for k, label in (("taxonomy_id", "category"), ("shipping_profile_id", "delivery profile"),
+                     ("shop_section_id", "shop section")):
         if k in fields:
             parts.append(f"{label} {x[k]} -> {fields[k]}" if x.get(k) else f"{label} {fields[k]}")
     if "materials" in fields:
@@ -247,14 +212,15 @@ def _said(x: dict, fields: dict, props: list[dict]) -> str:
 
 
 def _queue(lid: str, title: str, summary: str, send: dict, wanted: dict, reapply: bool,
-           thumbs: list | None = None) -> dict:
+           thumbs: list | None = None, owner_approval: dict | None = None) -> dict:
     import printify_pending
     checks = {"listing_id": lid, "fields": sorted(send["fields"]), "attributes": [p["name"] for p in send["properties"]],
               "images": len(send.get("images") or []), "reapply": reapply,
               "edited_last_24h": len(printify_pending.done_today("etsy")), "daily_max": edit_daily_max()}
     payload = {"listing_id": lid, "title": title, "send": send, "wanted": wanted, **({"thumbs": thumbs} if thumbs else {})}
     try:
-        return printify_pending.add(f"etsy-{lid}", h.trim(summary, 300), checks, action="etsy", payload=payload)
+        return printify_pending.add(f"etsy-{lid}", h.trim(summary, 300), checks, action="etsy", payload=payload,
+                                    owner_approval=owner_approval)
     except printify_pending.PendingError as exc:
         raise h.CommerceError(str(exc)) from None
 
@@ -262,7 +228,8 @@ def _queue(lid: str, title: str, summary: str, send: dict, wanted: dict, reapply
 @tool(name="listing.update", category="etsy", doc="etsy/write.md")
 def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] | None = None,
                    production_partner_ids: list[int] | None = None, shipping_profile_id: int = 0,
-                   properties: dict | None = None, reapply: bool = False, images: list[dict] | None = None) -> dict:
+                   properties: dict | None = None, reapply: bool = False, images: list[dict] | None = None,
+                   owner_approval: dict | None = None, shop_section_id: int = 0) -> dict:
     """Ask to set an Etsy listing's details that Printify doesn't manage: category, materials, production partners,
     delivery profile, attributes (colour, occasion, recipient, holiday...) and extra photos. It is NOT changed by this
     call: it's checked against the listing and Etsy's own lists, then waits for the owner's approval in the Control
@@ -284,6 +251,9 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
             "folder/name.png" (saved in the image store under its own name, e.g. "listing/krc-staffy-artwork-2400.png"),
             an image name, or a Printify mockup address. JPEG, PNG or GIF up to 10 MB; the listing holds at most 10.
             Each photo is fingerprinted now, and checked again before it's uploaded on approval.
+        owner_approval: {"id", "by", "at"}: the owner's own approval inside a trusted app (as printify.product.publish);
+            then it's set at once.
+        shop_section_id: the shop section to show the listing in (etsy.shop.update makes sections); 0 keeps it.
 
     Returns:
         {"pending": true, "id", "etsy": summary, "expires_in_h", "how"}: the approval request, not a change on the
@@ -298,12 +268,12 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
             raise h.CommerceError("nothing was set on this listing by this tool, so there's nothing to re-apply")
         fields, props = dict(saved.get("fields") or {}), list(saved.get("properties") or [])
     else:
-        fields = _check_fields(taxonomy_id, materials, production_partner_ids, shipping_profile_id)
+        fields = _check_fields(taxonomy_id, materials, production_partner_ids, shipping_profile_id, shop_section_id)
         if properties is not None and not isinstance(properties, dict):
             raise h.CommerceError('properties must be {"attribute name": "value" or ["values"]}')
         if not fields and not properties and not images:
             raise h.CommerceError("nothing to change: give a category, materials, production partners, a delivery "
-                                  "profile, attributes or images")
+                                  "profile, a shop section, attributes or images")
         props = []
     new_images = _check_images(images) if images and not reapply else []
     x = _own_listing(lid)
@@ -327,9 +297,7 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
         if not isinstance(tax, int):
             raise h.CommerceError("the listing has no category yet: give taxonomy_id too")
         props = _resolve(tax, properties)
-    now = {k: x.get(k) for k in fields}
-    if isinstance(now.get("production_partner_ids"), list):
-        now["production_partner_ids"] = sorted(now["production_partner_ids"])
+    now = {k: et.partner_ids(x) if k == "production_partner_ids" else x.get(k) for k in fields}
     send_fields = {k: v for k, v in fields.items() if now.get(k) != v}
     cur = et.get(f"/v3/application/shops/{et.shop_id()}/listings/{lid}/properties", oauth=False) or {}
     have = {p.get("property_id"): sorted(p.get("value_ids") or []) for p in cur.get("results") or [] if isinstance(p, dict)}
@@ -342,7 +310,7 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
                      if s)
     summary = f'{"Re-apply" if reapply else "Set"} Etsy details on "{title}": {said}'
     return _queue(lid, title, summary, {"fields": send_fields, "properties": send_props, "images": new_images},
-                  {"fields": fields, "properties": props}, reapply, thumbs)
+                  {"fields": fields, "properties": props}, reapply, thumbs, owner_approval)
 
 
 def queue_reapply(lid: str) -> dict | None:
@@ -374,9 +342,10 @@ def execute(payload: dict) -> dict:
                 **({"scale_id": p["scale_id"]} if p.get("scale_id") else {})}
         et.write("PUT", f"/v3/application/shops/{shop}/listings/{lid}/properties/{p['property_id']}", form,
                  et.WRITE_SETTING, LABEL)
-    uploaded = 0
+    uploaded, each = 0, []  # each photo's outcome, by name (the shop app, 2026-10-09: "done" didn't say which landed)
     for img in send.get("images") or []:
         if img.get("done_id"):
+            each.append({"image": img["image"], "listing_image_id": img["done_id"], "uploaded": "earlier"})
             continue  # uploaded by an earlier try of this approval: never twice
         data = _image(img["image"])
         if hashlib.sha256(data).hexdigest() != img.get("sha256"):
@@ -387,6 +356,7 @@ def execute(payload: dict) -> dict:
                        files={"image": (name, data, img.get("mime") or "image/jpeg")})
         img["done_id"] = (out or {}).get("listing_image_id") or True  # kept on the request (printify_pending saves it)
         uploaded += 1
+        each.append({"image": img["image"], "listing_image_id": img["done_id"], "uploaded": "now"})
     wanted = payload.get("wanted") or {k: v for k, v in send.items() if k != "images"}
     with _lock:
         rows = applied()
@@ -396,7 +366,10 @@ def execute(payload: dict) -> dict:
         rows[lid] = {"fields": {**(saved.get("fields") or {}), **(wanted.get("fields") or {})},
                      "properties": list(by_id.values()), "title": payload.get("title"), "at": time.time()}
         _write(ATTRS_FILE, "listings", rows)
+    # photos_landed == photos_asked means every photo asked for is on the listing ("earlier" ones landed on a previous
+    # try of this approval); an upload that fails raises instead, and the request stays waiting with its error
     return {"listing_id": lid, "fields": sorted(fields), "attributes": [p["name"] for p in props], "photos": uploaded,
+            "photos_asked": len(send.get("images") or []), "photos_landed": len(each), "photo_results": each,
             "note": "Set on Etsy. A Printify re-publish of this listing queues the details again for your approval."}
 
 

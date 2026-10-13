@@ -52,6 +52,15 @@
     "images": {
       "type": "array",
       "required": false
+    },
+    "owner_approval": {
+      "type": "object",
+      "required": false
+    },
+    "shop_section_id": {
+      "type": "integer",
+      "required": false,
+      "default": 0
     }
   },
   "execution": {

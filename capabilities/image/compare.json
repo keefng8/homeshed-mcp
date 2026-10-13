@@ -1,0 +1,51 @@
+{
+  "id": "image.compare",
+  "name": "Print Check",
+  "version": "1.0.0",
+  "description": "Is a scene's print exactly the reference's (the mockup it was made from, or the print file), and does the tee stand out from the background? Finds the print, scores structure and colour, looks for added text, and flags a tee that blends into its background. Free, local CPU.",
+  "category": "image",
+  "risk": "read",
+  "requires": [
+    "the local image service"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "print check",
+    "compare print",
+    "is the print unchanged",
+    "verify print in scene",
+    "does the shirt blend into the background"
+  ],
+  "inputs": {
+    "image": {
+      "type": "string",
+      "required": true
+    },
+    "reference": {
+      "type": "string",
+      "required": true
+    },
+    "region": {
+      "type": "string",
+      "required": false,
+      "default": "print"
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.compare.compare"
+  },
+  "latency": {
+    "expected_ms": 4000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.generate",
+    "image.text_check",
+    "image.preview",
+    "printify.mockup_fetch"
+  ]
+}

@@ -11,7 +11,8 @@ Threads). **Public.** Only call it for a post that has been approved for publish
 ## Parameters
 | Name | Required | Notes |
 |---|---|---|
-| `text` | yes | 1-500 characters (emoji count as their UTF-8 bytes, as Meta counts them). |
+| `text` | yes | 1-500 characters (emoji count as their UTF-8 bytes, as Meta counts them), including the AI line below. |
+| `ai_generated` | yes | True when any of the post was made by AI (image, video, voice or text). A last line is added: "Image made with AI." (image or carousel), "Video made with AI." or "Made with AI." (text), unless the text already says "made with AI". See AI disclosure below. |
 | `link` | no | One `https://` address, shown as a preview card. Text posts only (Meta ignores it with images). |
 | `image_names` | no | Images by their `saved_as` name: 1 = an IMAGE post, 2-10 = a CAROUSEL. |
 | `alt_text` | no | A description of the images for screen readers (each image gets it), up to 1000 characters. |
@@ -25,8 +26,15 @@ nothing is uploaded or posted if one fails), then staged in the private R2 bucke
 presigned link that works for an hour, and deleted again once the post is published or fails. Local images go as the
 image service's JPEG fitted in 1440 px (its originals can be 20 MB upscales); paid images (tool server) go as they are.
 
+## AI disclosure (2026-10-08, the Director)
+The Threads API has no AI-label field (checked 2026-10-08: none of `POST /{user}/threads`'s parameters; Instagram's
+API has `is_ai_generated`, Threads' doesn't). Meta requires disclosure for photorealistic video and realistic-sounding
+audio, and labels images itself only from C2PA/IPTC metadata, which re-encoded images lose. So the caption says it.
+The flag is kept in the post record and the audit trail.
+
 ## Returns
-`{"posted": true, "id", "permalink", "media_type", "posted_today", "daily_max"}`.
+`{"posted": true, "id", "permalink", "media_type", "posted_today", "daily_max", "ai_generated", "ai_line"}`
+(`ai_line`: the line that was added, or null).
 
 ## Limits
 At most `THREADS_DAILY_MAX` posts in 24 hours (default 25; Meta's own limit is 250). Each post is a container (one per

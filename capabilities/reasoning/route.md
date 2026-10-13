@@ -38,7 +38,7 @@ task itself. `reasoning` names which `classify_complexity` sub-scores contribute
 be diagnosed, not just distrusted.
 
 ## Optional second opinion (Shedkeeper, experimental)
-Shedkeeper is a small local decision model: a JEV-like system clone, inspired by Laya. Off by default: measured on 166 calls, it changed no result, so it only added latency. Set
+Shedkeeper is a small local decision model. Off by default: measured on 166 calls, it changed no result, so it only added latency. Set
 `ROUTE_ASK_SHEDKEEPER=1` to switch it back on. With it on and a Shedkeeper classifier configured (`SHEDKEEPER_URL`,
 a companion service not included in this package), route asks it only in borderline cases: when its own rules say "local" and either a judgement
 word matched (security, deploy, credentials and similar) or the score is 25 or more (`SHEDKEEPER_FROM`). Shedkeeper

@@ -11,7 +11,9 @@ from typing import Any
 
 import httpx
 
-HOSTS = {"etsy": "api.etsy.com", "printify": "api.printify.com", "threads": "graph.threads.net"}
+HOSTS = {"etsy": "api.etsy.com", "printify": "api.printify.com", "threads": "graph.threads.net",
+         "pinterest": "api.pinterest.com", "pinterest-sandbox": "api-sandbox.pinterest.com",
+         "bing": "ssl.bing.com"}  # Bing Webmaster Tools' keyword stats (signal.keywords)
 TIMEOUT_S = 15.0
 TIMEOUT = httpx.Timeout(TIMEOUT_S, connect=5.0)
 MAX_BYTES = 8 * 1024 * 1024

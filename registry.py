@@ -164,4 +164,7 @@ def discover(tools_pkg: str = "tools") -> list[Capability]:
     for _, module_name, is_pkg in pkgutil.walk_packages(package.__path__, prefix=f"{tools_pkg}."):
         if not is_pkg:
             importlib.import_module(module_name)
+    if tools_pkg == "tools":  # then HomeShed Pro's tools, if its package is installed here (pro_plugin.py); never raises
+        import pro_plugin
+        pro_plugin.load()
     return list(_REGISTRY)
