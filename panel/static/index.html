@@ -1807,7 +1807,7 @@ body.summary .sum-bar { display: flex; align-items: center; gap: 14px; margin-bo
     </div>
 
     <div class="tok-strip" data-card="tokens" data-name="Tokens kept out of Claude" title="Measured figures come from the tools themselves; the estimate is sizes-only (never content), about 4 characters per token, one rule per tool. Hover each figure for its method.">
-      <div class="tok-head card-head"><span class="lbl">Tokens kept out of Claude</span><span class="big" id="tokTotal">—</span><span class="sub" id="tokSub">Loading…</span></div>
+      <div class="tok-head card-head"><span class="lbl">Tokens kept out of Claude</span><span class="big" id="tokTotal">—</span><span class="sub" id="tokSub">Loading…</span><span class="sub" id="tokMoney" hidden></span></div>
       <div class="tok-bar" id="tokBar"></div>
       <div class="tok-cells">
         <div class="tok-cell" title="RTK's own count: command output it trimmed before it reached Claude."><span class="tok-sw" style="background:var(--green)"></span>Output trimmed by RTK<i>measured</i><b id="tokRtk">—</b><span id="tokRtkSub"></span></div>
@@ -2255,6 +2255,7 @@ body.summary .sum-bar { display: flex; align-items: center; gap: 14px; margin-bo
   <div class="sav-view" id="savingsView">
     <div class="stat-strip">
       <div class="stat-box"><div class="stat-num" id="svTotal">—</div><div class="stat-label">Tokens kept out of Claude</div></div>
+      <div class="stat-box" id="svMoneyBox" hidden><div class="stat-num" id="svMoney">—</div><div class="stat-label" id="svMoneyLbl">At API prices</div></div>
       <div class="stat-box"><div class="stat-num" id="svRtk">—</div><div class="stat-label">Trimmed by RTK (measured)</div></div>
       <div class="stat-box"><div class="stat-num" id="svPct">—</div><div class="stat-label">Average RTK reduction</div></div>
       <div class="stat-box"><div class="stat-num" id="svCmds">—</div><div class="stat-label">Commands filtered</div></div>
@@ -3625,6 +3626,25 @@ function fmtTok(n) {
   return n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(Math.round(n));
 }
 
+// Tokens saved as money (Settings > Control Panel > "Show tokens saved as money at"): what was kept out of Claude's
+// context at the model's input price, what the local model wrote instead at its output price. Pounds first on a UK
+// computer. null: tokens only.
+function savedMoney(m, inTok, outTok) {
+  if (!m) return null;
+  const usd = (inTok * m.in + outTok * m.out) / 1e6;
+  const fmt = (sym, v) => sym + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const both = [fmt('£', usd * m.gbp_per_usd), fmt('$', usd)];
+  if (!(navigator.language || '').startsWith('en-GB')) both.reverse();
+  return { text: '≈ ' + both.join(' · '), label: `at ${m.label} API prices`,
+           tip: `What the same tokens would cost on the API: $${m.in} per million read, $${m.out} per million written. `
+              + (m.approximate ? 'Pounds at an approximate rate (the daily rate could not be fetched).'
+                               : `Pounds at the European Central Bank rate of ${m.rate_from.replace('ECB ', '')}.`) };
+}
+function showMoney(el, money) {
+  el.hidden = !money;
+  if (money) { el.textContent = `${money.text} ${money.label}`; el.title = money.tip; }
+}
+
 async function loadTokens() {
   try {
     const d = await (await fetch('/api/tokens')).json();
@@ -3651,6 +3671,7 @@ async function loadTokens() {
     document.getElementById('tokSub').textContent = rtkOk
       ? `measured ${fmtTok(rtk)} + estimated ${fmtTok(gen + read + ret)} · ${d.rtk.total_commands} commands filtered`
       : `estimated ${fmtTok(gen + read + ret)}` + (rtkOff ? " · RTK isn't set up, so nothing is measured" : " · RTK's numbers aren't available right now");
+    showMoney(document.getElementById('tokMoney'), savedMoney(d.money, rtk + read + ret, gen));
     document.getElementById('tokRtk').textContent = rtkOk ? fmtTok(rtk) : '—';
     document.getElementById('tokRtkSub').textContent = rtkOk ? `avg ${Math.round(d.rtk.avg_savings_pct)}% smaller`
       : rtkOff ? 'Not set up yet: RTK trims shell output before Claude reads it' : 'Not answering right now';
@@ -4780,6 +4801,13 @@ async function loadSavings() {
   const rtkOff = !!(d.daily && d.daily.not_set_up), rtkHas = !!(d.daily && d.daily.summary);
   const RTK_WHAT = 'RTK trims shell output before Claude reads it, and this page shows what it saved.';
   document.getElementById('svTotal').textContent = '≈ ' + fmtTok(rtk + estTotal);
+  const money = savedMoney(d.money, rtk + (byRule.reading || 0) + (byRule.retrieval || 0), byRule.generation || 0);
+  document.getElementById('svMoneyBox').hidden = !money;
+  if (money) {
+    document.getElementById('svMoney').textContent = money.text;
+    document.getElementById('svMoneyLbl').textContent = money.label.charAt(0).toUpperCase() + money.label.slice(1);
+    document.getElementById('svMoneyBox').title = money.tip;
+  }
   document.getElementById('svRtk').textContent = rtkHas ? fmtTok(rtk) : '—';
   document.getElementById('svPct').textContent = sum.avg_savings_pct != null ? Math.round(sum.avg_savings_pct) + '%' : '—';
   document.getElementById('svCmds').textContent = sum.total_commands != null ? sum.total_commands.toLocaleString() : '—';

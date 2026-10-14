@@ -48,7 +48,7 @@ the change and queues it in the approvals bar ("Etsy listing details"); the owne
 | `production_partner_ids` | no | The full list of the shop's production partner ids. Omit to keep. |
 | `shipping_profile_id` | no | The delivery profile; 0 keeps it. |
 | `shop_section_id` | no | The shop section to show it in (`etsy.shop.update` makes sections); 0 keeps it. |
-| `properties` | no | `{"attribute": "value" or ["values"]}`, e.g. `{"Primary color": "Black", "Holiday": "Christmas"}`. |
+| `properties` | no | `{"attribute": "value" or ["values"]}`, e.g. `{"Primary color": "Black", "Holiday": "Christmas"}`. `null` removes an attribute (`{"Holiday": null}`), and a re-apply never sets it back. |
 | `reapply` | no | Set again everything this tool last set on the listing; the other arguments are ignored. Photos aren't re-applied. |
 | `images` | no | 1-5 photos to add: `[{"image": ref, "alt_text"?: up to 500 characters, "rank"?: 1-10}]`. |
 

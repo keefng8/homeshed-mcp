@@ -273,10 +273,22 @@ def test_packs_on_without_a_keyboard_asks_and_changes_nothing(cli, place, capsys
 
 
 def test_pro_connect_makes_the_local_vault_key_and_keeps_the_key_encrypted(cli, place, capsys, monkeypatch):
+    import base64
+    import time
+
+    import pro_proof
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    site, b64u = Ed25519PrivateKey.generate(), lambda b: base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+    monkeypatch.setattr(pro_proof, "PUBLIC_KEYS", {"k1": b64u(site.public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw))})
+    key, now = "mav_" + "Qx7" * 10, int(time.time())
+    body = b64u(json.dumps({"aud": "homeshed", "tier": "pro", "sub": "u1", "th": pro_proof.token_hint(key),
+                            "iat": now, "exp": now + 3600}).encode())
+    proof = f"k1.{body}.{b64u(site.sign(body.encode()))}"  # Pro counts only with the Pro site's signature (to-do #19)
     real = httpx.Client
     monkeypatch.setattr(mavis_pro.httpx, "get", lambda url, **k: real(transport=httpx.MockTransport(
-        lambda req: httpx.Response(200, json={"client": {"name": "Laptop"}}))).get(url, **k))
-    key = "mav_" + "Qx7" * 10
+        lambda req: httpx.Response(200, json={"client": {"name": "Laptop"}, "proof": proof}))).get(url, **k))
     monkeypatch.setattr(sys, "stdin", io.StringIO(key + "\n"))
     assert cli.main(["pro", "connect", "--key-stdin"]) == 0
     assert 'Connected with the key "Laptop". Pro is active.' in capsys.readouterr().out

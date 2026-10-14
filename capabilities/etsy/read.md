@@ -1,7 +1,7 @@
 # Etsy — Read (proxy)
 
 ## ID
-`etsy.shop.get`, `etsy.listings.list`, `etsy.listing.get`, `etsy.orders.list`, `etsy.order.get` (all read-only)
+`etsy.shop.get`, `etsy.listings.list`, `etsy.listing.get`, `etsy.orders.list`, `etsy.order.get`, `etsy.ledger` (all read-only)
 
 ## Purpose
 Let an app (for example one on another machine) use the Etsy shop **without ever holding its keys** (2026-10-03). The app
@@ -32,11 +32,12 @@ every result carries a `warning` to re-authorise and store it.
 ## Tools
 | Tool | Etsy endpoint | Inputs |
 |---|---|---|
-| `etsy.shop.get` | `GET /v3/application/shops/{shop_id}`, plus `/production-partners` (shops_r) | none |
+| `etsy.shop.get` | `GET /v3/application/shops/{shop_id}`, plus `/production-partners`, `/policies/return` and `/sections` (shops_r) | none |
 | `etsy.listings.list` | `GET /v3/application/shops/{shop_id}/listings` (listings_r) | `state` active/inactive/sold_out/draft/expired, `limit` 1-20, `offset` |
 | `etsy.listing.get` | `GET /v3/application/listings/{listing_id}` | `listing_id` |
 | `etsy.orders.list` | `GET /v3/application/shops/{shop_id}/receipts` (transactions_r) | `limit` 1-20, `offset`, `was_paid`/`was_shipped` any/yes/no |
 | `etsy.order.get` | `GET /v3/application/shops/{shop_id}/receipts/{receipt_id}` | `receipt_id` |
+| `etsy.ledger` | `GET /v3/application/shops/{shop_id}/payment-account/ledger-entries` (transactions_r): what Etsy actually charged and paid (listing, renewal, transaction, processing fees; sales; deposits), amounts in pounds, negative for a charge, with a per-type sum of the page (2026-10-14, so an app shows real fees, not an estimate) | `days` 1-365 (default 30) or `since`/`until` unix seconds, `limit` 1-30, `offset` |
 
 Results stay under about 5,000 characters (titles and descriptions trimmed, pages of at most 20). **Buyers' names,
 emails, addresses and messages are left out**; an order keeps its country, money, items and tracking.

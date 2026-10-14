@@ -74,6 +74,26 @@ def test_shop_get_lists_return_policies_and_listing_get_names_its_policy(monkeyp
     assert got["return_policy_id"] == 77 and got["shop_section_id"] == 5
 
 
+def test_shop_get_lists_sections_with_their_ids(monkeypatch):
+    """2026-10-14: the station puts each new listing in its section (shop_section_id), so it needs the ids."""
+    def get(path, params=None, oauth=True):
+        if path.endswith("/sections"):
+            return {"results": [{"shop_section_id": 51, "title": "Dog Lovers", "rank": 1, "user_id": 9,
+                                 "active_listing_count": 12}, "x"]}
+        return {"shop_id": 29235685, "shop_name": "Shop"}
+    monkeypatch.setattr(er.et, "shop_id", lambda: "29235685")
+    monkeypatch.setattr(er.et, "get", get)
+    assert er.shop_get()["sections"] == [{"shop_section_id": 51, "title": "Dog Lovers", "active_listing_count": 12}]
+
+    def no_sections(path, params=None, oauth=True):
+        if path.endswith("/sections"):
+            raise er.h.CommerceError("Etsy isn't connected")
+        return {"shop_id": 29235685, "shop_name": "Shop"}
+    monkeypatch.setattr(er.et, "get", no_sections)
+    out = er.shop_get()
+    assert out["shop_name"] == "Shop" and out["sections"] is None
+
+
 def test_shipping_destinations_flags_the_eu(monkeypatch):
     calls = []
     d = {"count": 3, "results": [
@@ -99,3 +119,46 @@ def test_bad_ids_are_refused_before_any_call(monkeypatch):
     for fn, arg in ((er.listing_get, "../x"), (er.shipping_destinations, "abc")):
         with pytest.raises(Exception):
             fn(arg)
+
+
+def test_shop_get_tells_an_app_how_many_listing_edits_are_left(monkeypatch):
+    """2026-10-14: 30 publishes needed 60 edits against a limit of 50; an app paces its publishes from this."""
+    import printify_pending as pp
+    monkeypatch.setattr(er.et, "shop_id", lambda: "1")
+    monkeypatch.setattr(er.et, "get", lambda path, params=None, oauth=True: {"shop_id": 1, "shop_name": "Shop"})
+    monkeypatch.setattr(pp, "done_today", lambda action: [{}] * 7 if action == "etsy" else [])
+    monkeypatch.setattr(pp, "list_pending", lambda: [
+        {"action": "etsy", "owner_approval": {"id": "a"}}, {"action": "etsy", "owner_approval": {"id": "b"}},
+        {"action": "etsy", "owner_approval": {"id": "c"}, "last_error": "boom"}, {"action": "etsy"},
+        {"action": "publish", "owner_approval": {"id": "d"}}])
+    monkeypatch.setenv("ETSY_EDIT_DAILY_MAX", "50")
+    assert er.shop_get()["listing_edits"] == {"last_24h": 7, "daily_max": 50, "queued": 2, "waiting_for_owner": 2}
+
+    def unreadable():
+        raise pp.PendingError("unreadable")
+    monkeypatch.setattr(pp, "list_pending", unreadable)
+    assert er.shop_get()["listing_edits"] is None
+
+
+def test_ledger_shows_what_etsy_charged_in_pounds_with_a_sum_per_type(monkeypatch):
+    """2026-10-14: an app's spend tile estimated Etsy fees (20c a listing + VAT); the ledger has the real ones."""
+    calls = []
+    page = {"count": 3, "results": [
+        {"amount": -16, "currency": "GBP", "ledger_type": "listing", "description": "listing fee",
+         "reference_type": "listing", "reference_id": 11, "created_timestamp": 1791900000},
+        {"amount": -16, "currency": "GBP", "ledger_type": "listing", "description": "listing fee",
+         "reference_type": "listing", "reference_id": 12, "created_timestamp": 1791900100},
+        {"amount": 1999, "currency": "GBP", "ledger_type": "sale", "description": "payment",
+         "reference_type": "receipt", "reference_id": 99, "create_date": 1791900200}, "x"]}
+    monkeypatch.setattr(er.et, "shop_id", lambda: "29235685")
+    monkeypatch.setattr(er.et, "get", lambda path, params=None, oauth=True: calls.append((path, params)) or page)
+    monkeypatch.setattr("time.time", lambda: 1792000000)
+    out = er.ledger(days=7, limit=2)
+    path, params = calls[-1]
+    assert path == "/v3/application/shops/29235685/payment-account/ledger-entries"
+    assert params == {"min_created": 1792000000 - 7 * 86400, "max_created": 1792000000, "limit": 2, "offset": 0}
+    assert out["currency"] == "GBP" and out["by_type"] == {"listing": -0.32} and out["next_offset"] == 2
+    assert [e["amount"] for e in out["entries"]] == [-0.16, -0.16] and out["entries"][0]["reference_id"] == 11
+    assert er.ledger(since=100, until=200, limit=30)["by_type"] == {"listing": -0.32, "sale": 19.99}
+    with pytest.raises(er.h.CommerceError):
+        er.ledger(limit=31)

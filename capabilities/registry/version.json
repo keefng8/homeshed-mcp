@@ -1,0 +1,42 @@
+{
+  "id": "registry.version",
+  "name": "Package Version",
+  "version": "1.0.0",
+  "description": "A package's latest released version and when it went up, from PyPI, npm or GitHub releases, in a few hundred characters. Read-only, no keys.",
+  "category": "registry",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "latest version",
+    "pypi version",
+    "npm version",
+    "release check",
+    "is the release out"
+  ],
+  "inputs": {
+    "ecosystem": {
+      "type": "string",
+      "required": true
+    },
+    "name": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.registry.version.version"
+  },
+  "latency": {
+    "expected_ms": 800
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "web.read",
+    "registry.find"
+  ]
+}

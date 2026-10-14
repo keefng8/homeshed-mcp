@@ -154,6 +154,14 @@ PANEL_SCHEMA = {
     "public_url": {"type": "url", "default": DASHBOARD_PUBLIC_URL, "group": "Sharing",
                    "label": "Public address of this Control Panel",
                    "help": "The web address people outside your home network use. It's sent with new view-only logins."},
+    "savings_money": {"type": "select", "default": "opus-5-5", "group": "Control Panel",
+                      "options": ["opus-5-5", "sonnet-5-5", "haiku-5-5", "fable-5-1", "off"],
+                      "option_labels": {"opus-5-5": "Claude Opus 5.5", "sonnet-5-5": "Claude Sonnet 5.5",
+                                        "haiku-5-5": "Claude Haiku 5.5", "fable-5-1": "Claude Fable 5.1",
+                                        "off": "Tokens only"},
+                      "label": "Show tokens saved as money at",
+                      "help": "The model your sessions use: its API prices turn tokens saved into pounds and dollars. "
+                              "On a subscription it's what the same work would cost on the API."},
     "viewers_see_savings": {"type": "bool", "default": True, "group": "Sharing",
                             "label": "View-only logins can see Savings",
                             "help": "The token savings charts. The list of missed commands is never shown to them."},
@@ -560,6 +568,7 @@ _USAGE = {**_plain("since", "estimated_tokens_saved", "images_generated", "calls
           "capabilities": {"*": _plain("calls", "errors", "in_chars", "out_chars", "saved_chars", "rule", "last",
                                        "saved_tokens")}}
 _MODEL_ROW = _plain("name", "online", "prompt_tokens", "output_tokens")
+_MONEY = _plain("model", "label", "in", "out", "gbp_per_usd", "rate_from", "approximate")
 _LOCAL_AI_ROW = {**_plain("name", "label", "type", "online", "requests_processing", "requests_deferred", "requests_total",
                           "prompt_tokens", "output_tokens", "total_tokens", "delta_tokens_window", "window_seconds",
                           "avg_ms"), "sparkline": [True]}
@@ -573,11 +582,12 @@ VIEWER_FIELDS = {
     "/api/context": {"sessions": [{**_plain("used_pct", "alarm_pct", "project", "model", "updated", "window",
                                             "tokens_in", "tokens_out"), "compactions": [_plain("pct", "at")]}],
                      "settings": _plain("context_alarm_pct"), "live_window_s": True},
-    "/api/tokens": {"rtk": _RTK_TOTALS, "estimate": _USAGE, "local_models": [_MODEL_ROW], "cloud_models": [_MODEL_ROW]},
+    "/api/tokens": {"rtk": _RTK_TOTALS, "estimate": _USAGE, "local_models": [_MODEL_ROW], "cloud_models": [_MODEL_ROW],
+                    "money": _MONEY},
     "/api/savings": {"daily": {**_plain("available", "error"), "summary": _RTK_TOTALS,
                                "daily": [_plain("date", "commands", "input_tokens", "output_tokens", "saved_tokens",
                                                 "savings_pct", "total_time_ms", "avg_time_ms")]},
-                     "estimate": _USAGE},  # not "discover": the missed-savings scan lists (redacted) command lines
+                     "estimate": _USAGE, "money": _MONEY},  # not "discover": the missed-savings scan lists command lines
     "/api/activity": [_plain("id", "timestamp", "duration_ms", "ok")],
 }
 
@@ -2987,6 +2997,47 @@ async def clients_tool(name: str, tool_id: str, action: str):
     return await _mcp_admin("POST", f"/clients/{name}/tools/{tool_id}/{action}")
 
 
+# Tokens saved as money (the owner, 2026-10-14; worked through in the HomeShed Library's docs/MONEY.md). Anthropic API
+# prices in US dollars per million tokens, checked 2026-10-06. Tokens kept out of Claude's context (RTK, reading and
+# search done locally) cost the input price; what the local model wrote instead costs the output price.
+MONEY_MODELS = {"opus-5-5": ("Claude Opus 5.5", 4.00, 20.00), "sonnet-5-5": ("Claude Sonnet 5.5", 2.00, 10.00),
+                "haiku-5-5": ("Claude Haiku 5.5", 0.10, 0.50), "fable-5-1": ("Claude Fable 5.1", 10.00, 50.00)}
+GBP_PER_USD_APPROX = 0.75
+# The European Central Bank's daily reference rates: a public file, nothing of ours is sent. Once a day at most.
+ECB_DAILY_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
+_ECB_RATE = re.compile(r"currency=['\"](USD|GBP)['\"]\s+rate=['\"]([0-9.]{1,12})['\"]")
+_ECB_DAY = re.compile(r"time=['\"](\d{4}-\d{2}-\d{2})['\"]")
+_fx: dict = {"at": 0.0, "gbp_per_usd": None, "day": None}
+
+
+async def _gbp_per_usd() -> tuple[float, str | None]:
+    """(pounds per dollar, the ECB day it's from), or the approximate rate and None when the file can't be read."""
+    if os.environ.get("PANEL_FX", "").lower() != "off" and time.time() - _fx["at"] > 86400:  # off: no internet
+        _fx["at"] = time.time()  # one try a day, success or not: a dead link never slows the page
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                r = await client.get(ECB_DAILY_URL)
+            text = r.text[:20_000] if r.status_code == 200 else ""
+            rates = {cur: float(v) for cur, v in _ECB_RATE.findall(text)}
+            if rates.get("USD", 0) > 0 and 0 < rates.get("GBP", 0):
+                day = _ECB_DAY.search(text)
+                _fx.update(gbp_per_usd=round(rates["GBP"] / rates["USD"], 4), day=day.group(1) if day else None)
+        except (httpx.HTTPError, ValueError):
+            pass
+    return (_fx["gbp_per_usd"], _fx["day"]) if _fx["gbp_per_usd"] else (GBP_PER_USD_APPROX, None)
+
+
+async def _money() -> dict | None:
+    """What the page needs to show tokens saved as pounds and dollars, or None when the owner chose tokens only."""
+    model = panel_values().get("savings_money")
+    if model not in MONEY_MODELS:
+        return None
+    label, price_in, price_out = MONEY_MODELS[model]
+    rate, day = await _gbp_per_usd()
+    return {"model": model, "label": label, "in": price_in, "out": price_out, "gbp_per_usd": rate,
+            "rate_from": f"ECB {day}" if day else "approximate", "approximate": day is None}
+
+
 @app.get("/api/savings")
 async def savings():
     """Savings page (2026-09-28, after OmniRoute's RTK/compression pages): RTK's per-day savings,
@@ -3008,6 +3059,7 @@ async def savings():
             out["estimate"] = r.json() if r.status_code == 200 else None
         except (httpx.RequestError, ValueError):
             pass
+    out["money"] = await _money()
     return out
 
 
@@ -3038,6 +3090,7 @@ async def tokens():
         row = {"name": server["name"], "online": latest.get("online", False),
                "prompt_tokens": life.get("prompt", 0), "output_tokens": life.get("output", 0)}
         out["local_models" if server["type"] == "llamacpp" else "cloud_models"].append(row)
+    out["money"] = await _money()
     return out
 
 

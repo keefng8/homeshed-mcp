@@ -28,6 +28,9 @@ Rules this module keeps:
   control. important info to my phone only"): an approval whose "by" is an automatic actor ("auto...") counts only for
   an app named in approvals_trusted_auto_clients. The phone hears only what matters: a publish that ran, and anything
   that couldn't run and now waits for the owner.
+- A bot's approval (the owner, 2026-10-14: the Director may approve Etsy listing details that match the plan): "by"
+  as "bot:<name>" counts only for an Etsy details edit and only for a bot named in approvals_trusted_bots (empty by
+  default). It's logged as the bot's, so nobody mistakes it for the owner's own tap.
 """
 from __future__ import annotations
 
@@ -51,6 +54,8 @@ ID_RE = re.compile(r"^[0-9a-f]{8}$")
 APPROVALS_FILE = Path(os.environ.get("PRINTIFY_APP_APPROVALS_FILE") or data_path("usage/app_approvals.json"))
 TRUST_SETTING = "approvals_trusted_clients"
 AUTO_TRUST_SETTING = "approvals_trusted_auto_clients"
+BOT_TRUST_SETTING = "approvals_trusted_bots"  # bots whose "bot:<name>" approval counts, for BOT_ACTIONS only
+BOT_ACTIONS = ("etsy",)  # Etsy listing details (owner, 2026-10-14: the Director may approve those), never a publish
 APPROVAL_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{3,80}$")
 APPROVAL_MAX_AGE_S = 3600
 APPROVAL_SKEW_S = 300
@@ -196,8 +201,9 @@ def _used_approvals() -> dict:
     return {k: v for k, v in rows.items() if time.time() - float(v.get("at") or 0) < APPROVALS_KEPT_S}
 
 
-def _approval_problem(client: str | None, ok) -> str | None:
-    """Why this owner_approval can't be used, or None."""
+def _approval_problem(client: str | None, ok, action: str = "publish") -> str | None:
+    """Why this owner_approval can't be used, or None. A bot's ("bot:<name>") counts only for BOT_ACTIONS and only
+    for a bot the owner named (approvals_trusted_bots): it's labelled as the bot's, never passed off as the owner's."""
     from datetime import datetime
     auto_ok = bool(client) and client in trusted_clients(AUTO_TRUST_SETTING)
     if not client or not (auto_ok or client in trusted_clients()):
@@ -211,6 +217,13 @@ def _approval_problem(client: str | None, ok) -> str | None:
     if by.lower().startswith("auto") and not auto_ok:
         return (f'"by" is an automatic actor, and {client}\'s AUTO mode doesn\'t count as the owner\'s approval: the '
                 'owner can name the app in Settings > Shops and social > "Apps whose AUTO mode counts as your approval"')
+    if by.lower().startswith("bot:"):
+        bot = by[4:].strip().lower()
+        if action not in BOT_ACTIONS:
+            return f'a bot\'s approval ("{by}") counts only for Etsy listing details, not for a {action}'
+        if bot not in {b.lower() for b in trusted_clients(BOT_TRUST_SETTING)}:
+            return (f'"{by}" isn\'t a bot the owner lets approve: the owner can name it in Settings > Shops and social '
+                    '> "Bots that may approve Etsy listing details"')
     try:
         at = datetime.fromisoformat(str(ok.get("at")).replace("Z", "+00:00")).timestamp()
     except ValueError:
@@ -247,7 +260,7 @@ def add(product_id: str, summary: str, checks: dict, action: str = "publish", pa
     import clients
     from tools.commerce import _http as h
     client = clients.current_client.get()
-    problem = _approval_problem(client, owner_approval) if owner_approval is not None else "none given"
+    problem = _approval_problem(client, owner_approval, action) if owner_approval is not None else "none given"
     with _lock:
         items = _load()
         if any(i.get("product_id") == product_id for i in items):

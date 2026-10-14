@@ -40,7 +40,8 @@ def shops_list() -> dict:
 @tool(name="products.list", category="printify", doc="printify/read.md")
 def products_list(page: int = 1, limit: int = 20) -> dict:
     """The configured shop's products (PRINTIFY_SHOP_ID), compact: id, title, visible, blueprint and print
-    provider, enabled variants, lowest price, updated.
+    provider, enabled variants, lowest price, updated, and external_id (the Etsy listing id once it's published, else
+    null), so a watch over drafts reads list pages instead of one product.get each (2026-10-14).
 
     Args:
         page: 1 or more.
@@ -54,10 +55,11 @@ def products_list(page: int = 1, limit: int = 20) -> dict:
             continue
         on = [v for v in (p.get("variants") or []) if isinstance(v, dict) and v.get("is_enabled")]
         prices = [v.get("price") for v in on if isinstance(v.get("price"), (int, float))]
+        ext = p.get("external") if isinstance(p.get("external"), dict) else {}
         rows.append({"id": p.get("id"), "title": h.trim(p.get("title"), 60), "visible": p.get("visible"),
                      "blueprint_id": p.get("blueprint_id"), "print_provider_id": p.get("print_provider_id"),
                      "variants_enabled": len(on), "min_price": _cents(min(prices)) if prices else None,
-                     "updated": p.get("updated_at")})
+                     "updated": p.get("updated_at"), "external_id": ext.get("id")})
     return {**_page(d), "products": rows}
 
 

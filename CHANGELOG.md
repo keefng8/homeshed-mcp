@@ -6,6 +6,31 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-14
+
+### Security
+- HomeShed Pro: a Pro tools package is checked against its signature and its file list before it's unpacked, and
+  again every time HomeShed starts, so a copied or edited package folder never loads. The Pro website's answer counts
+  only with a signed membership proof made for this install, and the 7-day offline grace runs from the signed time.
+  Pro tools packages need HomeShed 0.3.1 or newer.
+
+### Added
+- `registry.version`: a package's latest version and when it went up, from PyPI, npm or GitHub releases, in a few
+  hundred characters.
+- `etsy.ledger`: what Etsy actually charged and paid the shop (fees, sales, deposits), with a total per type.
+  Read-only.
+- `etsy.shop.get` also returns the shop's sections and today's listing edits against the daily limit.
+- `docs/upgrading.md`: how to move to a new version for each install method, with steps an AI agent can follow.
+
+### Changed
+- A call from the owner's own session with an input name the tool doesn't take is refused, and the answer names the
+  inputs it does take (before, the name was dropped and the tool ran with its default). Apps' calls are only logged.
+- `etsy.listing.update` can remove an attribute (give it as `null`); it waits for the owner's approval like any edit.
+- `printify.products.list` rows include the Etsy listing id once a product is published.
+- `ETSY_EDIT_DAILY_MAX` can go up to 200 (default 50).
+- The owner can name bots whose approval counts for Etsy listing details only (`approvals_trusted_bots`, empty by
+  default); never for a publish, and logged as the bot's.
+
 ## [0.3.0] - 2026-10-14
 
 ### Added

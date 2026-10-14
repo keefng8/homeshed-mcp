@@ -4,20 +4,40 @@ HomeShed (R&D's security review: a fork asking for one could be phishing). Statu
 key. The Pro site is faked with httpx.MockTransport; its answers are the Pro backend's real ones (200 Pro, 403 a valid
 key whose membership has ended, 401 unknown or revoked). Missing cases suggested by the local model (qwen3-coder-30b):
 key length boundaries, a corrupted state file."""
+import base64
 import json
+import time
 
 import httpx
 import pytest
 from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 import mavis_pro
+import pro_proof
 import vault
 
 KEY = "mav_" + "Qx7" * 10   # the shape of a real key, built at run time: no literal secret in this file
+SITE_KEY = Ed25519PrivateKey.generate()  # the fake Pro site's signing key; its public half is pinned in setup
+
+
+def b64u(b: bytes) -> str:
+    return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+
+
+def signed_proof(bearer: str, key=SITE_KEY) -> str:
+    token = (bearer or "").removeprefix("Bearer ")
+    now = int(time.time())
+    body = b64u(json.dumps({"aud": "homeshed", "tier": "pro", "sub": "u1", "th": pro_proof.token_hint(token),
+                            "iat": now, "exp": now + 3600}).encode())
+    return f"k1.{body}.{b64u(key.sign(body.encode()))}"
 
 
 @pytest.fixture(autouse=True)
 def setup(tmp_path, monkeypatch):
+    monkeypatch.setattr(pro_proof, "PUBLIC_KEYS", {"k1": b64u(SITE_KEY.public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw))})
     monkeypatch.setenv("VAULT_KEY", Fernet.generate_key().decode())
     monkeypatch.setattr(vault, "VAULT_FILE", tmp_path / "vault.json")
     monkeypatch.setattr(vault, "AUDIT_FILE", tmp_path / "audit.jsonl")
@@ -29,8 +49,9 @@ def setup(tmp_path, monkeypatch):
     return tmp_path
 
 
-def backend(monkeypatch, *, whoami=200, client=None, calls=None, down=False):
-    """A fake Pro site for every httpx call the module makes."""
+def backend(monkeypatch, *, whoami=200, client=None, calls=None, down=False, proof="signed"):
+    """A fake Pro site for every httpx call the module makes. proof: "signed" (the real site's key), "fake" (a site
+    signing with a key of its own), or None (a site that sends none: an old or fake Pro address)."""
     calls = [] if calls is None else calls
 
     def handler(req: httpx.Request) -> httpx.Response:
@@ -38,8 +59,11 @@ def backend(monkeypatch, *, whoami=200, client=None, calls=None, down=False):
         if down:
             raise httpx.ConnectError("no route to host")
         if req.url.path == "/api/pro-api/whoami":
-            return httpx.Response(whoami, json={"client": client if client is not None else {"name": "My laptop"},
-                                                "scopes": []})
+            body = {"client": client if client is not None else {"name": "My laptop"}, "scopes": []}
+            if proof and whoami == 200:
+                body["proof"] = signed_proof(req.headers.get("authorization"),
+                                             SITE_KEY if proof == "signed" else Ed25519PrivateKey.generate())
+            return httpx.Response(whoami, json=body)
         if req.url.path == "/api/pro-api/packs":
             return httpx.Response(whoami, json={"data": [{"slug": "safe-operator", "title": "Safe Operator",
                                                           "description": "Stops costly habits", "price": 1}]})
@@ -142,6 +166,16 @@ def test_status_follows_whoami(monkeypatch, code, connected, pro, words):
     assert (out["connected"], out["pro"]) == (connected, pro)
     assert words is None or words in out["reason"]
     assert out.get("unreachable", False) is (code == 503)  # only a non-answer is a blip pro.check rides out
+
+
+@pytest.mark.parametrize("proof", [None, "fake"])
+def test_a_200_without_the_pro_sites_signature_is_not_pro(monkeypatch, proof):
+    """To-do #19 t3: the Pro address pointed at a fake site that answers 200 made any key Pro."""
+    vault.set_credential("MAVIS_PRO_TOKEN", KEY, kind="api-key")
+    backend(monkeypatch, proof=proof)
+    out = mavis_pro.status()
+    assert out["connected"] and out["pro"] is False and "isn't signed" in out["reason"]
+    assert mavis_pro.last_proof() is None and "proof" not in out
 
 
 def test_a_corrupted_state_file_doesnt_stop_the_status(setup, monkeypatch):

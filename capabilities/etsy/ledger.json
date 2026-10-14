@@ -1,0 +1,62 @@
+{
+  "id": "etsy.ledger",
+  "name": "Etsy Ledger",
+  "version": "1.0.0",
+  "description": "What Etsy actually charged and paid the shop (listing, renewal, transaction and processing fees, sales, deposits), in pounds, paged, with a per-type sum. Read-only.",
+  "category": "etsy",
+  "risk": "read",
+  "requires": [
+    "the owner's commerce_etsy_enabled switch",
+    "Etsy app and shop credentials (ETSY_KEYSTRING, ETSY_SHARED_SECRET, ETSY_REFRESH_TOKEN, ETSY_SHOP_ID)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "etsy fees",
+    "etsy ledger",
+    "etsy listing fees",
+    "etsy payment account"
+  ],
+  "inputs": {
+    "days": {
+      "type": "integer",
+      "required": false,
+      "default": 30
+    },
+    "since": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "until": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 30
+    },
+    "offset": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    }
+  },
+  "execution": {
+    "type": "http",
+    "handler": "tools.etsy.read.ledger"
+  },
+  "latency": {
+    "expected_ms": 600
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "etsy.orders.list",
+    "etsy.order.get",
+    "etsy.shop.get"
+  ]
+}

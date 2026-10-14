@@ -486,3 +486,24 @@ def test_the_owner_and_the_named_tool_are_not_checked_twice(server, monkeypatch)
         clients.current_tool.reset(tool)
         clients.current_client.reset(who)
     assert calls == []
+
+
+def test_a_misnamed_input_is_refused_for_the_owner_and_only_logged_for_an_app(server):
+    """2026-10-14: repo.leak_scan given path= instead of folder= ran with folder=".", scanned the server's own folder and
+    said it was clean. The SDK drops unknown inputs silently, so the server checks them first."""
+    call = SimpleNamespace(name="repo.leak_scan", arguments={"path": "G:/somewhere", "secrets": False})
+    result = asyncio.run(server.mcp._handle_call_tool(_ctx("Bearer owner-secret"), call))
+    assert result.is_error and "no input named path" in result.content[0].text and "folder" in result.content[0].text
+    assert server._unknown_inputs("repo.leak_scan", {"folder": ".", "detail": "full"}) == []
+    assert server._unknown_inputs("no.such_tool", {"x": 1}) == [] and server._unknown_inputs("repo.leak_scan", None) == []
+    token = clients.create("app1", "", "all")
+    seen = []
+
+    async def fake_call(self, ctx, params):
+        seen.append(params.arguments)
+        return "ran"
+    import pytest
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(server.MCPServer, "_handle_call_tool", fake_call)
+        assert asyncio.run(server.mcp._handle_call_tool(_ctx(bearer(token)), call)) == "ran"  # an app keeps working
+    assert seen == [call.arguments]

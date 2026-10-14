@@ -83,6 +83,9 @@ Stuck? If the terminal says `uvx` isn't recognised or not found, open a new term
 can't start `uvx` (common for apps opened from the macOS Dock), put the full path that `which uvx` prints into its MCP
 settings in place of `uvx`.
 
+**Upgrading?** `uvx {pkg}@latest doctor`, then restart your app. Your data is kept.
+[All install methods, and steps for AI agents](docs/upgrading.md).
+
 <details><summary><b>Other apps and install methods</b> (Codex, Gemini CLI, Claude Desktop, Windsurf, Cline, Zed, OpenCode, Goose, pip)</summary>
 
 #### One-line commands

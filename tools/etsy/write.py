@@ -49,15 +49,17 @@ IMAGE_MIMES = ("image/jpeg", "image/png", "image/gif")
 _lock = threading.Lock()
 
 
-def _env_int(name: str, default: int) -> int:
+def _env_int(name: str, default: int, ceiling: int = 100) -> int:
     try:
-        return max(0, min(100, int(os.environ.get(name) or default)))
+        return max(0, min(ceiling, int(os.environ.get(name) or default)))
     except ValueError:
         return default
 
 
 def edit_daily_max() -> int:
-    return _env_int("ETSY_EDIT_DAILY_MAX", 50)  # 20 until 2026-10-09: a new listing needs 2 edits (the owner's OK)
+    # 20 until 2026-10-09: a new listing needs 2 edits (the owner's OK). The ceiling went from 100 to 200 on 2026-10-14
+    # (the owner: "Raise the limit to reach target", 150): 30 publishes a night need 60 edits, plus repairs.
+    return _env_int("ETSY_EDIT_DAILY_MAX", 50, ceiling=200)
 
 
 def deactivate_daily_max() -> int:
@@ -126,13 +128,17 @@ def _resolve(taxonomy_id: int, wanted: dict) -> list[dict]:
     out = []
     for name, value in wanted.items():
         vals = [value] if isinstance(value, str) else list(value) if isinstance(value, list) else []
-        if not vals or not all(isinstance(v, str) and v.strip() for v in vals):
-            raise h.CommerceError(f'"{name}": give a value, or a list of values')
+        if value is not None and (not vals or not all(isinstance(v, str) and v.strip() for v in vals)):
+            raise h.CommerceError(f'"{name}": give a value, a list of values, or null to remove it')
         key = str(name).strip().lower()
         prop = next((p for p in props if key in (str(p.get("name")).lower(), str(p.get("display_name")).lower())), None)
         if prop is None:
             raise h.CommerceError(h.trim(f'"{name}" isn\'t an attribute of category {taxonomy_id}; it has: '
                                          + ", ".join(names), 500))
+        if value is None:  # remove it (2026-10-14: "Holiday": "Christmas" had gone on year-round tees)
+            out.append({"property_id": prop["property_id"], "name": str(prop.get("display_name") or prop.get("name")),
+                        "value_ids": [], "values": [], "remove": True})
+            continue
         cap = prop.get("max_values_allowed") if prop.get("is_multivalued") else 1
         if isinstance(cap, int) and cap and len(vals) > cap:
             raise h.CommerceError(f'"{name}" takes at most {cap} value(s)')
@@ -207,7 +213,7 @@ def _said(x: dict, fields: dict, props: list[dict]) -> str:
         parts.append("materials: " + (", ".join(fields["materials"]) or "none"))
     if "production_partner_ids" in fields:
         parts.append("production partners: " + (", ".join(map(str, fields["production_partner_ids"])) or "none"))
-    parts += [f"{p['name']}: {', '.join(p['values'])}" for p in props]
+    parts += [f"{p['name']}: removed" if p.get("remove") else f"{p['name']}: {', '.join(p['values'])}" for p in props]
     return "; ".join(parts)
 
 
@@ -245,6 +251,7 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
         shipping_profile_id: the delivery profile; 0 keeps it.
         properties: {"attribute name": "value" or ["values"]}, e.g. {"Primary color": "Black", "Holiday":
             "Christmas"}, matched to the category's attributes and Etsy's values (a wrong one is refused with the list).
+            null removes the attribute ({"Holiday": null}), and it is never re-applied.
         reapply: set again everything this tool last set on the listing (after a re-publish undid it); the other
             arguments are then ignored. Photos aren't re-applied (a Printify update never re-sends photos).
         images: 1-5 photos to add, [{"image": ref, "alt_text"?: up to 500 characters, "rank"?: 1-10}], where ref is
@@ -301,7 +308,10 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
     send_fields = {k: v for k, v in fields.items() if now.get(k) != v}
     cur = et.get(f"/v3/application/shops/{et.shop_id()}/listings/{lid}/properties", oauth=False) or {}
     have = {p.get("property_id"): sorted(p.get("value_ids") or []) for p in cur.get("results") or [] if isinstance(p, dict)}
-    send_props = [p for p in props if have.get(p["property_id"]) != sorted(p["value_ids"])]
+    send_props = [p for p in props if (bool(have.get(p["property_id"])) if p.get("remove")
+                                       else have.get(p["property_id"]) != sorted(p["value_ids"]))]
+    if gone := {p["property_id"] for p in props if p.get("remove")}:
+        _forget_props(lid, gone)  # at once, even if Etsy already lacks it: a re-apply must never set it back
     if not send_fields and not send_props and not new_images:
         return {"listing_id": lid, "pending": False, "note": "already as asked: nothing queued"}
     title = h.trim(x.get("title"), 60) or "untitled"
@@ -311,6 +321,16 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
     summary = f'{"Re-apply" if reapply else "Set"} Etsy details on "{title}": {said}'
     return _queue(lid, title, summary, {"fields": send_fields, "properties": send_props, "images": new_images},
                   {"fields": fields, "properties": props}, reapply, thumbs, owner_approval)
+
+
+def _forget_props(lid: str, property_ids: set) -> None:
+    """Drop attributes from what this tool re-applies to a listing (applied())."""
+    with _lock:
+        rows = applied()
+        saved = rows.get(lid)
+        if saved and any(p.get("property_id") in property_ids for p in saved.get("properties") or []):
+            saved["properties"] = [p for p in saved["properties"] if p.get("property_id") not in property_ids]
+            _write(ATTRS_FILE, "listings", rows)
 
 
 def queue_reapply(lid: str) -> dict | None:
@@ -338,10 +358,17 @@ def execute(payload: dict) -> dict:
     if fields:
         et.write("PATCH", f"/v3/application/shops/{shop}/listings/{lid}", fields, et.WRITE_SETTING, LABEL)
     for p in props:
+        path = f"/v3/application/shops/{shop}/listings/{lid}/properties/{p['property_id']}"
+        if p.get("remove"):
+            try:
+                et.write("DELETE", path, {}, et.WRITE_SETTING, LABEL)
+            except h.CommerceError as exc:
+                if "HTTP 404" not in str(exc):  # already gone: done
+                    raise
+            continue
         form = {"value_ids": p["value_ids"], "values": p["values"],
                 **({"scale_id": p["scale_id"]} if p.get("scale_id") else {})}
-        et.write("PUT", f"/v3/application/shops/{shop}/listings/{lid}/properties/{p['property_id']}", form,
-                 et.WRITE_SETTING, LABEL)
+        et.write("PUT", path, form, et.WRITE_SETTING, LABEL)
     uploaded, each = 0, []  # each photo's outcome, by name (the shop app, 2026-10-09: "done" didn't say which landed)
     for img in send.get("images") or []:
         if img.get("done_id"):
@@ -363,6 +390,9 @@ def execute(payload: dict) -> dict:
         saved = rows.get(lid) or {}
         by_id = {p["property_id"]: p for p in saved.get("properties") or []}
         by_id.update({p["property_id"]: p for p in wanted.get("properties") or []})
+        for p in wanted.get("properties") or []:
+            if p.get("remove"):  # a removed attribute is never re-applied
+                by_id.pop(p["property_id"], None)
         rows[lid] = {"fields": {**(saved.get("fields") or {}), **(wanted.get("fields") or {})},
                      "properties": list(by_id.values()), "title": payload.get("title"), "at": time.time()}
         _write(ATTRS_FILE, "listings", rows)

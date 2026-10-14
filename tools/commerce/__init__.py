@@ -121,6 +121,14 @@ SETTINGS = {
                 "is published or couldn't run. An app named here also counts for \"Apps whose own approval counts\". "
                 "This trusts the app's word. Empty: no app.",
     },
+    "approvals_trusted_bots": {
+        "type": "names", "default": "", "group": "Online shops",
+        "label": "Bots that may approve Etsy listing details",
+        "help": "Bot names, separated by commas (e.g. director). An approval an app sends as \"bot:<name>\" counts for "
+                "Etsy listing details edits only (category, materials, partners, delivery, attributes, section, "
+                "photos), never for publishing or price changes, and only from an app in \"Apps whose own approval "
+                "counts\". Each is logged as that bot's, not yours. Empty: no bot.",
+    },
     "commerce_printify_billing_currency": {
         "type": "select", "default": "not set", "group": "Online shops",
         "options": ["not set", "USD", "GBP", "EUR", "AUD", "CAD"],

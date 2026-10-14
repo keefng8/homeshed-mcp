@@ -73,6 +73,24 @@ def installed() -> dict | None:
     return cur
 
 
+def trusted(folder: Path, cur: dict) -> str | None:
+    """Why this unpacked Pro package can't be trusted, or None: the release key must have signed its version and file
+    list, and every file must match that list (to-do #19 round 8: a copied or hand-made folder loaded unchecked)."""
+    import pro_proof
+    import pro_record
+    record = str(cur.get("record_sha256") or "")
+    if not pro_proof.verify_wheel(cur.get("kid"), cur.get("sig"), str(cur.get("version") or ""), record):
+        return "the Pro package isn't signed by HomeShed's release key; run  homeshed-mcp pro update"
+    return pro_record.verify(folder, record, PACKAGE)
+
+
+def _record_sha256(z: zipfile.ZipFile) -> str:
+    names = [n for n in z.namelist() if re.match(rf"^{PACKAGE}-[^/]+\.dist-info/RECORD$", n)]
+    if len(names) != 1:
+        raise ProPluginError("the Pro package has no single file list (RECORD); nothing was installed")
+    return hashlib.sha256(z.read(names[0])).hexdigest()
+
+
 def load() -> dict:
     """Put the current Pro package on the path and import it (its tools register themselves). Never raises."""
     if _loaded:
@@ -85,6 +103,8 @@ def load() -> dict:
     try:
         if not (folder / PACKAGE / "__init__.py").is_file():
             raise ProPluginError(f"the Pro package folder for {cur['version']} is incomplete")
+        if why := trusted(folder, cur):
+            raise ProPluginError(why)
         if str(folder) not in sys.path:
             sys.path.insert(0, str(folder))
         import manifest
@@ -164,6 +184,9 @@ def update(have: str | None = None) -> dict:
     except (ValueError, KeyError, TypeError, AttributeError):
         raise ProPluginError("The Pro website's answer about the package wasn't readable.") from None
     version_key(version)
+    signed = {k: str(d.get(k) or "") for k in ("kid", "sig", "record_sha256")}
+    if not all(signed.values()) or not SHA_RE.match(signed["record_sha256"].lower()):
+        raise ProPluginError("The Pro website's package isn't signed, so nothing was downloaded.")
     if not SHA_RE.match(sha) or not 0 < size <= MAX_WHEEL_BYTES or not url.startswith(
             "/api/pro-api/packages/homeshed-pro/") or ".." in url:
         raise ProPluginError("The Pro website's answer about the package didn't look right, so nothing was downloaded.")
@@ -198,7 +221,15 @@ def update(have: str | None = None) -> dict:
         with zipfile.ZipFile(wheel) as z:
             if why := _requires_ok(_check_members(z), have):
                 raise ProPluginError(why)
+            if _record_sha256(z) != signed["record_sha256"].lower():
+                raise ProPluginError("The package's file list doesn't match its signature; nothing was installed.")
+            import pro_proof
+            if not pro_proof.verify_wheel(signed["kid"], signed["sig"], version, signed["record_sha256"]):
+                raise ProPluginError("The package isn't signed by HomeShed's release key; nothing was installed.")
             z.extractall(part)
+        if why := trusted(part, {"version": version, **signed}):
+            shutil.rmtree(part, ignore_errors=True)
+            raise ProPluginError(f"{why}; nothing was installed")
         final = root / version
         shutil.rmtree(final, ignore_errors=True)
         os.replace(part, final)
@@ -209,7 +240,8 @@ def update(have: str | None = None) -> dict:
     finally:
         wheel.unlink(missing_ok=True)
     previous = cur.get("version") if cur else None
-    state = {"version": version, "sha256": sha, "at": time.time(), **({"previous": previous} if previous else {})}
+    state = {"version": version, "sha256": sha, "at": time.time(), **signed,
+             **({"previous": previous} if previous else {})}
     tmp = root / "current.json.tmp"
     tmp.write_text(json.dumps(state), encoding="utf-8")
     os.replace(tmp, root / "current.json")

@@ -9,6 +9,7 @@ SSE-vs-JSON branching, several error paths) to earn real coverage -- done with h
 instead, which exercises the real httpx.AsyncClient code path against a fake transport rather than
 patching methods, avoiding the awkwardness that ruled out testing the simpler endpoints.
 """
+import asyncio
 import base64
 import json
 import re
@@ -2863,3 +2864,44 @@ def test_proxmox_tab_routes_relay_to_the_tool_server_for_the_owner_only(monkeypa
     c.get("/api/proxmox/history", params={"node": "pve1&kind=lxc"})  # a smuggled parameter stays inside its value
     assert calls[-1][1] == "/proxmox/monitor/history?kind=node&node=pve1%26kind%3Dlxc&timeframe=hour"
     assert TestClient(main.app).get("/api/proxmox/monitor").status_code in (401, 403)  # not without the owner's login
+
+
+# --- tokens saved as money (2026-10-14) -----------------------------------------------------------------------------
+ECB_SAMPLE = """<Cube time='2026-10-13'><Cube currency='USD' rate='1.0800'/><Cube currency='JPY' rate='160.1'/>
+<Cube currency='GBP' rate='0.8370'/></Cube>"""
+
+
+def test_money_uses_the_chosen_models_prices_and_the_ecb_rate(owner, monkeypatch):
+    client, main = owner
+    monkeypatch.setenv("PANEL_FX", "")
+    monkeypatch.setitem(main._fx, "at", 0.0)
+    asked = []
+
+    async def ecb(self, url, **kw):
+        asked.append(url)
+        return httpx.Response(200, text=ECB_SAMPLE, request=httpx.Request("GET", url))
+    monkeypatch.setattr(httpx.AsyncClient, "get", ecb, raising=True)
+    money = asyncio.run(main._money())
+    assert money == {"model": "opus-5-5", "label": "Claude Opus 5.5", "in": 4.0, "out": 20.0,
+                     "gbp_per_usd": 0.775, "rate_from": "ECB 2026-10-13", "approximate": False}
+    asyncio.run(main._money())
+    assert asked == [main.ECB_DAILY_URL]  # once a day
+
+
+def test_money_falls_back_to_an_approximate_rate_and_tokens_only_turns_it_off(owner, monkeypatch):
+    client, main = owner
+    monkeypatch.setitem(main._fx, "at", 0.0)
+    monkeypatch.setitem(main._fx, "gbp_per_usd", None)
+    money = asyncio.run(main._money())  # PANEL_FX=off in tests: nothing fetched
+    assert money["approximate"] and money["gbp_per_usd"] == main.GBP_PER_USD_APPROX
+    monkeypatch.setattr(main, "panel_values", lambda: {"savings_money": "off"})
+    assert asyncio.run(main._money()) is None
+
+
+def test_viewers_see_the_money_line_too(owner, viewer, monkeypatch):
+    client, main = owner
+    friend, _, _ = viewer
+    _upstream(monkeypatch, main)
+    for path in ("/api/tokens", "/api/savings"):
+        money = friend.get(path).json()["money"]
+        assert money["label"] == "Claude Opus 5.5" and money["in"] == 4.0 and money["out"] == 20.0

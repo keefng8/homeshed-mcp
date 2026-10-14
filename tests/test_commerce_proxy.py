@@ -412,6 +412,7 @@ def test_printify_shapes(fake):
     prods = pr.products_list(limit=3)
     assert prods["total"] == 120 and len(prods["products"]) == 3
     assert prods["products"][0]["variants_enabled"] == 50 and prods["products"][0]["min_price"] == 15.0
+    assert prods["products"][0]["external_id"] is None  # a draft: not on Etsy yet
     bp = pr.blueprints_list(query="mug", limit=10, offset=5)
     assert bp["matches"] == 500 and len(bp["blueprints"]) == 10 and bp["next_offset"] == 15
     assert all("Mug" in b["title"] for b in bp["blueprints"])
@@ -427,3 +428,14 @@ def test_tools_never_write(fake):
     for call, kwargs in ETSY_CALLS + PF_CALLS:
         call(**kwargs)
     assert {c.method for c in fake.calls if c.url.path != "/v3/public/oauth/token"} == {"GET"}
+
+
+def test_printify_products_list_names_each_published_products_etsy_listing(monkeypatch):
+    """2026-10-14: an app watching its drafts reads list pages instead of one product.get each (~108 calls an hour)."""
+    page = {"current_page": 1, "last_page": 1, "total": 2, "data": [
+        {"id": "a", "title": "Live tee", "external": {"id": "4594788432", "handle": "https://etsy.example/l/1"}},
+        {"id": "b", "title": "Draft tee"}]}
+    monkeypatch.setattr(pr.pf, "get", lambda path, params=None: page)
+    monkeypatch.setattr(pr.pf, "shop_id", lambda: "1")
+    rows = pr.products_list()["products"]
+    assert [r["external_id"] for r in rows] == ["4594788432", None]

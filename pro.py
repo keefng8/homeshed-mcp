@@ -22,27 +22,35 @@ _confirmed_at: float | None = None  # None: not read from STATE yet
 _written_at = 0.0
 
 
-def _last_confirmed() -> float:
+def _last_confirmed(token: str) -> float:
+    """When the newest signed Pro statement kept on disk was signed, or 0. A time typed into the file counts for
+    nothing: only the Pro site's signature does (to-do #19 round 8)."""
     global _confirmed_at
     if _confirmed_at is None:
         try:
-            _confirmed_at = float(json.loads(STATE.read_text(encoding="utf-8"))["confirmed_at"])
-        except (OSError, ValueError, TypeError, KeyError):
-            _confirmed_at = 0.0
+            proof = json.loads(STATE.read_text(encoding="utf-8")).get("proof")
+        except (OSError, ValueError, TypeError, AttributeError):
+            proof = None
+        import pro_proof
+        _confirmed_at = float(pro_proof.signed_at(proof, token) or 0) if proof else 0.0
     return _confirmed_at
 
 
-def _confirm(now: float) -> None:
+def _confirm(proof: str | None, token: str) -> None:
     global _confirmed_at, _written_at
-    _confirmed_at = now
-    if now - _written_at < WRITE_EVERY_S:
+    import pro_proof
+    iat = pro_proof.signed_at(proof, token) if proof else None
+    if not iat:
+        return
+    _confirmed_at = float(iat)
+    if time.time() - _written_at < WRITE_EVERY_S:
         return
     try:
         STATE.parent.mkdir(parents=True, exist_ok=True)
         tmp = STATE.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"confirmed_at": now}), encoding="utf-8")
+        tmp.write_text(json.dumps({"proof": proof}), encoding="utf-8")
         os.replace(tmp, STATE)
-        _written_at = now
+        _written_at = time.time()
     except OSError:
         pass  # the grace then lasts only while this server runs, as it did before
 
@@ -58,10 +66,11 @@ def check() -> tuple[bool, str]:
     except Exception:  # noqa: BLE001 - treated like an unreachable site, never a failed tool call
         st = {"connected": True, "unreachable": True, "reason": "Couldn't check the Pro membership just now."}
     now = time.time()
-    if st.get("pro"):
-        _confirm(now)
+    token = mavis_pro.vault.secret(mavis_pro.TOKEN) or ""
+    if st.get("pro"):  # status() counts only a statement signed with the Pro site's key
+        _confirm(mavis_pro.last_proof(), token)
         return True, ""
-    # 0 <=: a confirmed time in the future is an edited file, not a membership (to-do #19 bypass test, 2026-10-01)
-    if st.get("unreachable") and 0 <= now - _last_confirmed() < GRACE_S:
+    # 0 <=: a signed time in the future isn't a membership either (to-do #19 bypass test, 2026-10-01)
+    if st.get("unreachable") and token and 0 <= now - _last_confirmed(token) < GRACE_S:
         return True, ""
     return False, st.get("reason") or ""

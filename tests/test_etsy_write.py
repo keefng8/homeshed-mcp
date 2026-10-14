@@ -75,6 +75,39 @@ def test_an_update_only_queues_what_differs_and_approval_sets_it(fake):
     assert len(pp.done_today("etsy")) == 1
 
 
+def test_null_removes_an_attribute_and_it_is_never_re_applied(fake):
+    """2026-10-14: "Holiday": "Christmas" went on ~55 year-round tees. {"Holiday": null} deletes it on approval and
+    drops it from what a re-apply sets; a listing without it queues nothing but still forgets it."""
+    state, writes, _, _ = fake
+    first = ew.listing_update("4412", properties={"Primary color": "Black", "Holiday": "Christmas"})
+    pp.decide(first["id"], True)
+    writes.clear()
+    state["current"] = {"results": [{"property_id": 200, "value_ids": [1]}, {"property_id": 46803063641,
+                                                                             "value_ids": [35]}]}
+    out = ew.listing_update("4412", properties={"holiday": None})
+    assert out["pending"] is True and out["etsy"] == 'Set Etsy details on "Retro Frenchie Tee": Holiday: removed'
+    assert [p["property_id"] for p in ew.applied()["4412"]["properties"]] == [200]  # forgotten at once
+    res = pp.decide(out["id"], True)
+    assert res["approved"] and writes == [("DELETE", f"/v3/application/shops/{SHOP}/listings/4412/properties/"
+                                           "46803063641", {}, et.WRITE_SETTING)]
+    assert [p["property_id"] for p in ew.applied()["4412"]["properties"]] == [200]
+    ew.queue_reapply("4412")  # after a Printify re-publish: Christmas doesn't come back
+    [again] = pp.list_pending()
+    assert [p["property_id"] for p in again["payload"]["send"]["properties"]] == [200]
+    pp.decide(again["id"], False)
+    state["current"] = {"results": [{"property_id": 200, "value_ids": [1]}]}  # Etsy has none now
+    assert ew.listing_update("4412", properties={"Holiday": None})["pending"] is False
+
+
+def test_removing_an_attribute_etsy_already_lacks_is_done(fake, monkeypatch):
+    def gone(method, path, form, setting, label):
+        raise h.CommerceError("Etsy: HTTP 404 not found")
+    monkeypatch.setattr(et, "write", gone)
+    payload = {"listing_id": "4412", "send": {"properties": [{"property_id": 5, "name": "Holiday", "value_ids": [],
+                                                              "values": [], "remove": True}]}}
+    assert ew.execute(payload)["attributes"] == ["Holiday"]
+
+
 def test_production_partners_compare_with_etsys_listing_field(fake):
     """Etsy's listing names its partners in "production_partners" (2026-10-09): one already linked isn't re-queued."""
     state, _, _, _ = fake
@@ -295,3 +328,12 @@ def test_the_client_sends_lists_comma_joined_and_names_a_missing_scope(monkeypat
         et.write("PUT", "/v3/application/shops/1/listings/4412/properties/200", {"value_ids": [1, 2]},
                  et.WRITE_SETTING, "x")
     assert seen[1] == {"value_ids": ["1,2"]}
+
+
+@pytest.mark.parametrize("value, edits, deactivations", [("150", 150, 100), ("500", 200, 100), ("x", 50, 5), ("", 50, 5)])
+def test_the_edit_limit_goes_to_200_and_deactivation_stays_at_100(monkeypatch, value, edits, deactivations):
+    """2026-10-14, the owner: raise the edit limit to 150 (30 publishes need 60 edits a night, plus repairs)."""
+    from tools.etsy import write as w
+    monkeypatch.setenv("ETSY_EDIT_DAILY_MAX", value)
+    monkeypatch.setenv("ETSY_DEACTIVATE_DAILY_MAX", value)
+    assert w.edit_daily_max() == edits and w.deactivate_daily_max() == deactivations

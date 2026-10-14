@@ -42,6 +42,7 @@ import clients
 import hmac
 import inspect
 import json
+import logging
 import projects
 import re
 import time
@@ -82,6 +83,29 @@ def _project_header(ctx) -> str:
     return (request.headers.get(projects.HEADER) or "") if request is not None else ""
 
 
+_log = logging.getLogger("homeshed")
+
+
+def _inputs(tool_name: str) -> list[str]:
+    from registry import get_capability
+    cap = get_capability(tool_name)
+    return list(inspect.signature(cap.func).parameters) if cap else []
+
+
+def _unknown_inputs(tool_name: str, arguments) -> list[str]:
+    """Input names the tool doesn't take. The SDK drops them silently, so a misnamed one ran with its default instead:
+    repo.leak_scan given path= (not folder=) scanned the server's own folder and said "clean" (2026-10-14). The owner's
+    sessions are told and nothing runs; an app's extra field is only logged, so a client sending one keeps working."""
+    from registry import get_capability
+    cap = get_capability(tool_name)
+    if cap is None or not isinstance(arguments, dict):
+        return []
+    params = inspect.signature(cap.func).parameters.values()
+    if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params):
+        return []
+    return sorted(set(arguments) - {p.name for p in params})
+
+
 class GuardedMCPServer(MCPServer):
     """MCPServer plus per-client tool grants (clients.py): a client only sees and can only call the
     tools the owner granted it, within its calls-per-minute limit.
@@ -104,6 +128,14 @@ class GuardedMCPServer(MCPServer):
                 from registry import log_refusal
                 log_refusal(params.name, client, reason, clients.connection_tag(client, _source(ctx)))
                 return CallToolResult(content=[TextContent(type="text", text=reason)], is_error=True)
+        unknown = _unknown_inputs(params.name, getattr(params, "arguments", None))
+        if unknown:
+            takes = ", ".join(_inputs(params.name)) or "no inputs"
+            text = (f"{params.name} has no input named {', '.join(unknown)}: it takes {takes}. Nothing was run; "
+                    "call it again with those names.")
+            if client is None:
+                return CallToolResult(content=[TextContent(type="text", text=text)], is_error=True)
+            _log.warning("client %s: %s", client, text)  # an app's extra field is logged, never refused here
         conn = clients.seen(client, _source(ctx), call=True)
         token, ctoken = clients.current_client.set(client), clients.current_connection.set(conn)
         # The tool checked just above: anything else a client's call runs (workflow.run's steps) is checked by the

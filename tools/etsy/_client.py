@@ -141,7 +141,7 @@ SHOP_WRITE_SETTING = "commerce_etsy_shop_write_enabled"  # etsy.shop.update (sho
 
 
 def write(method: str, path: str, form: dict, setting: str, label: str, files: dict | None = None) -> Any:
-    """A change to one of the shop's listings (PATCH, PUT, or a POST with files: multipart): the read switch, the
+    """A change to one of the shop's listings (PATCH, PUT, DELETE, a POST with files: multipart): the read switch, the
     calling tool's own switch, and a connection made with listings_w (Connect Etsy asks for it once a write switch is
     on). Etsy reads a list in a form as one comma-separated value (repeated keys keep only the last one:
     etsy/open-api discussion #1086), so lists are joined here."""
@@ -157,7 +157,7 @@ def write(method: str, path: str, form: dict, setting: str, label: str, files: d
         try:
             resp = h.request("etsy", method, path, headers=headers, data=body, files=files,
                              secrets=tuple(s for s in (key, sec, token, _state["refresh"]) if s))
-            return h.json_of("etsy", resp)
+            return h.json_of("etsy", resp) if resp.content else None  # a DELETE answers 204, no body
         except h.CommerceError as exc:
             if attempt == 0 and "HTTP 401" in str(exc):
                 continue  # the access token went stale early: refresh once and try again

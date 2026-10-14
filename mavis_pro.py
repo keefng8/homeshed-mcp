@@ -125,6 +125,12 @@ def connect_key(key: str) -> dict:
     return status(fresh=True)
 
 
+def last_proof() -> str | None:
+    """The newest signed Pro statement status() saw from the Pro site, or None."""
+    with _lock:
+        return _cache.get("proof")
+
+
 def status(fresh: bool = False) -> dict:
     """{connected, pro, account, client_name, connected_at, reason, unreachable}. Asks the backend at most every
     10 minutes; unreachable is set when the site gave no answer about the membership (down, or an HTTP error)."""
@@ -140,7 +146,20 @@ def status(fresh: bool = False) -> dict:
     try:
         r = httpx.get(f"{api_url()}/pro-api/whoami", headers={"Authorization": f"Bearer {token}"}, timeout=10)
         if r.status_code == 200:
-            out["pro"] = True
+            # Only a statement signed with the Pro site's key counts: a fake site (the Pro address pointed elsewhere)
+            # answers 200 too (to-do #19 t3). The proof is kept so pro.check's grace counts from when it was signed.
+            import pro_proof
+            try:
+                proof = (r.json() or {}).get("proof")
+            except (ValueError, AttributeError):
+                proof = None
+            if pro_proof.verify_membership(proof, token):
+                out["pro"] = True
+                with _lock:
+                    _cache["proof"] = proof  # not in status(): that goes to the panel, and this is for pro.check
+            else:
+                out["reason"] = ("The Pro website's answer isn't signed, so Pro stays off. Check the Pro address in "
+                                 "Settings, or update HomeShed.")
         elif r.status_code == 403:
             out["reason"] = "Your Pro membership has ended, so Pro features are paused here. Renew on the Pro website."
         elif r.status_code == 401:

@@ -68,6 +68,7 @@ This guide takes you from nothing to a working setup, one step at a time. You do
 
 ## Next steps
 
+- **Upgrading later:** see [Upgrading HomeShed](upgrading.md). Your data is kept.
 - **Use your own AI model** (for example Ollama) so routine work doesn't use your paid AI: see "Want more?" in the
   [README](../README.md#install).
 - **Tools that change things** (git commits, Docker) are **off by default** for safety. Switch on only the ones you

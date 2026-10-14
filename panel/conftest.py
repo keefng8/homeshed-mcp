@@ -16,6 +16,7 @@ TEST_ENV = {
     "MEMORY_TEAM_ID": "test-team",
     "MEMORY_USER_ID": "test-user",
     "MEMORY_AGENT_ID": "test-agent",
+    "PANEL_FX": "off",  # never fetch the exchange rate from a test
 }
 for _key, _value in TEST_ENV.items():
     os.environ.setdefault(_key, _value)

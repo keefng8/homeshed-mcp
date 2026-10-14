@@ -1,5 +1,5 @@
 """etsy.shop.get, etsy.listings.list, etsy.listing.get, etsy.shipping_destinations, etsy.orders.list,
-etsy.order.get (read-only).
+etsy.order.get, etsy.ledger (read-only).
 See ../../capabilities/etsy/read.md. Results are compact (under about 5,000 characters) and leave out buyers'
 personal details: names, emails, addresses and messages."""
 from __future__ import annotations
@@ -15,6 +15,21 @@ def _ts(v):
     return int(v) if isinstance(v, (int, float)) else None
 
 
+def _listing_edits() -> dict | None:
+    """The listing-details edits' daily limit, so an app paces its publishes to the edits a new listing needs (2026-10-14:
+    30 publishes needed 60 edits against 50, and 19 went live without delivery profile or partner)."""
+    import printify_pending
+    from tools.etsy.write import edit_daily_max
+    try:
+        waiting = [i for i in printify_pending.list_pending() if i.get("action") == "etsy"]
+    except printify_pending.PendingError:
+        return None
+    return {"last_24h": len(printify_pending.done_today("etsy")), "daily_max": edit_daily_max(),
+            # approved, held back only by the limit (they run by themselves when there's room)
+            "queued": sum(1 for i in waiting if i.get("owner_approval") and not i.get("last_error")),
+            "waiting_for_owner": sum(1 for i in waiting if not i.get("owner_approval") or i.get("last_error"))}
+
+
 @tool(name="shop.get", category="etsy", doc="etsy/read.md")
 def shop_get() -> dict:
     """The configured Etsy shop (ETSY_SHOP_ID): name, title, currency, counts, reviews, vacation mode, and its
@@ -25,7 +40,10 @@ def shop_get() -> dict:
         {"shop_id", "shop_name", "title", "currency", "active_listings", "sold", "review_average", "review_count",
          "is_vacation", "url", "created", "production_partners": [{"id", "name", "location"}] or null when the shop's
          connection can't read them, "return_policies": [{"id", "accepts_returns", "accepts_exchanges",
-         "return_deadline_days"}] or null likewise}
+         "return_deadline_days"}] or null likewise, "sections": [{"shop_section_id", "title",
+         "active_listing_count"}] (what a listing's shop_section_id names) or null likewise, "listing_edits":
+         {"last_24h", "daily_max" (ETSY_EDIT_DAILY_MAX), "queued" (approved, waiting for room under the limit),
+         "waiting_for_owner"}}
     """
     sid = et.shop_id()
     s = et.get(f"/v3/application/shops/{sid}", oauth=False) or {}
@@ -42,8 +60,15 @@ def shop_get() -> dict:
                    for r in rows or [] if isinstance(r, dict)][:20]
     except h.CommerceError:
         returns = None
-    return et.note({"shop_id": s.get("shop_id"), "shop_name": s.get("shop_name"), "title": h.trim(s.get("title"), 120),
-                    "return_policies": returns,
+    try:  # getShopSections: what a listing's shop_section_id names (2026-10-14, the station files new listings)
+        rows = (et.get(f"/v3/application/shops/{sid}/sections") or {}).get("results")
+        sections = [{"shop_section_id": r.get("shop_section_id"), "title": h.trim(r.get("title"), 40),
+                     "active_listing_count": r.get("active_listing_count")}
+                    for r in rows or [] if isinstance(r, dict)][:30]
+    except h.CommerceError:
+        sections = None
+    return et.note({"listing_edits": _listing_edits(),"shop_id": s.get("shop_id"), "shop_name": s.get("shop_name"), "title": h.trim(s.get("title"), 120),
+                    "return_policies": returns, "sections": sections,
                     "currency": s.get("currency_code"), "active_listings": s.get("listing_active_count"),
                     "sold": s.get("transaction_sold_count"), "review_average": s.get("review_average"),
                     "review_count": s.get("review_count"), "is_vacation": s.get("is_vacation"),
@@ -205,3 +230,44 @@ def order_get(receipt_id: str) -> dict:
                     "shipping": h.money(r.get("total_shipping_cost")), "tax": h.money(r.get("total_tax_cost")),
                     "discount": h.money(r.get("discount_amt")), "items": items, "shipments": ships,
                     "updated": _ts(r.get("updated_timestamp"))})
+
+
+@tool(name="ledger", category="etsy", doc="etsy/read.md")
+def ledger(days: int = 30, since: int = 0, until: int = 0, limit: int = 30, offset: int = 0) -> dict:
+    """The shop's payment account ledger: what Etsy actually charged and paid (listing, renewal, transaction and
+    processing fees, sales, deposits), so an app shows real fees instead of an estimate (2026-10-14). Read-only.
+
+    Args:
+        days: how far back, when since isn't given (1-365, default 30).
+        since / until: unix seconds instead (until defaults to now).
+        limit: 1-30 per page (answers stay small); offset: skip this many (paging: use "next_offset").
+
+    Returns:
+        {"since", "until", "total", "offset", "next_offset", "currency", "by_type": {ledger_type: sum on this page},
+         "entries": [{"created", "amount", "ledger_type", "description", "reference_type", "reference_id"}]}
+        Amounts are in the currency's main unit (pounds), negative for a charge.
+    """
+    import time
+    now = int(time.time())
+    until = h.clamp(until, 0, now + 86400, "until") or now
+    since = h.clamp(since, 0, until, "since") or until - h.clamp(days, 1, 365, "days") * 86400
+    limit, offset = h.clamp(limit, 1, 30, "limit"), h.clamp(offset, 0, 100_000, "offset")
+    d = et.get(f"/v3/application/shops/{et.shop_id()}/payment-account/ledger-entries",
+               params={"min_created": since, "max_created": until, "limit": limit, "offset": offset}) or {}
+    rows, by_type, currency = [], {}, None
+    for e in (d.get("results") or [])[:limit]:
+        if not isinstance(e, dict):
+            continue
+        amount = e.get("amount")
+        amount = round(amount / 100, 2) if isinstance(amount, (int, float)) else None
+        kind = str(e.get("ledger_type") or "?")
+        currency = currency or e.get("currency")
+        if amount is not None:
+            by_type[kind] = round(by_type.get(kind, 0) + amount, 2)
+        rows.append({"created": _ts(e.get("created_timestamp") or e.get("create_date")), "amount": amount,
+                     "ledger_type": kind, "description": h.trim(e.get("description"), 80),
+                     "reference_type": e.get("reference_type"), "reference_id": e.get("reference_id")})
+    total = d.get("count")
+    nxt = offset + len(rows) if isinstance(total, int) and offset + len(rows) < total else None
+    return et.note({"since": since, "until": until, "total": total, "offset": offset, "next_offset": nxt,
+                    "currency": currency, "by_type": by_type, "entries": rows})
