@@ -169,7 +169,7 @@ def test_on_makes_the_settings_file_when_there_is_none_and_copies_the_engine(pla
     assert rp.turn_on()["changed"] and ours(settings(place)) == [rp.hook_entry()]
     assert rp.ENGINE_COPY.read_text(encoding="utf-8") == Path(guard_engine.__file__).read_text(encoding="utf-8")
     entries = rp.hook_entries()
-    assert list(entries) == ["PreToolUse", "UserPromptSubmit", "SessionStart", "Stop"]
+    assert list(entries) == ["PreToolUse", "UserPromptSubmit", "SessionStart", "Stop", "PreCompact"]
     assert all(e["hooks"][0]["timeout"] == rp.HOOK_TIMEOUT_S and e["hooks"][0]["command"] == rp.hook_command()
                for e in entries.values())
     assert [e for e, x in entries.items() if "matcher" in x] == ["PreToolUse"]  # the others fire on every prompt/stop
@@ -427,3 +427,43 @@ def test_doctor_reports_rule_packs(cli, place, capsys):
     rp.ENGINE_COPY.write_text('ENGINE_VERSION = "0"\n', encoding="utf-8")
     report = cli.diagnose()
     assert report["packs"]["state"] == "broken" and report["broken"] >= 1
+
+
+# --- compact-at: when Claude Code compacts (Token Saver keeps the place across it) ---------------------------------------
+def test_compact_at_sets_and_removes_only_its_own_env_line(place):
+    path = place / "claude" / "settings.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({"env": {"OTHER": "1"}, "model": "opus"}), encoding="utf-8")
+    asked = []
+    assert rp.compact_at(80, confirm=lambda before, p: asked.append(before) or True)["reason"] == "set"
+    assert settings(place) == {"env": {"OTHER": "1", rp.COMPACT_ENV: "80"}, "model": "opus"} and asked == [None]
+    assert rp.compact_at(80)["reason"] == "already"
+    assert rp.compact_at(70, confirm=lambda before, p: False)["reason"] == "declined"
+    assert rp.compact_at(None)["reason"] == "set" and settings(place) == {"env": {"OTHER": "1"}, "model": "opus"}
+
+
+def test_compact_at_off_leaves_no_empty_env_and_refuses_bad_values(place):
+    assert rp.compact_at(60)["changed"] and rp.compact_at(None)["changed"]
+    assert settings(place) == {}
+    for bad in (0, 100, -1):
+        with pytest.raises(rp.PackError):
+            rp.compact_at(bad)
+
+
+def test_compact_at_never_writes_settings_it_cant_read(place):
+    path = place / "claude" / "settings.json"
+    path.parent.mkdir(parents=True)
+    for text in ("{not json", json.dumps({"env": ["x"]})):
+        path.write_text(text, encoding="utf-8")
+        assert rp.compact_at(50)["reason"] == "unreadable" and path.read_text(encoding="utf-8") == text
+
+
+def test_the_cli_shows_the_change_and_asks(place, monkeypatch, capsys):
+    import cli
+    monkeypatch.setattr(cli, "_prepare", lambda: None)
+    monkeypatch.setattr(cli, "_ask", lambda q, default=False: True)
+    assert cli.main(["packs", "compact-at", "75"]) == 0
+    out = capsys.readouterr().out
+    assert rp.COMPACT_ENV + "=75" in out and "Sessions started from now compact at 75%" in out
+    assert cli.main(["packs", "compact-at", "off"]) == 0 and settings(place) == {}
+    assert cli.main(["packs", "compact-at", "150"]) == 1

@@ -563,6 +563,8 @@ def cmd_packs(args) -> int:
             return 0
         if action == "on":
             return _packs_on(rp, args.yes)
+        if action == "compact-at":
+            return _compact_at(rp, args.name, args.yes)
         if action == "off":
             res = rp.turn_off()
             print({"off": f"The hook is off: Claude Code no longer runs rule packs ({res['path']}).",
@@ -643,7 +645,7 @@ def _packs_on(rp, yes: bool) -> int:
     def confirm(entries, path) -> bool:
         print(f"This adds HomeShed's rule-pack hook to Claude Code's settings ({path}). It's one small program, run "
               "before each command, file write or message (PreToolUse), and, for the built-in checks, when a prompt "
-              "arrives, when a session starts and when a turn ends:")
+              "arrives, when a session starts, when a turn ends and just before Claude Code compacts a session:")
         print(json.dumps({"hooks": {event: [entry] for event, entry in entries.items()}}, indent=2))
         print(f"A copy of that file is kept first ({path.name}.homeshed-backup). Undo it any time:  {NAME} packs off")
         return yes or _ask("Add it? [y/N] ", default=False)
@@ -660,6 +662,30 @@ def _packs_on(rp, yes: bool) -> int:
            "changed meanwhile": "Claude Code's settings changed while this ran, so nothing was written. Run it again."
            }[res["reason"]])
     return 0 if res["reason"] != "changed meanwhile" else 1
+
+
+def _compact_at(rp, value: str, yes: bool) -> int:
+    """`packs compact-at 80` or `packs compact-at off`: when Claude Code compacts (Token Saver keeps the session's place
+    across it). One line in Claude Code's settings, so it shows the change and asks first."""
+    pct = None if value.lower() in ("off", "default") else int(value) if value.isdigit() else -1
+
+    def confirm(before, path) -> bool:
+        now = "Claude Code's own point" if pct is None else f"{pct}% of Claude Code's usual point"
+        print(f"This sets when Claude Code compacts a session to {now}, with one line under \"env\" in its settings "
+              f"({path}): {rp.COMPACT_ENV}" + ("" if pct is None else f"={pct}") + (" (removed)" if pct is None else ""))
+        if before is not None:
+            print(f"It's {before}% now.")
+        return yes or _ask("Change it? [y/N] ", default=False)
+
+    res = rp.compact_at(pct, confirm=confirm)
+    print({"set": "Done. Sessions started from now compact " + (
+               "at Claude Code's own point." if pct is None else f"at {pct}% of Claude Code's usual point."),
+           "already": "That's already the setting.",
+           "declined": "Nothing was changed.",
+           "changed meanwhile": "Claude Code's settings changed while this ran, so nothing was written. Run it again.",
+           "unreadable": f"Your Claude Code settings ({res['path']}) couldn't be read, so nothing was changed. Set "
+                         f"{rp.COMPACT_ENV} under \"env\" there yourself."}[res["reason"]])
+    return 0 if res["reason"] in ("set", "already", "declined") else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -692,8 +718,9 @@ def main(argv: list[str] | None = None) -> int:
     pr.add_argument("--key-stdin", action="store_true", help="connect: read the key from stdin (for scripts)")
     pk = sub.add_parser("packs", parents=[remote], help="rule packs, and their hook in Claude Code")
     pk.add_argument("action", nargs="?", default="list",
-                    choices=["list", "install", "add", "check", "remove", "on", "off"])
-    pk.add_argument("name", nargs="?", help="install/remove: a pack's name; add/check: a pack file")
+                    choices=["list", "install", "add", "check", "remove", "on", "off", "compact-at"])
+    pk.add_argument("name", nargs="?", help="install/remove: a pack's name; add/check: a pack file; compact-at: a "
+                                            "percentage (1-99) or off")
     pk.add_argument("--yes", action="store_true",
                     help="on: change Claude Code's settings without asking; add: accept the pack's session notes")
     args = p.parse_args(argv)
@@ -701,6 +728,8 @@ def main(argv: list[str] | None = None) -> int:
         args = p.parse_args(["serve", *(argv or [])])
     if args.command == "packs" and args.action in ("install", "add", "check", "remove") and not args.name:
         p.error(f"packs {args.action} needs a {'pack name' if args.action in ('install', 'remove') else 'pack file'}")
+    if args.command == "packs" and args.action == "compact-at" and not args.name:
+        p.error("packs compact-at needs a percentage (1-99) or off")
     return {"serve": cmd_serve, "init": cmd_init, "setup": cmd_setup, "doctor": cmd_doctor,
             "panel": cmd_panel, "pro": cmd_pro, "packs": cmd_packs}[args.command](args)
 

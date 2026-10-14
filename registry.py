@@ -103,11 +103,12 @@ def tool(*, name: str, category: str, doc: str):
             if quiet_call.get() and client is None and tool_meta(capability_id)[0] == "read":
                 return func(*args, **kwargs)  # the panel drawing itself: not activity (quiet_call above)
             start = time.monotonic()
+            shown = usage.ledger_id(capability_id, kwargs)  # how the call is counted (a GET to a write tool reads)
             try:
                 result = func(*args, **kwargs)
                 _ACTIVITY_LOG.append(
                     {
-                        "id": capability_id,
+                        "id": shown,
                         "timestamp": time.time(),
                         "duration_ms": round((time.monotonic() - start) * 1000, 1),
                         "ok": True,
@@ -115,12 +116,12 @@ def tool(*, name: str, category: str, doc: str):
                         "conn": conn,
                     }
                 )
-                usage.record(capability_id, kwargs, result, ok=True, client=client)  # sizes only; never raises
+                usage.record(shown, kwargs, result, ok=True, client=client)  # sizes only; never raises
                 return result
             except Exception as exc:
                 _ACTIVITY_LOG.append(
                     {
-                        "id": capability_id,
+                        "id": shown,
                         "timestamp": time.time(),
                         "duration_ms": round((time.monotonic() - start) * 1000, 1),
                         "ok": False,
@@ -128,7 +129,7 @@ def tool(*, name: str, category: str, doc: str):
                         "conn": conn,
                     }
                 )
-                usage.record(capability_id, kwargs, None, ok=False, client=client)
+                usage.record(shown, kwargs, None, ok=False, client=client)
                 # Real bug found live 2026-09-23: the MCP SDK's own Tool.run() treats any bare
                 # exception as "a crash" and deliberately strips its message before it reaches
                 # the client — every one of this project's capabilities has always documented

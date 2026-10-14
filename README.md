@@ -27,6 +27,7 @@
 
 <p align="center">
   <a href="#install">Install</a> ·
+  <a href="#try-it-things-to-ask">Try it</a> ·
   <a href="#what-your-ai-can-do">What your AI can do</a> ·
   <a href="#tools">All tools</a> ·
   <a href="#security">Security</a> ·
@@ -68,13 +69,38 @@ it has seen before, and solve logic problems: <!--count:total-->132<!--/count-->
 - **Mistakes that stay fixed.** Your AI logs corrections and broken rules as observations, repeats get flagged, and a
   known-bugs list answers "has this error been seen before?"
 - **Checks before your AI acts.** Rule packs check each command and file write before Claude Code runs it, and stop
-  risky ones with the reason and what to do instead. Write your own in a few lines of JSON, or add
-  [HomeShed Pro](#homeshed-pro)'s curated packs ([how](docs/rule-packs.md)).
+  risky ones with the reason and what to do instead. Anyone can write their own in a few lines of JSON
+  ([how](docs/rule-packs.md)). Or skip the trial and error: [HomeShed Pro](#homeshed-pro)'s five packs are already
+  written, tested on real sessions and kept up to date, and each one is a single install.
 - **A Control Panel, if you want one.** An optional web page on your own machine shows what's running and what it has
   saved you, with a switch for every tool and a key for every app. Add it any time; HomeShed never needs it.
 - **One endpoint, you stay in control.** Every app gets its own key, tool list and rate limit, and every change to
   them is logged. Tools that act on your machines start off, and keys sit in an encrypted vault that's never shown
   to the AI.
+- **Your homelab at a glance.** If you run Proxmox, the Control Panel's Proxmox tab and `proxmox.health` show every
+  node, VM and container, and send you an alarm when something breaks and again when it recovers. A Terminal tab
+  (off until you switch it on) gives you SSH to your own machines in the browser.
+- **Spend you can cap.** Every app gets a daily dollar cap for paid models and images. At the cap its paid calls stop
+  and everything free keeps working.
+- **Never lose your place (Pro).** Before Claude Code compacts a long session, HomeShed Pro saves a note
+  of what you were doing and puts it back straight after. [More](#homeshed-pro).
+
+## Try it: things to ask
+
+Once HomeShed is added, just ask your AI. A few favourites:
+
+| Ask your AI | What happens |
+|---|---|
+| "Have I ever pasted an API key into Claude Code?" | `secrets.transcript_scan` checks your saved sessions and lists each key's kind, where it is and where to rotate it, without ever showing the key |
+| "Remember that we deploy from the `release` branch", then next week: "where do we deploy from?" | `memory.remember_fact` saves it; `memory.recall_relevant` finds it in a later session |
+| "Seen this error before?" | `bugs.find` checks your known-bugs list (and Pro's feed, if you have it) for the cause and fix |
+| "Ann, Bob and Cat sit in a row. Ann isn't next to Bob, and Bob isn't on the left. Who sits where?" | `reasoning.solve` hands the logic to the Z3 solver, so the answer is proven, not guessed |
+| "Is this repo ready to go public?" | `repo.readiness` scores it with one fix per gap; `repo.leak_scan` finds private details and secrets first |
+| "Is my site leaking anything?" | `network.exposure_check` tries the paths attackers try first (admin pages, `/.env`, `/.git`) on your own public site |
+| "How's the Proxmox cluster?" | `proxmox.health`: quorum, each node's CPU, RAM and disk, what's running, and any alarm active now |
+| "How many stars and downloads did my project get?" | `repo.stats`: stars, forks, release and PyPI downloads, plus views and referrers with a GitHub token |
+| "What did my apps spend on AI today?" | `spend.today`: each app's spend against the daily cap you set |
+| "Which container keeps restarting?" | `docker.container.list` and `docker.container.logs`, once you switch Docker on |
 
 ## Install
 
@@ -830,8 +856,13 @@ HomeShed is free and complete, and it stays that way: every tool and all of its 
 **Mavis Pro**, the membership from the makers of [Mavis](https://mavis-ai.co.uk/?src=homeshed&m=readme), a Windows
 voice assistant with 124 one-click apps. One membership covers both. It adds:
 
-- **Every curated rule pack** for your AI assistant, with updates as they improve: **Token Saver** (cuts wasted tokens
-  and time: bounded searches, no waiting in loops, simple work to your own model), **Safe Operator** (keeps keys and
+- **Never lose your place.** Before Claude Code compacts a long session, HomeShed Pro saves a note of
+  what you were doing and puts it back straight after, so Claude carries on knowing the task. It comes with the Token
+  Saver pack, and `uvx homeshed-mcp packs compact-at 80` sets when compaction starts. Windows and Linux tested; macOS
+  should work. The note stays on your own machine ([how it works](docs/rule-packs.md#never-lose-your-place-when-a-session-compacts)).
+- **Every curated rule pack, done for you.** You can write your own packs, so why do Pro's? Because these are the
+  lessons from real Claude Code sessions, already written, tested and kept up to date, and one command installs each:
+  **Token Saver** (cuts wasted tokens and time: bounded searches, no waiting in loops, simple work to your own model), **Safe Operator** (keeps keys and
   passwords out of commands, files and the chat, and stops risky commands with the reason), **Team Sessions** (several
   Claude sessions working together: every message checked, nothing handed over unchecked, nobody left waiting),
   **Release Ready** (keeps `.env` files out of git, plus Docker lockfile hygiene) and **Beginner Mode** (plain words,

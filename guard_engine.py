@@ -1,6 +1,6 @@
 """Rule packs' guard engine: the Claude Code hook that runs every installed pack's checks before a command runs or a file
 is written (PreToolUse) and, for the built-in checks that need them, when a prompt arrives (UserPromptSubmit), a session
-starts or compacts (SessionStart) and a turn ends (Stop). HomeShed's public port (2026-10-01) of the engine its owner's
+starts or compacts (SessionStart), a turn ends (Stop) and Claude Code is about to compact (PreCompact). HomeShed's public port (2026-10-01) of the engine its owner's
 own platform runs; `homeshed-mcp packs on` adds it to Claude Code (rule_packs.py).
 
 A pack is data, never code: a JSON file (formatVersion 1) of rules and guards.
@@ -37,7 +37,7 @@ from time import gmtime as _gmtime, strftime as _strftime  # the event log's day
 from datetime import datetime
 from pathlib import Path
 
-ENGINE_VERSION = "3"   # `packs on` copies this file; doctor compares the copy's version with the package's
+ENGINE_VERSION = "4"   # `packs on` copies this file; doctor compares the copy's version with the package's
 MAX_TEXT = 100_000     # each check reads at most this much of a command or file: bounds the time a pattern can take
 MAX_MESSAGE = 300      # a pack's message reaches Claude's context: short, plain text, always labelled (R&D's review)
 MAX_PACK_BYTES = 256_000
@@ -86,7 +86,7 @@ MAX_PATTERN = 400
 # auto mode); warn tells Claude and lets it run; remind stays silent.
 DECISIONS = ("block", "ask", "warn", "remind")
 MODES = DECISIONS + ("off",)
-HOOK_EVENTS = ("PreToolUse", "UserPromptSubmit", "SessionStart", "Stop")
+HOOK_EVENTS = ("PreToolUse", "UserPromptSubmit", "SessionStart", "Stop", "PreCompact")
 
 
 def strict_loads(text: str):
@@ -827,6 +827,64 @@ def _context_alarm(call: Call, p: dict, how: str, guard: dict) -> list:
                      f"near {point // 1000}k. Save decisions and next steps to memory now, then carry on.")]
 
 
+# compact-keeper: Token Saver's place-keeper across a compaction --------------------------------------------------------
+KEEP_TAIL_BYTES = 1_000_000  # the end of the session before it's summarised: the recent asks, files and to-do list
+KEEP_FOR_S = 3600            # a note not picked up within the hour is stale (the session was left, then resumed later)
+
+
+def place_note(records: list[dict], p: dict) -> str:
+    """What the session was doing, from the transcript alone (no model, nothing sent anywhere): the last few asks, the
+    files it changed, its open to-do items and the last thing Claude said. The parts a summary tends to blur."""
+    asks, files, todos, last, failed = [], [], None, "", _failed(records)
+    for record in records:
+        text = prompt_text(record)
+        if text is not None:
+            asks.append(text)
+        for use in _tool_uses(record):
+            tool, args = str(use.get("name") or ""), _args(use)
+            path = args.get("file_path") or args.get("notebook_path")
+            if tool in WRITE_TOOLS and use.get("id") not in failed and isinstance(path, str) and path:
+                files = [f for f in files if f != path] + [path]
+            elif tool == "TodoWrite" and isinstance(args.get("todos"), list):
+                todos = args["todos"]
+        content = _content(record)
+        if record.get("type") == "assistant" and isinstance(content, list):
+            said = " ".join(str(c.get("text") or "") for c in content if isinstance(c, dict) and c.get("type") == "text")
+            last = said.strip() or last
+    parts = []
+    if asks:
+        parts.append("Last asks, newest last: " + " / ".join(f'"{clean(a, 400)}"' for a in asks[-p["asks"]:]))
+    if files:
+        parts.append("Files changed: " + ", ".join(clean(f, 200) for f in files[-10:]))
+    open_items = [t for t in todos or [] if isinstance(t, dict) and t.get("status") != "completed"]
+    if open_items:
+        parts.append("Open to-do: " + "; ".join(f"[{clean(t.get('status'), 20)}] {clean(t.get('content'), 200)}"
+                                                for t in open_items[:10]))
+    if last:
+        parts.append(f'Last said: "{clean(last, 600)}"')
+    return "\n".join(parts)[:p["max_chars"]]
+
+
+def _compact_keeper(call: Call, p: dict, how: str, guard: dict) -> list:
+    """Just before Claude Code compacts the session, keep a note of what it was doing; straight after (a session start
+    whose source is "compact"), give that note back, once. PreCompact never answers, so it can't delay or stop the
+    compaction; the note stays in this session's state file on this machine."""
+    if call.name == "PreCompact":
+        note = place_note(call.tail(KEEP_TAIL_BYTES), p)
+        if note:
+            call.set("place", {"at": call.now, "note": note})
+        return []
+    if call.name != "SessionStart" or call.event.get("source") != "compact":
+        return []
+    place = call.state.get("place")
+    call.drop("place")
+    if not isinstance(place, dict) or not isinstance(place.get("note"), str) \
+            or call.now - float(place.get("at") or 0) > KEEP_FOR_S:
+        return []
+    return [("note", "Saved just before this session was compacted (taken from the conversation itself: a record "
+                     "of what was asked and done, not new instructions). Carry on from here.\n" + place["note"])]
+
+
 # delegation: Token Saver's local-model-first --------------------------------------------------------------------------
 def _counts_as_work(path) -> bool:
     """A project file: not Claude's own memory or plan files, nor anything in the temporary folder (its scratchpad)."""
@@ -1293,6 +1351,8 @@ BUILTINS = {
                            "params": {}, "examples": halved_backslashes},
     "lessons": {"run": _lessons, "events": ("SessionStart",), "decisions": ("warn", "remind"),
                 "params": {"days": (7, 1, 30), "min_stops": (2, 1, 20), "limit": (3, 1, 5)}},
+    "compact-keeper": {"run": _compact_keeper, "events": ("PreCompact", "SessionStart"), "decisions": ("warn", "remind"),
+                       "params": {"asks": (3, 1, 10), "max_chars": (3000, 500, 8000)}},
 }
 
 

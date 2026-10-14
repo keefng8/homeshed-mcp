@@ -702,3 +702,56 @@ def test_answer_length_is_a_builtin_with_bounded_max_words():
     import guard_engine as ge
     b = ge.BUILTINS["answer-length"]
     assert b["events"] == ("Stop", "UserPromptSubmit") and b["params"]["max_words"] == (250, 50, 2000)
+
+
+# --- compact-keeper --------------------------------------------------------------------------------------------------------
+KEEPER = {"id": "context.compact-keeper", "check": "compact-keeper", "decision": "warn"}
+
+
+def before_compaction(engine):
+    return transcript(engine, [
+        prompt("fix the login page"), prompt("then add a test for it"),
+        said(use("Edit", "e1", file_path="/w/login.py", old_string="a", new_string="b")), result("e1"),
+        said(use("Write", "e2", file_path="/w/refused.py", content="x")), result("e2", error=True),
+        said(use("TodoWrite", "t1", todos=[{"content": "Fix login", "status": "completed"},
+                                            {"content": "Add the test", "status": "in_progress"}])), result("t1"),
+        said({"type": "text", "text": "Login fixed; writing the test next."}),
+    ])
+
+
+def test_the_place_is_kept_before_compaction_and_given_back_once_after(engine):
+    install(engine, KEEPER)
+    path = before_compaction(engine)
+    assert hook("PreCompact", transcript_path=path, trigger="auto") is None    # never answers: can't hold compaction up
+    back = note(hook("SessionStart", source="compact", transcript_path=path)["hookSpecificOutput"])
+    assert "context.compact-keeper" in back and "not new instructions" in back
+    assert '"fix the login page" / "then add a test for it"' in back
+    assert "Files changed: /w/login.py" in back and "refused.py" not in back   # a failed write changed nothing
+    assert "[in_progress] Add the test" in back and "Fix login" not in back    # only what's still open
+    assert "Login fixed; writing the test next." in back
+    assert hook("SessionStart", source="compact", transcript_path=path) is None  # given back once
+
+
+@pytest.mark.parametrize("source, later, given", [("startup", 0, False), ("resume", 0, False), ("compact", 3601, False),
+                                                  ("compact", 60, True)])
+def test_the_place_comes_back_only_straight_after_a_compaction(engine, source, later, given):
+    install(engine, KEEPER)
+    path = before_compaction(engine)
+    hook("PreCompact", transcript_path=path, trigger="manual")
+    engine.clock.t += later
+    assert (hook("SessionStart", source=source, transcript_path=path) is not None) is given
+
+
+def test_the_place_is_this_sessions_own_and_bounded(engine):
+    install(engine, {**KEEPER, "settings": {"asks": 1, "max_chars": 500}})
+    path = transcript(engine, [prompt("old ask"), prompt("y" * 5000)])
+    hook("PreCompact", transcript_path=path)
+    assert hook("SessionStart", session="s-2", source="compact") is None
+    back = note(hook("SessionStart", source="compact")["hookSpecificOutput"])
+    assert "old ask" not in back and len(back) < 900
+
+
+def test_without_the_keeper_precompact_does_nothing(engine):
+    install(engine, CONTEXT)
+    assert hook("PreCompact", transcript_path=before_compaction(engine)) is None
+    assert hook("SessionStart", source="compact") is None

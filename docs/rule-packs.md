@@ -6,8 +6,8 @@ are free. [HomeShed Pro](../README.md#homeshed-pro) adds curated packs, kept up 
 
 ## Turn the checks on
 
-The checks run through HomeShed's hook in Claude Code, at four moments: before each tool call, when you send a
-prompt, when a session starts, and when a turn ends. Add it:
+The checks run through HomeShed's hook in Claude Code, at five moments: before each tool call, when you send a
+prompt, when a session starts, when a turn ends, and just before Claude Code compacts a session. Add it:
 
 ```bash
 uvx homeshed-mcp packs on
@@ -113,7 +113,25 @@ inside HomeShed, and a pack names one, with optional settings inside fixed limit
 | `peer-request` | A message from another session: a note to check it like your own request |
 | `peer-handoff` | Work handed to another Claude before the request was checked with memory and routing |
 | `owed-reply` | Another session asked something and is waiting: a reply first, before the turn ends (held once) |
+| `compact-keeper` | Losing your place when Claude Code compacts a long session: just before, it notes your last asks, the files changed, the open to-do items and the last reply; straight after, it gives that note back once. It never delays a compaction, and the note stays on your machine |
 | `session-note` | The pack's own note, added when a session starts, resumes or is compacted |
+
+## Never lose your place when a session compacts
+
+When a long session fills up, Claude Code compacts it into a summary, and the details of what you were doing can blur.
+The `compact-keeper` check keeps them: just before the compaction it takes a note from the session itself (your last
+few asks, the files changed, the open to-do items and Claude's last reply), and straight after it gives the note back,
+so Claude carries on where it was. Nothing is sent anywhere, and a note not picked up within the hour is dropped.
+
+It comes with HomeShed Pro's **Token Saver** pack (`uvx homeshed-mcp packs install token-saver`), or name it in your own
+pack. Then choose when Claude Code compacts, as a percentage of its usual point (it can only be earlier):
+
+```bash
+uvx homeshed-mcp packs compact-at 80
+```
+
+It shows the one line it adds to Claude Code's settings and asks first; `packs compact-at off` goes back to Claude
+Code's own point. Tested on Windows and Linux; macOS should work.
 
 ## Where a pack came from
 

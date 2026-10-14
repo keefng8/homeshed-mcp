@@ -398,6 +398,39 @@ def turn_off(settings: Path | None = None) -> dict:
     return {"changed": True, "reason": "off", "path": str(path)}
 
 
+COMPACT_ENV = "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"  # code.claude.com/docs/en/env-vars: it can only bring compaction earlier
+
+
+def compact_at(pct: int | None, confirm=None, settings: Path | None = None) -> dict:
+    """When Claude Code compacts, as a percentage of its usual point (1-99), or None for its own default: the one "env"
+    line in Claude Code's user settings, nothing else touched. {changed, reason, path, before}."""
+    if pct is not None and not 1 <= pct <= 99:
+        raise PackError("Pick a percentage from 1 to 99 (Claude Code can only compact earlier than it would anyway), "
+                        "or off for its own default.")
+    path = settings or claude_settings()
+    data, read_hash = _read_settings(path)
+    if data is None:
+        return {"changed": False, "reason": "unreadable", "path": str(path), "before": None}
+    env = data.get("env") if isinstance(data.get("env"), dict) else None
+    if "env" in data and env is None:
+        return {"changed": False, "reason": "unreadable", "path": str(path), "before": None}
+    before = (env or {}).get(COMPACT_ENV)
+    if before == (None if pct is None else str(pct)):
+        return {"changed": False, "reason": "already", "path": str(path), "before": before}
+    if confirm is not None and not confirm(before, path):
+        return {"changed": False, "reason": "declined", "path": str(path), "before": before}
+    env = data.setdefault("env", {})
+    if pct is None:
+        env.pop(COMPACT_ENV, None)
+        if not env:
+            del data["env"]
+    else:
+        env[COMPACT_ENV] = str(pct)
+    if not _write_settings(path, data, read_hash):
+        return {"changed": False, "reason": "changed meanwhile", "path": str(path), "before": before}
+    return {"changed": True, "reason": "set", "path": str(path), "before": before}
+
+
 def hook_state(settings: Path | None = None) -> dict:
     """For doctor and `packs list`: is the hook on, and current (this install's command on every event, an up-to-date
     engine copy, a Python that still exists)? {on, current, why}."""

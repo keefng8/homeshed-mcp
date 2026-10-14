@@ -71,3 +71,12 @@ def test_record_never_raises(monkeypatch):
 def test_unserialisable_values_do_not_break_sizes():
     usage.record("local_ai.ask", {"obj": object()}, {"text": "abcd"}, ok=True)
     assert usage.summary()["estimated_tokens_saved"] == 1
+
+
+def test_a_get_to_a_listed_write_tool_counts_as_a_read(monkeypatch):
+    import usage as u
+    monkeypatch.setattr(u, "READ_BY_METHOD", {"svc.call": "svc.read"})
+    assert u.ledger_id("svc.call", {"method": "GET", "path": "/x"}) == "svc.read"
+    assert u.ledger_id("svc.call", {"method": "post"}) == "svc.call"
+    assert u.ledger_id("svc.call", None) == "svc.call"
+    assert u.ledger_id("git.commit", {"method": "GET"}) == "git.commit"  # only tools listed

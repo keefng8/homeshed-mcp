@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-14
+
+### Added
+- Never lose your place: a new built-in check, `compact-keeper`. Just before Claude Code compacts a long session it
+  notes the last asks, the files changed, the open to-do items and the last reply, and straight after it gives that
+  note back once. It never delays a compaction, and the note stays on your machine. HomeShed Pro's Token Saver pack
+  (1.3.0) switches it on, or name it in your own pack.
+- `homeshed-mcp packs compact-at <1-99|off>`: when Claude Code compacts, as a percentage of its usual point. It shows
+  the one settings line it changes and asks first.
+
+- README: a "Try it: things to ask" section with example uses, and the v0.2.0 highlights (Proxmox and Terminal tabs,
+  per-app spend caps).
+
+### Changed
+- The rule-pack hook also runs just before a compaction (engine version 4). After upgrading, run
+  `uvx homeshed-mcp packs on` again; until then `doctor` says the hook needs refreshing.
+
 ## [0.2.0] - 2026-10-13
 
 ### Breaking

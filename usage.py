@@ -69,6 +69,23 @@ def _load() -> dict:
         return {"since": time.time(), "capabilities": {}}
 
 
+# Write tools whose GET calls only read: {tool id: the id those GETs are counted under}, so the panel's Reads/Writes
+# split stays true (2026-10-13: an app polling a write tool with GETs showed as ~100k writes). An install lists its
+# own in private_settings.READ_BY_METHOD.
+try:
+    from private_settings import READ_BY_METHOD
+except ImportError:
+    READ_BY_METHOD = {}
+
+
+def ledger_id(capability_id: str, args: dict | None) -> str:
+    """The id a call is counted and shown under: a write tool's GET is a read."""
+    alias = READ_BY_METHOD.get(capability_id)
+    if alias and str((args or {}).get("method") or "").upper() == "GET":
+        return alias
+    return capability_id
+
+
 def record(capability_id: str, args: dict, result, ok: bool, client: str | None = None) -> None:
     """Never raises: accounting must not break a real capability call."""
     try:
