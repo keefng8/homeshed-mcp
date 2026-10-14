@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- README: HomeShed Pro's first tools, the to-do list and trend signals, are available to members with
+  `homeshed-mcp pro update` (HomeShed 0.3.1 or newer).
+
 ## [0.3.1] - 2026-10-15
 
 ### Security
