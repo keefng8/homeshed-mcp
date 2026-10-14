@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.3.1] - 2026-10-14
+## [0.3.1] - 2026-10-15
 
 ### Security
 - HomeShed Pro: a Pro tools package is checked against its signature and its file list before it's unpacked, and

@@ -49,9 +49,10 @@ def setup(tmp_path, monkeypatch):
     return tmp_path
 
 
-def backend(monkeypatch, *, whoami=200, client=None, calls=None, down=False, proof="signed"):
+def backend(monkeypatch, *, whoami=200, client=None, calls=None, down=False, proof="signed", wrapped=True):
     """A fake Pro site for every httpx call the module makes. proof: "signed" (the real site's key), "fake" (a site
-    signing with a key of its own), or None (a site that sends none: an old or fake Pro address)."""
+    signing with a key of its own), or None (a site that sends none: an old or fake Pro address). wrapped: whoami's
+    fields inside "data", as the live site sends them (2026-10-15); False puts them at the top level."""
     calls = [] if calls is None else calls
 
     def handler(req: httpx.Request) -> httpx.Response:
@@ -63,7 +64,7 @@ def backend(monkeypatch, *, whoami=200, client=None, calls=None, down=False, pro
             if proof and whoami == 200:
                 body["proof"] = signed_proof(req.headers.get("authorization"),
                                              SITE_KEY if proof == "signed" else Ed25519PrivateKey.generate())
-            return httpx.Response(whoami, json=body)
+            return httpx.Response(whoami, json={"data": body} if wrapped else body)
         if req.url.path == "/api/pro-api/packs":
             return httpx.Response(whoami, json={"data": [{"slug": "safe-operator", "title": "Safe Operator",
                                                           "description": "Stops costly habits", "price": 1}]})
@@ -166,6 +167,15 @@ def test_status_follows_whoami(monkeypatch, code, connected, pro, words):
     assert (out["connected"], out["pro"]) == (connected, pro)
     assert words is None or words in out["reason"]
     assert out.get("unreachable", False) is (code == 503)  # only a non-answer is a blip pro.check rides out
+
+
+@pytest.mark.parametrize("wrapped", [True, False])
+def test_the_proof_and_key_name_are_read_inside_data_or_at_the_top(monkeypatch, wrapped):
+    """2026-10-15: the live site sends {"data": {"client", "scopes", "proof"}}; reading only the top level made every
+    member "not Pro"."""
+    backend(monkeypatch, wrapped=wrapped, client={"name": "Desk PC"})
+    out = mavis_pro.connect_key(KEY)
+    assert out["pro"] is True and out["client_name"] == "Desk PC" and mavis_pro.last_proof()
 
 
 @pytest.mark.parametrize("proof", [None, "fake"])

@@ -91,6 +91,15 @@ def _message(resp: httpx.Response) -> str:
 KEY_RE = re.compile(r"^mav_[A-Za-z0-9_-]{20,200}$")
 
 
+def _who(body) -> dict:
+    """whoami's fields: the Pro site sends them inside "data" ({"data": {"client", "scopes", "proof"}}, seen live
+    2026-10-15); an answer with them at the top level is read the same way."""
+    if not isinstance(body, dict):
+        return {}
+    inner = body.get("data")
+    return {**body, **inner} if isinstance(inner, dict) else body
+
+
 def connect_key(key: str) -> dict:
     """Checks a pasted Pro key with the site and keeps it only if the site knows it. Never echoes the key."""
     key = (key or "").strip()
@@ -107,10 +116,10 @@ def connect_key(key: str) -> dict:
     if r.status_code not in (200, 403):
         raise MavisProError(f"The Pro website couldn't check the key just now (HTTP {r.status_code}). Try again shortly.")
     try:
-        who = r.json() or {}
+        who = _who(r.json())
     except ValueError:
         who = {}
-    client = who.get("client") if isinstance(who, dict) else None
+    client = who.get("client")
     name = (client.get("name") if isinstance(client, dict) else client) or "Pro key"
     try:
         vault.set_credential(TOKEN, key, actor="pro-connect", label="HomeShed Pro: this install", kind="api-key",
@@ -150,7 +159,7 @@ def status(fresh: bool = False) -> dict:
             # answers 200 too (to-do #19 t3). The proof is kept so pro.check's grace counts from when it was signed.
             import pro_proof
             try:
-                proof = (r.json() or {}).get("proof")
+                proof = _who(r.json()).get("proof")
             except (ValueError, AttributeError):
                 proof = None
             if pro_proof.verify_membership(proof, token):
