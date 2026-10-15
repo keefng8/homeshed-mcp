@@ -1,0 +1,10 @@
+{
+ "_about": "Shape of the live answer (keys and value types only), captured 2026-10-15 with scripts/capture_contracts.py. Re-capture when the service changes.",
+ "shape": {
+  "data": {
+   "client": "str",
+   "proof": "str",
+   "scopes": []
+  }
+ }
+}

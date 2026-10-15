@@ -1,0 +1,18 @@
+{
+ "_about": "Shape of the live answer (keys and value types only), captured 2026-10-15 with scripts/capture_contracts.py. Re-capture when the service changes.",
+ "shape": {
+  "data": {
+   "filename": "str",
+   "kid": "str",
+   "name": "str",
+   "record_sha256": "str",
+   "requires_homeshed": "str",
+   "requires_python": "null",
+   "sha256": "str",
+   "sig": "str",
+   "size": "int",
+   "url": "str",
+   "version": "str"
+  }
+ }
+}

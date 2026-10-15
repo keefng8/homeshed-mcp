@@ -60,7 +60,8 @@ def backend(monkeypatch, *, whoami=200, client=None, calls=None, down=False, pro
         if down:
             raise httpx.ConnectError("no route to host")
         if req.url.path == "/api/pro-api/whoami":
-            body = {"client": client if client is not None else {"name": "My laptop"}, "scopes": []}
+            # the live site sends the key's name as a plain string (tests/fixtures/contracts/pro_whoami.json)
+            body = {"client": client if client is not None else "My laptop", "scopes": []}
             if proof and whoami == 200:
                 body["proof"] = signed_proof(req.headers.get("authorization"),
                                              SITE_KEY if proof == "signed" else Ed25519PrivateKey.generate())

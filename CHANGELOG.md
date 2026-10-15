@@ -6,9 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-15
+
+### Added
+- `web.search`: search the web through your own SearXNG (free, no API key) and get titles, links and short
+  snippets; read a result with `web.read`. Set `SEARXNG_URL` ([configuration](docs/configuration.md#other-connections)).
+- `system.savings`: tokens saved today and on each of the last 7 days, with what they'd have cost at a model's API
+  price (approximate).
+
 ### Changed
 - README: HomeShed Pro's first tools, the to-do list and trend signals, are available to members with
   `homeshed-mcp pro update` (HomeShed 0.3.1 or newer).
+- Tests: contract tests check each live service's answer shape against what the code reads.
 
 ## [0.3.1] - 2026-10-15
 

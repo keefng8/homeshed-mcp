@@ -1,0 +1,37 @@
+{
+  "id": "web.search",
+  "name": "Web Search",
+  "version": "1.0.0",
+  "description": "Search the web through a self-hosted SearXNG: titles, links and short snippets; read pages with web.read.",
+  "category": "web",
+  "risk": "read",
+  "requires": ["a SearXNG search engine (SEARXNG_URL); free and self-hosted, no API key"],
+  "transport": "mcp",
+  "aliases": [
+    "search the web",
+    "web search",
+    "google this",
+    "look up online",
+    "find sources",
+    "research online"
+  ],
+  "inputs": {
+    "query": {"type": "string", "required": true},
+    "max_results": {"type": "integer", "default": 5},
+    "time_range": {"type": "string", "default": ""},
+    "language": {"type": "string", "default": "en"}
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.web.search.search"
+  },
+  "latency": {
+    "expected_ms": 2500
+  },
+  "cache": {
+    "enabled": true,
+    "ttl": 300,
+    "freshness": "eventual"
+  },
+  "related": ["web.read"]
+}

@@ -1,0 +1,35 @@
+{
+  "id": "system.savings",
+  "name": "Tokens Saved",
+  "version": "1.0.0",
+  "description": "Tokens saved today and per day for the last week, with what they'd have cost at a model's API price.",
+  "category": "system",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "tokens saved",
+    "savings today",
+    "money saved",
+    "usage history",
+    "how much have we saved"
+  ],
+  "inputs": {
+    "model": {"type": "string", "default": "opus-5-5", "description": "opus-5-5, sonnet-5-5, haiku-5-5 or fable-5-1"}
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.system.savings.savings"
+  },
+  "latency": {
+    "expected_ms": 300
+  },
+  "cache": {
+    "enabled": true,
+    "ttl": 60,
+    "freshness": "eventual"
+  },
+  "related": [
+    "system.health"
+  ]
+}

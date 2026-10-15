@@ -66,7 +66,8 @@ def signature(version: str, rsha: str, key=RELEASE) -> str:
 
 
 class Site:
-    def __init__(self, data: bytes, version="0.2.0", status=200, checksum=None, requires=None, signed=True,
+    # requires: the live site always sends requires_homeshed (tests/fixtures/contracts/pro_latest.json)
+    def __init__(self, data: bytes, version="0.2.0", status=200, checksum=None, requires=">=0.2.0", signed=True,
                  key=RELEASE):
         self.data, self.version, self.status = data, version, status
         self.sha = checksum or hashlib.sha256(data).hexdigest()

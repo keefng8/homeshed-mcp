@@ -1,0 +1,48 @@
+{
+ "_about": "Shape of the live answer (keys and value types only), captured 2026-10-15 with scripts/capture_contracts.py. Re-capture when the service changes.",
+ "shape": {
+  "answers": [],
+  "corrections": [],
+  "infoboxes": [],
+  "query": "str",
+  "results": [
+   {
+    "audio_src": "str",
+    "author": "str",
+    "category": "str",
+    "close_group": "bool",
+    "content": "str",
+    "engine": "str",
+    "engines": [
+     "str"
+    ],
+    "iframe_src": "str",
+    "img_src": "str",
+    "length": "null",
+    "metadata": "str",
+    "open_group": "bool",
+    "parsed_url": [
+     "str"
+    ],
+    "positions": [
+     "int"
+    ],
+    "priority": "str",
+    "pubdate": "str",
+    "publishedDate": "null",
+    "score": "float",
+    "template": "str",
+    "thumbnail": "str",
+    "title": "str",
+    "url": "str",
+    "views": "str"
+   }
+  ],
+  "suggestions": [],
+  "unresponsive_engines": [
+   [
+    "str"
+   ]
+  ]
+ }
+}

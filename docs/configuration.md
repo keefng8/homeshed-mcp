@@ -274,6 +274,7 @@ Never use a bare `tcp://` address: port 2375 is Docker's unauthenticated API, an
 | Variable | Default | What it does |
 |---|---|---|
 | `KUMA_DB_PATH` | `DATA_DIR/kuma/kuma.db` | [Uptime Kuma](https://github.com/louislam/uptime-kuma)'s database, for `uptime.status`. It's only read, never changed. In Docker, mount Kuma's data volume read-only and point this at `kuma.db`. |
+| `SEARXNG_URL` | none | For `web.search`: the address of your own [SearXNG](https://docs.searxng.org/) (free, no API key), with its JSON format switched on in `settings.yml`. Keep it off the internet; on the same Docker network that's for example `http://searxng:8080`. Without it, `web.search` says it isn't set up. |
 | `GITHUB_SEARCH_TOKEN` | none | Optional. Raises GitHub's rate limit for `bugs.find`'s GitHub search, which is off until the owner switches on the `bugs_search_public` setting. |
 
 ## Tool groups

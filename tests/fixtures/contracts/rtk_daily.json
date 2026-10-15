@@ -1,0 +1,27 @@
+{
+ "_about": "Shape of the live answer (keys and value types only), captured 2026-10-15 with scripts/capture_contracts.py. Re-capture when the service changes.",
+ "shape": {
+  "available": "bool",
+  "daily": [
+   {
+    "avg_time_ms": "int",
+    "commands": "int",
+    "date": "str",
+    "input_tokens": "int",
+    "output_tokens": "int",
+    "saved_tokens": "int",
+    "savings_pct": "float",
+    "total_time_ms": "int"
+   }
+  ],
+  "summary": {
+   "avg_savings_pct": "float",
+   "avg_time_ms": "int",
+   "total_commands": "int",
+   "total_input": "int",
+   "total_output": "int",
+   "total_saved": "int",
+   "total_time_ms": "int"
+  }
+ }
+}
