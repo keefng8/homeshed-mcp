@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 
 HOSTS = {"etsy": "api.etsy.com", "printify": "api.printify.com", "threads": "graph.threads.net",
+         "instagram": "graph.instagram.com", "instagram-auth": "api.instagram.com",  # Instagram API with Instagram Login
          "pinterest": "api.pinterest.com", "pinterest-sandbox": "api-sandbox.pinterest.com",
          "bing": "ssl.bing.com"}  # Bing Webmaster Tools' keyword stats (signal.keywords)
 TIMEOUT_S = 15.0
@@ -56,6 +57,28 @@ def _reason(resp: httpx.Response) -> str:
     return ""
 
 
+ETSY_QUOTA: dict = {}  # the last Etsy answer's own limit headers (the Director, 2026-10-21: a 429 "daily rate limit")
+
+
+def _note_quota(resp: httpx.Response) -> None:
+    """Etsy sends x-limit-per-day / x-remaining-today (and per-second) on every answer, refusals included."""
+    import time
+    got = {}
+    for key, head in (("limit_per_day", "x-limit-per-day"), ("remaining_today", "x-remaining-today"),
+                      ("limit_per_second", "x-limit-per-second"), ("remaining_this_second", "x-remaining-this-second")):
+        v = resp.headers.get(head)
+        if v is not None and str(v).strip().isdigit():
+            got[key] = int(v)
+    if got:
+        ETSY_QUOTA.update(got, seen_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                          last_status=resp.status_code)
+
+
+def etsy_quota() -> dict | None:
+    """What Etsy last said about this app's quota, or None before any call since the server started."""
+    return dict(ETSY_QUOTA) or None
+
+
 def request(service: str, method: str, path: str, *, headers: dict, secrets: tuple[str, ...],
             params: dict | None = None, data: dict | None = None, json: dict | None = None,
             files: dict | None = None) -> httpx.Response:
@@ -77,6 +100,8 @@ def request(service: str, method: str, path: str, *, headers: dict, secrets: tup
         raise CommerceError(f"couldn't reach {name} ({type(exc).__name__})") from None
     if resp.url.host != host:  # belt and braces: the client never follows redirects
         raise CommerceError(f"{name} answered from an unexpected host; ignored")
+    if service == "etsy":
+        _note_quota(resp)
     if 300 <= resp.status_code < 400:
         raise CommerceError(f"{name} tried to redirect (HTTP {resp.status_code}); redirects are refused")
     if resp.status_code >= 400:

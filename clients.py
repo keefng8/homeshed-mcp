@@ -166,11 +166,16 @@ def create(name: str, note: str = "", preset: str = "none", expires_days: int | 
     return token
 
 
-def rotate(name: str) -> str:
-    """New token for a client; the old one stops working at once. Returns the new token (shown once)."""
+def rotate(name: str, by_manager: bool = False) -> str:
+    """New token for a client; the old one stops working at once. Returns the new token (shown once).
+    A client with "managed_by" (a seat runner's) is refused unless its manager does it: a token rotated anywhere else
+    never reaches the runner, which then fails "auth" (promoter, 2026-10-15; the owner's rule)."""
     with _lock:
         data = _editable()
         c = _get(data, name)
+        if c.get("managed_by") and not by_manager:
+            raise ClientError(f"{name}'s key belongs to a seat runner: rotate it with {c['managed_by']} so the runner "
+                              "gets the new one (here it would end the runner's key and give it nothing)")
         token = _new_token()
         c["token_sha256"], c["token_created"] = _hash(token), time.time()
         _save(data)
@@ -186,6 +191,19 @@ def delete(name: str) -> None:
         _save(data)
     _windows.pop(name, None)
     _audit("deleted", name)
+
+
+def set_managed_by(name: str, manager: str | None) -> None:
+    """Mark a client's token as managed by a script (only it may rotate), or clear the mark with None."""
+    with _lock:
+        data = _editable()
+        c = _get(data, name)
+        if manager:
+            c["managed_by"] = str(manager)[:80]
+        else:
+            c.pop("managed_by", None)
+        _save(data)
+    _audit("token manager set", name, managed_by=manager)
 
 
 def set_suspended(name: str, suspended: bool) -> None:
@@ -381,6 +399,7 @@ def list_clients() -> dict:
             "memory_agent": c.get("memory_agent"), "memory_shared_read": c.get("memory_shared_read") is not False,
             "daily_spend_usd": c.get("daily_spend_usd"), "spend_today": _spent(name),
             "cap_delegated": bool(c.get("cap_delegated")), "control_keys": c.get("control_keys"),
+            "managed_by": c.get("managed_by"),
         })
     return {"clients": out, "unreadable": bool(data.get("unreadable"))}
 

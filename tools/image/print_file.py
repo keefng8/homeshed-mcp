@@ -20,7 +20,7 @@ _slots = threading.BoundedSemaphore(RUNNING_AT_ONCE)
 
 @tool(name="print_file", category="image", doc="image/print_file.md")
 def print_file(image: str, width_px: int, height_px: int, variants: list[str] | None = None, colours: int = 0,
-               vignette: str = "") -> dict:
+               vignette: str = "", keep_chest: bool = False) -> dict:
     """Turn a design into print-ready files: a transparent PNG at the print area's exact size (a 5% margin), 300
     DPI, full colour (or `colours` flat colours), in a light-tee and a dark-tee version (a thin light keyline round the
     design so dark ink reads on a dark tee). The design must
@@ -37,6 +37,9 @@ def print_file(image: str, width_px: int, height_px: int, variants: list[str] | 
             out, then a short soft rim of hard-edged halftone dots (at least 6 px, pitch at least 12 px at the print
             size; smaller dots are dropped); "round" is an oval, "cloud" a near-rectangle with gentle bumps. Empty (default): the plain background is removed instead. A
             design that already has a transparent background keeps it either way.
+        keep_chest: true for a bust (a pet portrait cut off at the chest): its white chest, the background's own
+            colour with no outline below it, is kept instead of removed, so it doesn't print as shirt colour on a dark
+            tee. Leave it off for scenes (a gap under a motorbike would fill in).
 
     Returns:
         {"files": {"light": {"name", "width", "height", "dpi", "colours"}, "dark": {...}}, "folder", "source",
@@ -47,7 +50,7 @@ def print_file(image: str, width_px: int, height_px: int, variants: list[str] | 
     if vignette and vignette not in ("round", "cloud"):
         raise ImageError('vignette is "round" or "cloud" (or empty)')
     body = {"width_px": width_px, "height_px": height_px, "variants": variants or ["light", "dark"], "colours": colours,
-            **({"vignette": vignette} if vignette else {})}
+            **({"vignette": vignette} if vignette else {}), **({"keep_chest": True} if keep_chest else {})}
     local = prov.output_dir() / image  # a paid provider's design is kept here on the tool server
     if local.is_file():
         if local.stat().st_size > MAX_BYTES:

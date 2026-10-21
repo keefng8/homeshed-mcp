@@ -1358,6 +1358,34 @@ def test_connect_threads_routes_and_callback(monkeypatch):
     assert not any(p.startswith("/api/threads") for p in main.VIEWER_ROUTES)
 
 
+def test_connect_instagram_routes_and_callback(monkeypatch):
+    """The owner, 2026-10-20: the Promoter posts to Instagram too; a Connect Instagram card like Threads'."""
+    import main
+    calls = []
+
+    async def fake_admin(method, path, body=None):
+        calls.append((method, path, body))
+        if path == "/instagram/finish" and body.get("state") == "bad":
+            return main.JSONResponse({"error": "press Connect again"}, status_code=400)
+        return main.JSONResponse({"url": "https://www.instagram.com/oauth/authorize?x=1"}
+                                 if method == "POST" and path == "/instagram/connect"
+                                 else {"connected": True, "username": "kindretroco"})
+    monkeypatch.setattr(main, "_mcp_admin", fake_admin)
+    monkeypatch.setattr(main, "DASHBOARD_PASSWORD", OWNER_PW)
+    c = TestClient(main.app, headers=OWNER)
+    assert c.get("/api/instagram").json()["connected"] is True
+    assert c.post("/api/instagram/connect", json={"redirect_uri": "https://p.example/api/instagram/callback"}
+                  ).json()["url"].startswith("https://www.instagram.com/")
+    r = c.get("/api/instagram/callback", params={"code": "abc#_", "state": "s1"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/#settings?instagram=ok&account=kindretroco"
+    r = c.get("/api/instagram/callback", params={"code": "abc", "state": "bad"}, follow_redirects=False)
+    assert "instagram=failed" in r.headers["location"]
+    assert ("POST", "/instagram/finish", {"url": "https://x.example/cb?code=1&state=2"}) not in calls
+    c.post("/api/instagram/finish", json={"url": "https://x.example/cb?code=1&state=2"})
+    assert calls[-1] == ("POST", "/instagram/finish", {"url": "https://x.example/cb?code=1&state=2"})
+    assert not any(p.startswith("/api/instagram") for p in main.VIEWER_ROUTES)
+
+
 def test_connect_pinterest_routes_and_callback(monkeypatch):
     """The owner's decision, 2026-10-10: Connect Pinterest, the same relay as Threads; owner only."""
     import main

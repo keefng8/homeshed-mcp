@@ -9,6 +9,7 @@ Jina Reader call) re-expressed in this project's own error-handling style.
 from __future__ import annotations
 
 import ipaddress
+import json
 import socket
 import urllib.request
 from urllib.parse import urlsplit
@@ -102,8 +103,29 @@ def _is_antibot_page(body: bytes) -> bool:
     return (jina_captcha and challenge_structure) or cloudflare_block
 
 
+# Jina Reader's own options: drop the page's chrome so the article comes first (R&D, 2026-10-15: a Woodland Trust page
+# was 54k characters of cookie banner and menus before the text; with these, 5.6k with the body intact). full=True
+# skips them for a page whose content sits inside one of these elements.
+_MAIN_ONLY = {"X-Retain-Images": "none",
+              "X-Remove-Selector": "header, nav, footer, aside, [class*=cookie], [id*=cookie], [class*=banner]"}
+
+
+def _jina_error(body: bytes) -> str | None:
+    """Jina Reader answers some failures (rate limit, a refused or missing page) with a JSON object, not the page."""
+    text = body.lstrip()[:2000]
+    if not text.startswith(b"{"):
+        return None
+    try:
+        data = json.loads(body)
+    except ValueError:
+        return None
+    if isinstance(data, dict) and ("code" in data or "message" in data or "readableMessage" in data):
+        return str(data.get("readableMessage") or data.get("message") or data.get("code"))[:200]
+    return None
+
+
 @tool(name="read", category="web", doc="web/read.md")
-def read(url: str) -> dict:
+def read(url: str, full: bool = False) -> dict:
     """Fetch a public webpage and return it as Markdown, via Jina Reader (r.jina.ai) — zero
     API key, zero account, no external dependency beyond stdlib. Ported from Agent-Reach's
     WebChannel, see this file's module docstring.
@@ -112,6 +134,8 @@ def read(url: str) -> dict:
         url: the page to read. Scheme optional (defaults to https). Must resolve to a public
             HTTP(S) address — localhost, private/link-local IPs, and cloud metadata endpoints
             are rejected before any request is made.
+        full: False (default) drops headers, menus, footers, cookie banners and images so the main text comes first;
+            True returns the whole page.
 
     Returns:
         {"url": str, "content": str} — content is the page as Markdown, as returned by Jina
@@ -123,7 +147,8 @@ def read(url: str) -> dict:
     """
     normalized = _normalize_public_http_url(url)
     jina_url = f"https://r.jina.ai/{normalized}"
-    req = urllib.request.Request(jina_url, headers={"User-Agent": _UA, "Accept": "text/plain"})
+    req = urllib.request.Request(jina_url, headers={"User-Agent": _UA, "Accept": "text/plain",
+                                                    **({} if full else _MAIN_ONLY)})
 
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -133,6 +158,8 @@ def read(url: str) -> dict:
 
     if len(body) > _MAX_RESPONSE_BYTES:
         raise WebReadError(f"response exceeds {_MAX_RESPONSE_BYTES} byte limit")
+    if why := _jina_error(body):
+        raise WebReadError(f"Jina Reader couldn't read {normalized}: {why}")
     if _is_antibot_page(body):
         raise WebReadError(
             "Jina Reader returned an anti-bot challenge page, not real content — "

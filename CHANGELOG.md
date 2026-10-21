@@ -6,6 +6,37 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-21
+
+### Added
+- A Claude Code plugin (`plugin/`): `/plugin marketplace add keefng8/homeshed-mcp`, then
+  `/plugin install homeshed@homeshed`. It runs HomeShed through `uvx` and adds a setup skill and a which-tool
+  skill. No hooks. Its README shows how to use your own HomeShed server instead.
+- `PRIVACY.md`: what stays on your machine, what's downloaded, and when HomeShed talks to anything else.
+- `instagram.publish` and `instagram.status`, with a Connect Instagram card on the Control Panel: post an image or a
+  carousel of up to 10 (at most 5 hashtags, Instagram's limit). Off until the owner switches it on, only for apps
+  granted it, with a daily cap (`INSTAGRAM_DAILY_MAX`, default 25). Each post is read back afterwards, so one
+  Instagram didn't keep is reported as not posted.
+- `image.fetch`: a finished image job's full-size original (1 MB by default, up to 25 MB on request).
+- `image.carousel` and `image.promo_card`: a "hud" style, and a square `1:1` carousel shape (2000x2000).
+- `etsy.listing.update` can remove photos and set each photo's alt text; `etsy.listing.get` lists every photo.
+- `etsy.listings.list`: `photos=true` adds each listing's first photo, and `detail=true` adds tags, category, shipping
+  profile, the full title and every photo, so a whole shop takes about two calls.
+- `etsy.shop.get` reports Etsy's own daily request allowance and what's left today (`api_quota`).
+
+### Changed
+- `web.read` returns a page's main text by default (menus, cookie banners and images left out), and an error from the
+  reading service is reported as an error, not as page text.
+- `etsy.listing.update`: after any photo change the photos are numbered again in order, a re-order keeps each photo's
+  alt text, and an automatic approval only ever removes a photo as part of a one-for-one artwork swap.
+- `ETSY_EDIT_DAILY_MAX` can go up to 500.
+- The approval queue retries a shop's "too many requests" answer by itself on its next round, instead of leaving the
+  request failed.
+- `image.print_file` keeps a pet portrait's chest when it's the same colour as the background.
+- `doctor` shows each tool group's full name.
+- The PyPI description no longer carries a directory ownership code.
+- Docker image: Python 3.12 base image updated.
+
 ## [0.3.2] - 2026-10-15
 
 ### Added

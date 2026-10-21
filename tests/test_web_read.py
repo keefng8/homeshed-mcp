@@ -87,6 +87,45 @@ def test_rejects_oversized_response():
             module.read("example.com")
 
 
+def _page(body: bytes):
+    fake_resp = MagicMock()
+    fake_resp.__enter__.return_value = fake_resp
+    fake_resp.read.return_value = body
+    return fake_resp
+
+
+def test_main_content_by_default_whole_page_on_request():
+    """R&D 2026-10-15: cookie banners and menus came before the article; Jina's own options drop them."""
+    from tools.web import read as module
+
+    with patch("tools.web.read.urllib.request.urlopen", return_value=_page(b"text")) as mock_open:
+        module.read("example.com")
+        module.read("example.com", full=True)
+    main, whole = (c[0][0] for c in mock_open.call_args_list)
+    assert main.get_header("X-retain-images") == "none" and "cookie" in main.get_header("X-remove-selector")
+    assert whole.get_header("X-remove-selector") is None and whole.get_header("Accept") == "text/plain"
+
+
+@pytest.mark.parametrize("body, words", [
+    (b'{"code": 429, "name": "RateLimitTriggeredError", "readableMessage": "Too many requests"}', "Too many requests"),
+    (b'  {"code": 451, "message": "blocked"}', "blocked"),
+])
+def test_a_jina_error_answer_is_an_error_not_page_text(body, words):
+    """R&D 2026-10-15: a JSON answer came back as the page and the caller couldn't parse it."""
+    from tools.web import read as module
+
+    with patch("tools.web.read.urllib.request.urlopen", return_value=_page(body)):
+        with pytest.raises(module.WebReadError, match=words):
+            module.read("example.com")
+
+
+def test_a_page_that_is_json_but_not_an_error_is_returned():
+    from tools.web import read as module
+
+    with patch("tools.web.read.urllib.request.urlopen", return_value=_page(b'{"items": [1, 2]}')):
+        assert module.read("example.com")["content"] == '{"items": [1, 2]}'
+
+
 def test_rejects_antibot_challenge_page():
     from tools.web import read as module
 

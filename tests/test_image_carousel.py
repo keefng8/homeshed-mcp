@@ -23,12 +23,20 @@ def test_carousel_sends_local_names_and_paid_bytes(monkeypatch, tmp_path):
     assert seen["body"]["watermark"] == "ASInspiredDesigns"
     ic.carousel(["20261007-1.png"], watermark="KindRetroCo", watermark_style="tiled")
     assert seen["body"]["watermark_style"] == "tiled"
+    ic.carousel(["20261007-1.png"], shape="1:1", watermark="Kind Retro Co.", watermark_style="tiled")
+    assert seen["body"]["size"] == "2000x2000"  # an Etsy listing hero
+    assert "frame" not in seen["body"]
+    ic.carousel(["20261007-1.png"], frame="hud", title=" Retro Doodle Tee ", watermark="Kind Retro Co.",
+                watermark_style="tiled")
+    assert (seen["body"]["frame"], seen["body"]["title"], seen["body"]["cta"]) == ("hud", "Retro Doodle Tee", "")
 
 
 @pytest.mark.parametrize("args", [dict(image_names=[]), dict(image_names=["a.png"] * 11),
-                                  dict(image_names=["../x.png"]), dict(image_names=["a.png"], shape="1:1"),
+                                  dict(image_names=["../x.png"]), dict(image_names=["a.png"], shape="2:3"),
                                   dict(image_names=["a.png"], watermark="Brand", watermark_style="diagonal"),
-                                  dict(image_names=["a.png"], watermark_style="tiled")])
+                                  dict(image_names=["a.png"], watermark_style="tiled"),
+                                  dict(image_names=["a.png"], frame="neon", title="x"),
+                                  dict(image_names=["a.png"], frame="hud")])
 def test_carousel_refuses_bad_input_without_calling_the_service(monkeypatch, args):
     monkeypatch.setattr(ic.httpx, "post", lambda *a, **k: pytest.fail("called the service"))
     with pytest.raises(ic.ImageError):

@@ -6034,10 +6034,11 @@ const SET_LABEL = { 'Credentials': 'Keys and passwords' };  // shown names
 // Numbers that fine-tune a choice go under "Advanced", so the choices come first; so do the shops' vault entry names.
 const _vaultName = it => /_name$/.test(it.key || '');
 const SET_ADVANCED = { 'Rules and monitoring': it => it.type === 'int', 'Etsy': _vaultName, 'Printify': _vaultName,
-  'Threads': _vaultName, 'Pinterest': _vaultName, 'Online shops': _vaultName };
+  'Threads': _vaultName, 'Instagram': _vaultName, 'Pinterest': _vaultName, 'Online shops': _vaultName };
 // The tool server sends one "Online shops" group; the page splits it into a card per service (first match wins).
 const SHOP_CARDS = [['Approvals', k => k.startsWith('approvals_')], ['Printify', k => k.includes('printify')],
-  ['Threads', k => k.includes('threads')], ['Pinterest', k => k.includes('pinterest')], ['Etsy', k => k.includes('etsy')]];
+  ['Threads', k => k.includes('threads')], ['Instagram', k => k.includes('instagram')],
+  ['Pinterest', k => k.includes('pinterest')], ['Etsy', k => k.includes('etsy')]];
 function splitGroup(groups, from, cards) {
   const items = groups[from];
   if (!items) return;
@@ -6148,6 +6149,7 @@ async function loadSettings() {
   loadApiCatalog();
   loadEtsyConnect();
   loadThreadsConnect();
+  loadInstagramConnect();
   loadPinterestConnect();
 }
 let _setCat = null;
@@ -6253,6 +6255,67 @@ async function finishThreadsConnect(btn) {
     const msg = `Threads connected${d.username ? ` as @${d.username}` : ''}.`;
     await loadThreadsConnect();
     document.getElementById('threadsNote').textContent = msg;
+    loadCredentials();
+  } catch (e) { note.textContent = e.message; btn.disabled = false; }
+}
+// Connect Instagram (the owner, 2026-10-20): the Threads card's steps, for Meta's Instagram API with Instagram Login.
+async function loadInstagramConnect() {
+  const rows = document.getElementById('set-instagram-rows');
+  if (!rows || _viewer) return;
+  let box = document.getElementById('instagramConnect');
+  if (!box) {
+    box = document.createElement('div'); box.id = 'instagramConnect'; box.className = 'etsy-connect';
+    rows.insertBefore(box, rows.querySelector(':scope > details.set-adv'));
+  }
+  let d;
+  try { d = await apiCall('GET', '/api/instagram'); }
+  catch (e) { box.innerHTML = `<p class="hint">Connect Instagram: ${escapeHtml(e.message)}</p>`; return; }
+  const own = location.protocol === 'https:' ? `${location.origin}/api/instagram/callback` : '';
+  let saved = ''; try { saved = localStorage.getItem('cp-instagram-return') || ''; } catch (e) { /* not kept */ }
+  const missing = ['app_id', 'app_secret'].filter(k => !d.have[k]).map(k => d.names[k]);
+  box.classList.toggle('on', !!d.connected);
+  box.innerHTML = `<div class="panel-title" style="margin-top:14px">Connect Instagram ${d.connected ? `<span class="etsy-on">● Connected${d.account ? ' as @' + escapeHtml(d.account) : ''}</span>` : ''}</div>
+    ${missing.length ? `<p class="hint">First save your Instagram app's ID and secret under Credentials: ${missing.map(escapeHtml).join(' and ')} (Meta's developer page for your app, Instagram > API setup with Instagram login: the Instagram app ID and secret, not the Facebook app ones). The account must be a Business or Creator account.</p>` : `
+    <p class="hint">${d.connected ? (d.enabled ? 'Posting is on.' : 'Connected. Posting stays off until you switch on "Let apps post to Instagram" above.') + ' The connection renews itself.' : 'Sign in on Instagram once with your Business or Creator account; HomeShed keeps the connection (60 days, renewed automatically). Asks for: ' + escapeHtml(d.scopes) + '.'}</p>
+    <ol class="hint etsy-steps">
+      <li>In your Meta app, Instagram > API setup with Instagram login > Business login settings, add this as an OAuth redirect URI (exactly):
+        <div class="msg-cmd"><code id="instagramReturnShow">${escapeHtml(own || saved || 'type an https address below')}</code><button type="button" class="ghost" onclick="navigator.clipboard.writeText(document.getElementById('instagramReturn').value)">Copy</button></div>
+        ${own ? '' : '<span>This panel isn\'t on https, so Instagram can\'t come back to it. Use any https address you own; you\'ll paste the address Instagram sends you to below.</span>'}
+        <input id="instagramReturn" type="url" value="${escAttr(own || saved)}" placeholder="https://…" aria-label="Return address"
+          oninput="document.getElementById('instagramReturnShow').textContent = this.value; try { localStorage.setItem('cp-instagram-return', this.value); } catch (e) {}"${own ? ' hidden' : ''}></li>
+      <li><button type="button" onclick="startInstagramConnect(this)">${d.connected ? 'Connect again' : 'Connect Instagram'}</button> opens Instagram's sign-in in a new tab.</li>
+      ${own ? '' : `<li>After you allow it, paste the address Instagram sent you to:
+        <span style="display:flex;gap:6px;margin-top:4px"><input id="instagramPasted" type="url" placeholder="https://…?code=…&state=…" aria-label="Address Instagram sent you to" style="flex:1">
+        <button type="button" onclick="finishInstagramConnect(this)">Finish</button></span></li>`}
+    </ol>`}
+    <p class="hint" id="instagramNote"></p>`;
+  const q = new URLSearchParams(location.hash.split('?')[1] || '');
+  if (q.get('instagram')) {
+    document.getElementById('instagramNote').textContent = q.get('instagram') === 'ok'
+      ? `Instagram connected${q.get('account') ? ` as @${q.get('account')}` : ''}.` : `Instagram didn't connect: ${q.get('why') || 'unknown reason'}`;
+    showSetCat('Shops and social');
+    box.scrollIntoView({ block: 'center' });
+  }
+}
+async function startInstagramConnect(btn) {
+  const note = document.getElementById('instagramNote'), ret = document.getElementById('instagramReturn').value.trim();
+  btn.disabled = true;
+  try {
+    const d = await apiCall('POST', '/api/instagram/connect', { redirect_uri: ret });
+    window.open(d.url, '_blank', 'noopener');
+    note.textContent = 'Instagram opened in a new tab. Allow access there (within 10 minutes).';
+  } catch (e) { note.textContent = e.message; }
+  btn.disabled = false;
+}
+async function finishInstagramConnect(btn) {
+  const note = document.getElementById('instagramNote'), url = document.getElementById('instagramPasted').value.trim();
+  if (!url) { document.getElementById('instagramPasted').focus(); return; }
+  btn.disabled = true;
+  try {
+    const d = await apiCall('POST', '/api/instagram/finish', { url });
+    const msg = `Instagram connected${d.username ? ` as @${d.username}` : ''}.`;
+    await loadInstagramConnect();
+    document.getElementById('instagramNote').textContent = msg;
     loadCredentials();
   } catch (e) { note.textContent = e.message; btn.disabled = false; }
 }
@@ -6650,6 +6713,7 @@ async function saveCred(form) {
   await loadCredentials();
   loadEtsyConnect();  // the owner: the Connect button appeared only after a page refresh
   loadThreadsConnect();
+  loadInstagramConnect();
   loadPinterestConnect();
   const row = document.querySelector(`#credList .cred-row[data-name="${CSS.escape(name)}"]`);
   if (row) { row.classList.add('flash'); row.scrollIntoView({ block: 'nearest' }); }
@@ -6666,6 +6730,7 @@ async function deleteCred(btn) {
   loadCredentials();
   loadEtsyConnect();
   loadThreadsConnect();
+  loadInstagramConnect();
   loadPinterestConnect();
 }
 // --- HomeShed Pro (branding-and-pro-review.md; facts from .claude/pro-and-paid-plan.md): plan badge, Pro page and
@@ -7020,6 +7085,7 @@ async function saveSetting(source, key, el) {
     if (source === 'panel') applyUiSettings();  // refresh speed, animations and viewer pages apply at once
     if (/^commerce_etsy/.test(key)) loadEtsyConnect();  // a renamed Etsy entry shows on the Connect card at once
     if (/^social_threads/.test(key)) loadThreadsConnect();
+    if (/^social_instagram/.test(key)) loadInstagramConnect();
     if (/^social_pinterest/.test(key)) loadPinterestConnect();  // a renamed entry or the Trial switch shows at once
   } catch (e) {
     msg.textContent = e.message; msg.className = 'set-msg bad';

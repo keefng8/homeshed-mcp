@@ -1,0 +1,17 @@
+{
+  "name": "homeshed",
+  "owner": {
+    "name": "Keith Stewartson",
+    "url": "https://github.com/keefng8"
+  },
+  "metadata": {
+    "description": "The HomeShed plugin for Claude Code, from the homeshed-mcp repo."
+  },
+  "plugins": [
+    {
+      "name": "homeshed",
+      "source": "./plugin",
+      "description": "HomeShed, a self-hosted MCP tool server: memory, a logic solver, git, network checks, known bugs and release checks. Free, no key needed."
+    }
+  ]
+}

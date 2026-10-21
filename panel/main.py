@@ -2904,6 +2904,43 @@ async def threads_callback(code: str = "", state: str = "", error: str = "", err
     return RedirectResponse(f"/#settings?threads=failed&why={quote(str(data.get('error') or 'unknown')[:200])}", status_code=303)
 
 
+# Connect Instagram (the owner, 2026-10-20), the same relay as Connect Threads. Owner only.
+@app.get("/api/instagram")
+async def instagram_status():
+    return await _mcp_admin("GET", "/instagram/connect")
+
+
+@app.post("/api/instagram/connect")
+async def instagram_connect(request: Request):
+    body = await _json_body(request)
+    return await _mcp_admin("POST", "/instagram/connect", {"redirect_uri": str((body or {}).get("redirect_uri") or "")[:300]})
+
+
+@app.post("/api/instagram/finish")
+async def instagram_finish(request: Request):
+    body = await _json_body(request)
+    return await _mcp_admin("POST", "/instagram/finish", {"url": str((body or {}).get("url") or "")[:2000]})
+
+
+@app.get("/api/instagram/callback")
+async def instagram_callback(code: str = "", state: str = "", error: str = "", error_description: str = ""):
+    """Where Instagram sends the browser back (the panel on https)."""
+    from urllib.parse import quote
+    if error or not code:
+        why = error_description or error or "Instagram sent no code"
+        return RedirectResponse(f"/#settings?instagram=failed&why={quote(why[:200])}", status_code=303)
+    resp = await _mcp_admin("POST", "/instagram/finish", {"code": code[:600], "state": state[:200]})
+    try:
+        data = json.loads(resp.body)
+    except (ValueError, AttributeError):
+        data = {}
+    if resp.status_code == 200:
+        return RedirectResponse(f"/#settings?instagram=ok&account={quote(str(data.get('username') or '')[:60])}",
+                                status_code=303)
+    return RedirectResponse(f"/#settings?instagram=failed&why={quote(str(data.get('error') or 'unknown')[:200])}",
+                            status_code=303)
+
+
 # Connect Pinterest (the owner's decision, 2026-10-10), the same relay as Connect Threads. Owner only.
 @app.get("/api/pinterest")
 async def pinterest_status():

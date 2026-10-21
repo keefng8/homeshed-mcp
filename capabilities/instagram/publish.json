@@ -1,0 +1,53 @@
+{
+  "id": "instagram.publish",
+  "name": "Post to Instagram",
+  "version": "1.0.0",
+  "description": "Post one image or a carousel (2-10 images) with a caption to the owner's connected Instagram professional account. Public; off until the owner switches it on.",
+  "category": "instagram",
+  "risk": "write",
+  "requires": [
+    "Instagram connected in Settings > Shops and social",
+    "the owner's switch: Let apps post to Instagram"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "post to instagram",
+    "publish on instagram",
+    "instagram post",
+    "insta post"
+  ],
+  "inputs": {
+    "text": {
+      "type": "string",
+      "required": true
+    },
+    "ai_generated": {
+      "type": "boolean",
+      "required": true
+    },
+    "image_names": {
+      "type": "array",
+      "required": true
+    },
+    "alt_text": {
+      "type": "string",
+      "required": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.instagram.publish.publish"
+  },
+  "latency": {
+    "expected_ms": 20000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "instagram.status",
+    "threads.publish",
+    "image.carousel"
+  ]
+}

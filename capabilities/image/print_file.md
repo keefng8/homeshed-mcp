@@ -17,6 +17,7 @@ the edges is removed, so white inside the design stays. Runs on the image servic
 | `variants` | `["light", "dark"]` (default both). |
 | `colours` | 0 keeps every colour (default; DTG prints full colour); 2-8 reduces to flat colours. |
 | `vignette` | `"round"` or `"cloud"` for a full-scene design (no plain background needed): the picture stays solid to 88% of the way out, then a short soft rim of hard-edged halftone dots (the owner, 2026-10-08: the first, wider fade hid most of the image). `"round"` is an oval; `"cloud"` a near-rectangle with gentle bumps, so the corners stay. Dots are at least 6 px on a pitch of at least 12 px (0.6% of the print's shorter side) at 300 DPI; smaller ones are dropped, not shrunk, and there's no partial alpha (DTG underbase haloes it). Empty (default): the plain background is removed. A design that already has a transparent background keeps it. |
+| `keep_chest` | `true` for a bust (a pet portrait cut off at the chest): a background-coloured area between the design's left and right edges that opens downward, in the lower middle, is kept (to-do #123: 9 dogs printed White only because their white chests went with the background). Gaps opening upward (between ears) or at the sides stay see-through. Default `false`: scenes have such gaps too (under a motorbike). |
 
 ## Returns
 `{"files": {"light": {"name", "width", "height", "dpi", "colours"}, "dark": {...}}, "folder": "print-files",

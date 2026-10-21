@@ -29,6 +29,16 @@
       "type": "integer",
       "required": false,
       "default": 0
+    },
+    "photos": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    },
+    "detail": {
+      "type": "boolean",
+      "required": false,
+      "default": false
     }
   },
   "execution": {

@@ -411,6 +411,13 @@ def decide(item_id: str, approve: bool, via: str = "") -> dict:
             try:
                 result["result"] = run()
             except h.CommerceError as exc:
+                if "HTTP 429" in str(exc) and item.get("owner_approval"):
+                    # a shop's per-second limit (the Director, 2026-10-20: an Etsy details edit hit 429 and then sat
+                    # waiting): nothing changed on the shop, so an app-approved request is held like a daily limit
+                    # and retry_waiting runs it again next round, instead of waiting for the owner
+                    clients._audit(f"printify {action} rate limited", item.get("client"), item=item_id)
+                    raise NotYet(f"the shop said too many requests (HTTP 429); it runs again by itself in a few "
+                                 "minutes") from None
                 item["last_error"] = str(exc)[:300]
                 _save(items)
                 clients._audit(f"printify {action} failed", item.get("client"), item=item_id, error=str(exc)[:200])

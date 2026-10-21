@@ -387,7 +387,7 @@ def cmd_doctor(args) -> int:
     if mem["state"] != "ready":
         print(f"{'':19}Fix: {mem['next']}")
     for g in report["groups"]:
-        print(f"{mark[g['state']]} {g['name'][:16]:<16}{g['tools']} tool(s): {g['detail']}")
+        print(f"{mark[g['state']]} {g['name']:<16} {g['tools']} tool(s): {g['detail']}")
         if g["state"] != "ready":
             print(f"{'':19}{'Fix' if g['state'] == 'broken' else 'Add'}: {g['next']}")
     pk = report["packs"]

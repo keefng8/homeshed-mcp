@@ -43,7 +43,9 @@ def shop_get() -> dict:
          "return_deadline_days"}] or null likewise, "sections": [{"shop_section_id", "title",
          "active_listing_count"}] (what a listing's shop_section_id names) or null likewise, "listing_edits":
          {"last_24h", "daily_max" (ETSY_EDIT_DAILY_MAX), "queued" (approved, waiting for room under the limit),
-         "waiting_for_owner"}}
+         "waiting_for_owner"}, "api_quota": what Etsy's own headers said on the server's last Etsy call (refusals
+         included): {"limit_per_day", "remaining_today", "limit_per_second", "remaining_this_second", "seen_at",
+         "last_status"}, or null before any call since the server started; throttle on remaining_today}
     """
     sid = et.shop_id()
     s = et.get(f"/v3/application/shops/{sid}", oauth=False) or {}
@@ -67,7 +69,7 @@ def shop_get() -> dict:
                     for r in rows or [] if isinstance(r, dict)][:30]
     except h.CommerceError:
         sections = None
-    return et.note({"listing_edits": _listing_edits(),"shop_id": s.get("shop_id"), "shop_name": s.get("shop_name"), "title": h.trim(s.get("title"), 120),
+    return et.note({"listing_edits": _listing_edits(), "api_quota": h.etsy_quota(), "shop_id": s.get("shop_id"), "shop_name": s.get("shop_name"), "title": h.trim(s.get("title"), 120),
                     "return_policies": returns, "sections": sections,
                     "currency": s.get("currency_code"), "active_listings": s.get("listing_active_count"),
                     "sold": s.get("transaction_sold_count"), "review_average": s.get("review_average"),
@@ -77,27 +79,55 @@ def shop_get() -> dict:
 
 
 @tool(name="listings.list", category="etsy", doc="etsy/read.md")
-def listings_list(state: str = "active", limit: int = 20, offset: int = 0) -> dict:
+def listings_list(state: str = "active", limit: int = 20, offset: int = 0, photos: bool = False,
+                  detail: bool = False) -> dict:
     """The shop's listings, newest first, compact: id, title, state, price, quantity, updated.
 
     Args:
         state: active (default), inactive, sold_out, draft or expired.
-        limit: 1-20 per page.
+        limit: 1-20 per page (1-100 with photos).
         offset: skip this many (paging: use "next_offset").
+        photos: True adds each listing's first photo ({url, alt}) in the same Etsy call, and allows 100 a page: a
+            catalogue in 2 calls instead of one etsy.listing.get per listing (2026-10-21: per-listing refreshes were a
+            large share of the Etsy daily limit).
+        detail: True (implies photos) adds what a listing check reads, from the same call: tags, taxonomy_id,
+            who_made, when_made, shipping_profile_id, production_partner_ids, description_chars and every photo's
+            {listing_image_id, rank, alt_text}. Properties aren't in it (Etsy serves them per listing: listing.get
+            full=true).
 
     Returns:
         {"total", "offset", "next_offset", "listings": [{"listing_id", "title", "state", "price": {amount,
-         currency}, "quantity", "updated"}]}
+         currency}, "quantity", "updated", "photo"?: {"url", "alt"}, + the detail fields}]}
     """
     if state not in LISTING_STATES:
         raise h.CommerceError(f"state must be one of {', '.join(LISTING_STATES)}")
-    limit, offset = h.clamp(limit, 1, 20, "limit"), h.clamp(offset, 0, 100_000, "offset")
+    photos = photos or detail
+    limit, offset = h.clamp(limit, 1, 100 if photos else 20, "limit"), h.clamp(offset, 0, 100_000, "offset")
     d = et.get(f"/v3/application/shops/{et.shop_id()}/listings",
                params={"state": state, "limit": limit, "offset": offset, "sort_on": "updated",
-                       "sort_order": "desc"}) or {}
+                       "sort_order": "desc", **({"includes": "Images"} if photos else {})}) or {}
+
+    def first_photo(x):
+        imgs = sorted((i for i in x.get("images") or [] if isinstance(i, dict)), key=lambda i: i.get("rank") or 99)
+        if not imgs:
+            return None
+        return {"url": imgs[0].get("url_570xN") or imgs[0].get("url_fullxfull"), "alt": h.trim(imgs[0].get("alt_text"), 120)}
+
+    def details(x):
+        imgs = [i for i in x.get("images") or [] if isinstance(i, dict)]
+        desc = x.get("description") if isinstance(x.get("description"), str) else ""
+        return {"title": h.trim(x.get("title"), 140), "tags": (x.get("tags") or [])[:13], "taxonomy_id": x.get("taxonomy_id"), "who_made": x.get("who_made"),
+                "when_made": x.get("when_made"), "shipping_profile_id": x.get("shipping_profile_id"),
+                "production_partner_ids": et.partner_ids(x), "description_chars": len(desc),
+                "images": {"count": len(imgs), "photos": sorted(
+                    ({"listing_image_id": i.get("listing_image_id"), "rank": i.get("rank"),
+                      "alt_text": h.trim(i.get("alt_text"), 120),
+                      "url": i.get("url_570xN") or i.get("url_fullxfull")} for i in imgs),
+                    key=lambda p: p["rank"] if isinstance(p["rank"], int) else 99)}}
     rows = [{"listing_id": x.get("listing_id"), "title": h.trim(x.get("title"), 60), "state": x.get("state"),
              "price": h.money(x.get("price")), "quantity": x.get("quantity"),
-             "updated": _ts(x.get("updated_timestamp") or x.get("last_modified_timestamp"))}
+             "updated": _ts(x.get("updated_timestamp") or x.get("last_modified_timestamp")),
+             **({"photo": first_photo(x)} if photos else {}), **(details(x) if detail else {})}
             for x in (d.get("results") or [])[:limit]]
     total = d.get("count")
     nxt = offset + len(rows) if isinstance(total, int) and offset + len(rows) < total else None
@@ -133,7 +163,12 @@ def listing_get(listing_id: str, full: bool = False) -> dict:
         "is_digital": x.get("is_digital"), "is_customizable": x.get("is_customizable"),
         "shipping_profile_id": x.get("shipping_profile_id"), "return_policy_id": x.get("return_policy_id"),
         "shop_section_id": x.get("shop_section_id"),
-        "images": {"count": len(imgs), "ranks": sorted(i.get("rank") for i in imgs if isinstance(i.get("rank"), int))},
+        "images": {"count": len(imgs), "ranks": sorted(i.get("rank") for i in imgs if isinstance(i.get("rank"), int)),
+                   # each photo, for etsy.listing.update remove_images / images_alt (raw-art swap, 2026-10-18)
+                   "photos": sorted(({"listing_image_id": i.get("listing_image_id"), "rank": i.get("rank"),
+                                      "alt_text": h.trim(i.get("alt_text"), 120), "width": i.get("full_width"),
+                                      "height": i.get("full_height"), "url": i.get("url_fullxfull")}
+                                     for i in imgs), key=lambda p: p["rank"] if isinstance(p["rank"], int) else 99)},
         "production_partner_ids": et.partner_ids(x),
         "production_partners": [{"id": p.get("production_partner_id"), "name": h.trim(p.get("partner_name"), 60)}
                                 for p in x.get("production_partners") or [] if isinstance(p, dict)][:10],

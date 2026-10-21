@@ -58,8 +58,9 @@ def _env_int(name: str, default: int, ceiling: int = 100) -> int:
 
 def edit_daily_max() -> int:
     # 20 until 2026-10-09: a new listing needs 2 edits (the owner's OK). The ceiling went from 100 to 200 on 2026-10-14
-    # (the owner: "Raise the limit to reach target", 150): 30 publishes a night need 60 edits, plus repairs.
-    return _env_int("ETSY_EDIT_DAILY_MAX", 50, ceiling=200)
+    # (the owner: "Raise the limit to reach target", 150): 30 publishes a night need 60 edits, plus repairs. 500 on
+    # 2026-10-18 (the owner: "raise the edit limit on etsy to 500 now. i need it").
+    return _env_int("ETSY_EDIT_DAILY_MAX", 50, ceiling=500)
 
 
 def deactivate_daily_max() -> int:
@@ -235,7 +236,9 @@ def _queue(lid: str, title: str, summary: str, send: dict, wanted: dict, reapply
 def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] | None = None,
                    production_partner_ids: list[int] | None = None, shipping_profile_id: int = 0,
                    properties: dict | None = None, reapply: bool = False, images: list[dict] | None = None,
-                   owner_approval: dict | None = None, shop_section_id: int = 0) -> dict:
+                   owner_approval: dict | None = None, shop_section_id: int = 0,
+                   remove_images: list[int] | None = None, images_alt: list[dict] | None = None,
+                   swap: bool = False) -> dict:
     """Ask to set an Etsy listing's details that Printify doesn't manage: category, materials, production partners,
     delivery profile, attributes (colour, occasion, recipient, holiday...) and extra photos. It is NOT changed by this
     call: it's checked against the listing and Etsy's own lists, then waits for the owner's approval in the Control
@@ -261,6 +264,16 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
         owner_approval: {"id", "by", "at"}: the owner's own approval inside a trusted app (as printify.product.publish);
             then it's set at once.
         shop_section_id: the shop section to show the listing in (etsy.shop.update makes sections); 0 keeps it.
+        remove_images: listing_image_ids to delete from the listing (etsy.listing.get lists them), e.g. raw artwork
+            being swapped for a watermarked copy. Can't be undone; never the listing's last photo (add the new ones in
+            the same call: they go up first).
+        images_alt: new alt text for photos already on the listing, [{"listing_image_id", "alt_text": up to 500}].
+        swap: true for a raw-artwork photo swap (the owner, 2026-10-20, design theft): an AUTO or bot approval may
+            delete a photo ONLY as a swap that passes every guard: one photo removed and its watermarked replacement
+            added in the same call; the removed one's alt text says "artwork", it is a 2048 or 2400 px square, not at
+            rank 1 or 2, and not a mockup, a "worn in" hero or an info card; at most ETSY_SWAP_DAILY_MAX (60) a day.
+            On approval the replacement is read back on Etsy and the old photo backed up (file and link) before the
+            delete. Fail any guard and an automatic approval isn't used: it waits for the owner's tap.
 
     Returns:
         {"pending": true, "id", "etsy": summary, "expires_in_h", "how"}: the approval request, not a change on the
@@ -278,16 +291,28 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
         fields = _check_fields(taxonomy_id, materials, production_partner_ids, shipping_profile_id, shop_section_id)
         if properties is not None and not isinstance(properties, dict):
             raise h.CommerceError('properties must be {"attribute name": "value" or ["values"]}')
-        if not fields and not properties and not images:
+        if not fields and not properties and not images and not remove_images and not images_alt:
             raise h.CommerceError("nothing to change: give a category, materials, production partners, a delivery "
-                                  "profile, a shop section, attributes or images")
+                                  "profile, a shop section, attributes, images, remove_images or images_alt")
         props = []
     new_images = _check_images(images) if images and not reapply else []
     x = _own_listing(lid)
     thumbs = []
+    removes, alts = ([], []) if reapply else (_check_photo_edits(remove_images, images_alt))
+    have_ids = None
+    if removes or alts:
+        listed = (et.get(f"/v3/application/listings/{lid}/images") or {}).get("results") or []
+        have_ids = {int(i["listing_image_id"]) for i in listed if isinstance(i, dict) and i.get("listing_image_id")}
+        if missing := sorted({*removes, *(a["listing_image_id"] for a in alts)} - have_ids):
+            raise h.CommerceError(f"not photos of this listing: {missing} (etsy.listing.get lists its photos)")
+        if len(have_ids) - len(set(removes)) + len(new_images) < 1:
+            raise h.CommerceError("that would leave the listing with no photo: add the new one in the same call")
+        if set(removes) & {a["listing_image_id"] for a in alts}:
+            raise h.CommerceError("a photo can't be both removed and given new alt text")
     if new_images:
-        have_n = (et.get(f"/v3/application/listings/{lid}/images") or {}).get("count") or 0
-        if have_n + len(new_images) > MAX_LISTING_IMAGES:
+        have_n = len(have_ids) if have_ids is not None else \
+            (et.get(f"/v3/application/listings/{lid}/images") or {}).get("count") or 0
+        if have_n - len(set(removes)) + len(new_images) > MAX_LISTING_IMAGES:
             raise h.CommerceError(f"the listing has {have_n} photos; {len(new_images)} more would pass Etsy's "
                                   f"{MAX_LISTING_IMAGES}")
         for img in new_images:
@@ -312,15 +337,124 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
                                        else have.get(p["property_id"]) != sorted(p["value_ids"]))]
     if gone := {p["property_id"] for p in props if p.get("remove")}:
         _forget_props(lid, gone)  # at once, even if Etsy already lacks it: a re-apply must never set it back
-    if not send_fields and not send_props and not new_images:
+    if not send_fields and not send_props and not new_images and not removes and not alts:
         return {"listing_id": lid, "pending": False, "note": "already as asked: nothing queued"}
     title = h.trim(x.get("title"), 60) or "untitled"
     said = "; ".join(s for s in (_said(x, send_fields, send_props),
-                                 ("photos: " + ", ".join(_short_ref(i["image"]) for i in new_images)) if new_images else "")
+                                 ("photos: " + ", ".join(_short_ref(i["image"]) for i in new_images)) if new_images else "",
+                                 f"delete photos {removes} (can't be undone)" if removes else "",
+                                 f"new alt text on photos {[a['listing_image_id'] for a in alts]}" if alts else "")
                      if s)
     summary = f'{"Re-apply" if reapply else "Set"} Etsy details on "{title}": {said}'
-    return _queue(lid, title, summary, {"fields": send_fields, "properties": send_props, "images": new_images},
-                  {"fields": fields, "properties": props}, reapply, thumbs, owner_approval)
+    send = {"fields": send_fields, "properties": send_props, "images": new_images, "remove_images": removes,
+            "images_alt": alts}
+    held = None
+    if removes and _automatic(owner_approval):  # a machine never approves a delete outside a guarded swap
+        held = _swap_problem(swap, removes, new_images, listed) or None
+        if held:
+            owner_approval = None
+        else:
+            send["swap"] = True  # execute() reads the replacement back and backs the old photo up first
+    out = _queue(lid, title, summary, send, {"fields": fields, "properties": props}, reapply, thumbs, owner_approval)
+    return {**out, "swap_held": held} if held else out
+
+
+SWAP_SIDES = (2048, 2400)  # the raw artwork's square sizes (the Director's guard 1)
+SWAP_NEVER = ("mockup", "worn in", "info", "size guide", "size chart")  # guard 5: photos a swap never deletes
+SWAP_FILE = Path(os.environ.get("ETSY_SWAPS_FILE") or data_path("usage/etsy_photo_swaps.json"))
+SWAP_BACKUPS = Path(os.environ.get("ETSY_SWAP_BACKUP_DIR") or data_path("usage/etsy_photo_backups"))
+
+
+def swap_daily_max() -> int:
+    return _env_int("ETSY_SWAP_DAILY_MAX", 60, ceiling=60)
+
+
+def _automatic(ok) -> bool:
+    by = str((ok or {}).get("by") or "").strip().lower() if isinstance(ok, dict) else ""
+    return by.startswith(("auto", "bot:"))
+
+
+def _swaps_today() -> list[dict]:
+    try:
+        rows = json.loads(SWAP_FILE.read_text(encoding="utf-8")).get("swaps") or []
+    except (OSError, ValueError, AttributeError):
+        rows = []
+    return [r for r in rows if isinstance(r, dict) and time.time() - float(r.get("at") or 0) < 86400]
+
+
+def _swap_problem(swap: bool, removes: list[int], new_images: list[dict], listed: list) -> str:
+    """Why an automatic approval can't delete this photo, or "" when every guard passes (the owner's yes, 2026-10-20,
+    "only if mistakes are mitigated first")."""
+    if not swap:
+        return "a photo delete with an automatic approval must be a swap (swap=true): it waits for the owner"
+    if len(removes) != 1:
+        return "a swap deletes exactly one photo: it waits for the owner"
+    if not new_images:
+        return "a swap adds its watermarked replacement in the same request: it waits for the owner"
+    photo = next((p for p in listed if isinstance(p, dict) and int(p.get("listing_image_id") or 0) == removes[0]), {})
+    alt = str(photo.get("alt_text") or "").lower()
+    w, hgt, rank = photo.get("full_width"), photo.get("full_height"), photo.get("rank")
+    if "artwork" not in alt:
+        return "the photo's alt text doesn't say \"artwork\": it waits for the owner"
+    if any(word in alt for word in SWAP_NEVER):
+        return "the photo looks like a mockup, a worn-in hero or an info card: it waits for the owner"
+    if not (isinstance(w, int) and w == hgt and w in SWAP_SIDES):
+        return f"the photo is {w}x{hgt}, not a 2048 or 2400 px square: it waits for the owner"
+    if not isinstance(rank, int) or rank <= 2:
+        return f"the photo is at rank {rank}: a swap never deletes rank 1 or 2, it waits for the owner"
+    if len(_swaps_today()) >= swap_daily_max():
+        return f"{swap_daily_max()} automatic swaps in the last 24 hours: this one waits for the owner"
+    return ""
+
+
+def _backup_photo(lid: str, iid: int, listed: list) -> dict:
+    """The photo's file and link saved before it is deleted, so it can be put back. Raises if it can't be saved: then
+    nothing is deleted."""
+    photo = next((p for p in listed if isinstance(p, dict) and int(p.get("listing_image_id") or 0) == iid), {})
+    url = str(photo.get("url_fullxfull") or "")
+    if not url.startswith("https://i.etsystatic.com/"):
+        raise h.CommerceError(f"photo {iid} has no Etsy image link to back up: nothing was deleted")
+    try:
+        r = httpx.get(url, timeout=60, follow_redirects=False)
+    except httpx.HTTPError as exc:
+        raise h.CommerceError(f"photo {iid} couldn't be backed up ({type(exc).__name__}): nothing was deleted") from None
+    if r.status_code != 200 or len(r.content) < 1000:
+        raise h.CommerceError(f"photo {iid} couldn't be backed up (HTTP {r.status_code}): nothing was deleted")
+    folder = SWAP_BACKUPS / lid
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / f"{iid}.jpg").write_bytes(r.content)
+    meta = {"listing_id": lid, "listing_image_id": iid, "url": url, "alt_text": photo.get("alt_text"),
+            "rank": photo.get("rank"), "width": photo.get("full_width"), "height": photo.get("full_height"),
+            "bytes": len(r.content), "at": time.time()}
+    (folder / f"{iid}.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
+    return meta
+
+
+def _record_swap(row: dict) -> None:
+    rows = _swaps_today() + [row]
+    SWAP_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = SWAP_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"swaps": rows[-500:]}, indent=1), encoding="utf-8")
+    os.replace(tmp, SWAP_FILE)
+
+
+def _check_photo_edits(remove_images, images_alt) -> tuple[list[int], list[dict]]:
+    removes = []
+    for i in remove_images or []:
+        if isinstance(i, bool) or not str(i).isdigit():
+            raise h.CommerceError("remove_images: listing_image_ids (numbers, from etsy.listing.get)")
+        removes.append(int(i))
+    alts = []
+    for a in images_alt or []:
+        iid, text = (a or {}).get("listing_image_id"), (a or {}).get("alt_text")
+        if isinstance(iid, bool) or not str(iid or "").isdigit() or not isinstance(text, str) or not text.strip():
+            raise h.CommerceError('images_alt: [{"listing_image_id": number, "alt_text": "text"}]')
+        if len(text) > 500:
+            raise h.CommerceError("images_alt: alt_text is at most 500 characters")
+        alts.append({"listing_image_id": int(iid), "alt_text": text.strip()})
+    if len(removes) + len(alts) > MAX_LISTING_IMAGES:
+        raise h.CommerceError(f"at most {MAX_LISTING_IMAGES} photo edits in one call")
+    return sorted(set(removes)), alts
 
 
 def _forget_props(lid: str, property_ids: set) -> None:
@@ -384,7 +518,41 @@ def execute(payload: dict) -> dict:
         img["done_id"] = (out or {}).get("listing_image_id") or True  # kept on the request (printify_pending saves it)
         uploaded += 1
         each.append({"image": img["image"], "listing_image_id": img["done_id"], "uploaded": "now"})
-    wanted = payload.get("wanted") or {k: v for k, v in send.items() if k != "images"}
+    # After the new photos are up: alt text on existing ones (Etsy's image upload re-saves an existing photo given its
+    # listing_image_id), then deletions last, so the listing never has none. Both are safe to retry.
+    # the re-save also carries the photo's current rank, so setting alt text can't move it (Etsy re-saves the photo
+    # whole: a rank-only re-save blanked alt text, 2026-10-18)
+    ranks = {p.get("listing_image_id"): p.get("rank") for p in _photos(lid)} if send.get("images_alt") else {}
+    for a in send.get("images_alt") or []:
+        rank = ranks.get(a["listing_image_id"])
+        et.write("POST", f"/v3/application/shops/{shop}/listings/{lid}/images",
+                 {"listing_image_id": a["listing_image_id"], "alt_text": a["alt_text"],
+                  **({"rank": rank} if isinstance(rank, int) else {})}, et.WRITE_SETTING, LABEL)
+    removed, backed_up = [], []
+    if send.get("swap") and send.get("remove_images"):
+        # an automatic swap (guards checked when it was asked): the replacement must be on the listing now, and the
+        # old photo is saved first; either failing raises, so nothing is deleted and the request waits with the error
+        photos = _photos(lid)
+        new_ids = {i["listing_image_id"] for i in each}
+        if not new_ids or not new_ids <= {p.get("listing_image_id") for p in photos}:
+            raise h.CommerceError("the watermarked replacement isn't on the listing yet: nothing was deleted")
+        backed_up = [_backup_photo(lid, int(iid), photos) for iid in send["remove_images"]]
+    for iid in send.get("remove_images") or []:
+        try:
+            et.write("DELETE", f"/v3/application/shops/{shop}/listings/{lid}/images/{iid}", {}, et.WRITE_SETTING, LABEL)
+        except h.CommerceError as exc:
+            if "HTTP 404" not in str(exc):  # already gone: done
+                raise
+        removed.append(iid)
+    if send.get("swap") and removed:
+        _record_swap({"at": time.time(), "listing_id": lid, "removed": removed,
+                      "backups": [b["listing_image_id"] for b in backed_up]})
+        import clients
+        clients._audit("etsy photo swap", None, listing=lid, removed=removed)
+    # any photo change also tidies the ranks: closes a deletion's gap, repairs a listing an earlier upload left doubled
+    reranked = _rerank(shop, lid, {i["listing_image_id"] for i in each if i["uploaded"] == "now"}) \
+        if send.get("images") or send.get("images_alt") or removed else []
+    wanted = payload.get("wanted") or {k: v for k, v in send.items() if k not in ("images", "remove_images", "images_alt")}
     with _lock:
         rows = applied()
         saved = rows.get(lid) or {}
@@ -400,7 +568,33 @@ def execute(payload: dict) -> dict:
     # try of this approval); an upload that fails raises instead, and the request stays waiting with its error
     return {"listing_id": lid, "fields": sorted(fields), "attributes": [p["name"] for p in props], "photos": uploaded,
             "photos_asked": len(send.get("images") or []), "photos_landed": len(each), "photo_results": each,
+            "photos_removed": removed, "alt_text_set": [a["listing_image_id"] for a in send.get("images_alt") or []],
+            "photos_reranked": reranked,
             "note": "Set on Etsy. A Printify re-publish of this listing queues the details again for your approval."}
+
+
+def _photos(lid: str) -> list[dict]:
+    return [p for p in (et.get(f"/v3/application/listings/{lid}/images", None, False) or {}).get("results") or []
+            if isinstance(p, dict) and p.get("listing_image_id")]
+
+
+def _rerank(shop: str, lid: str, new_ids: set) -> list[dict]:
+    """Etsy puts an upload at its rank but doesn't move the photo already there (live 2026-10-18: a hero at rank 1 left
+    ranks [1, 1, 2, 3, 4, 5]). Re-number the listing's photos 1..n, a new photo ahead of an old one on the same rank,
+    and re-save each one whose rank changed (Etsy's upload with listing_image_id and rank). Returns what moved.
+    The re-save carries the photo's alt text: Etsy blanks it otherwise (live 2026-10-18, five photos lost theirs)."""
+    photos = _photos(lid)
+    if not all(isinstance(p.get("rank"), int) for p in photos):
+        return []  # Etsy didn't say where each one is: leave them
+    photos.sort(key=lambda p: (int(p.get("rank") or 99), p["listing_image_id"] not in new_ids))
+    moved = []
+    for rank, p in enumerate(photos, 1):
+        if int(p.get("rank") or 0) != rank:
+            et.write("POST", f"/v3/application/shops/{shop}/listings/{lid}/images",
+                     {"listing_image_id": p["listing_image_id"], "rank": rank,
+                      **({"alt_text": p["alt_text"]} if p.get("alt_text") else {})}, et.WRITE_SETTING, LABEL)
+            moved.append({"listing_image_id": p["listing_image_id"], "rank": rank})
+    return moved
 
 
 @tool(name="listing.deactivate", category="etsy", doc="etsy/write.md")

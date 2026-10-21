@@ -12,7 +12,7 @@ from tools.image.generate import ImageError, base_url, raise_for_backend
 from tools.image.print_file import MAX_BYTES, NAME_RE
 
 SHAPES = {"9:16": "1080x1920", "4:5": "1080x1350"}
-TEMPLATES = ("drop", "editorial")
+TEMPLATES = ("drop", "editorial", "hud")
 WATERMARK_STYLES = ("tiled", "corner", "both")
 STYLE_RE = re.compile(r"^[a-z0-9-]{1,30}$")  # a brand frame's style name, e.g. "neon-gold"
 MATTE_RE = re.compile(r"^(auto|none|#[0-9a-f]{6})$")
@@ -32,7 +32,10 @@ def promo_card(product_image: str, headline: str, price_gbp: float, template: st
         headline: the product's name (up to 60 characters).
         price_gbp: the real listed price in pounds, e.g. 24.99. Never a placeholder.
         template: "drop" (bold: dark navy, glowing frame, retro stripes, confetti; for younger buyers) or
-            "editorial" (premium: cream, thin gold frame, serif headline; for gift buyers).
+            "editorial" (premium: cream, thin gold frame, serif headline; for gift buyers), or "hud" (the shop's
+            current neon HUD brand, 2026-10-20: near-black, the photo whole with a cyan neon edge, green HUD corner
+            brackets, the shop's mark, the headline, the price in a pink neon pill and the link in green; frame,
+            cutout and matte are ignored).
         benefit: one line that's true for the listing (up to 110 characters).
         link_text: the shop link as shown at the bottom (up to 60 characters).
         kicker: a short label (up to 20), e.g. "New drop"; only if true.
@@ -60,7 +63,7 @@ def promo_card(product_image: str, headline: str, price_gbp: float, template: st
     if shape not in SHAPES:
         raise ImageError('shape is "9:16" or "4:5"')
     if template not in TEMPLATES:
-        raise ImageError('template is "drop" or "editorial"')
+        raise ImageError('template is "drop", "editorial" or "hud"')
     if watermark_style not in WATERMARK_STYLES:
         raise ImageError(f"watermark_style is one of {list(WATERMARK_STYLES)}")
     matte = (matte or "auto").strip().lower()

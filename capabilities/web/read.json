@@ -5,7 +5,9 @@
   "description": "Fetch a public webpage as Markdown via Jina Reader, zero API key required.",
   "category": "web",
   "risk": "read",
-  "requires": ["internet access; pages are fetched through Jina Reader (r.jina.ai)"],
+  "requires": [
+    "internet access; pages are fetched through Jina Reader (r.jina.ai)"
+  ],
   "transport": "mcp",
   "aliases": [
     "read webpage",
@@ -18,6 +20,11 @@
     "url": {
       "type": "string",
       "required": true
+    },
+    "full": {
+      "type": "boolean",
+      "default": false,
+      "description": "False: main text only (menus, cookie banners, images dropped); True: the whole page"
     }
   },
   "execution": {

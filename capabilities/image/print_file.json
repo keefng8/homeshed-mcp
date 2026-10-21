@@ -41,6 +41,11 @@
       "type": "string",
       "required": false,
       "default": ""
+    },
+    "keep_chest": {
+      "type": "boolean",
+      "required": false,
+      "default": false
     }
   },
   "execution": {

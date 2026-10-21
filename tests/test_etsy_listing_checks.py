@@ -15,7 +15,8 @@ def test_listing_get_full_description_photos_and_partners(monkeypatch):
     short = er.listing_get("1")
     assert calls[-1] == ("/v3/application/listings/1", {"includes": "Images"}, False)
     assert len(short["description"]) <= 1500 and short["description_chars"] == len(long)
-    assert short["images"] == {"count": 3, "ranks": [1, 2, 3]} and short["production_partner_ids"] == [555]
+    assert (short["images"]["count"], short["images"]["ranks"]) == (3, [1, 2, 3]) and short["production_partner_ids"] == [555]
+    assert [p["rank"] for p in short["images"]["photos"]] == [1, 2, 3]  # each photo, for remove_images / images_alt
     assert short["production_partners"] == [{"id": 555, "name": "Print Co"}]
     full = er.listing_get("1", full=True)
     assert full["description"].endswith("AI-assisted design.")  # the disclosure at the end is visible
@@ -138,6 +139,68 @@ def test_shop_get_tells_an_app_how_many_listing_edits_are_left(monkeypatch):
         raise pp.PendingError("unreadable")
     monkeypatch.setattr(pp, "list_pending", unreadable)
     assert er.shop_get()["listing_edits"] is None
+
+
+def test_listings_list_can_bring_each_first_photo_in_the_same_call(monkeypatch):
+    """2026-10-21: a site refresh did one listing.get per listing; with photos=True one call returns 100 with photos."""
+    calls = []
+    page = {"count": 2, "results": [
+        {"listing_id": 1, "title": "Tee", "images": [{"rank": 2, "url_570xN": "https://i.etsystatic.com/b.jpg"},
+                                                     {"rank": 1, "url_570xN": "https://i.etsystatic.com/a.jpg",
+                                                      "alt_text": "front"}]},
+        {"listing_id": 2, "title": "Hoodie"}]}
+    monkeypatch.setattr(er.et, "shop_id", lambda: "1")
+    monkeypatch.setattr(er.et, "get", lambda path, params=None, oauth=True: calls.append(params) or page)
+    out = er.listings_list(limit=100, photos=True)
+    assert calls[-1]["includes"] == "Images" and calls[-1]["limit"] == 100
+    assert out["listings"][0]["photo"] == {"url": "https://i.etsystatic.com/a.jpg", "alt": "front"}
+    assert out["listings"][1]["photo"] is None
+    plain = er.listings_list()
+    assert "includes" not in calls[-1] and "photo" not in plain["listings"][0]
+    with pytest.raises(er.h.CommerceError):
+        er.listings_list(limit=100)  # 100 a page only with photos (the compact list stays small)
+
+
+def test_listings_list_detail_carries_what_a_listing_check_reads(monkeypatch):
+    """2026-10-21 (a shop app): the live check read 3 calls per listing; detail=True brings its fields in the page call."""
+    calls = []
+    page = {"count": 1, "results": [
+        {"listing_id": 1, "title": "T" * 140, "tags": ["a", "b"], "taxonomy_id": 482, "who_made": "i_did",
+         "when_made": "made_to_order", "shipping_profile_id": 9, "description": "hello",
+         "production_partners": [{"production_partner_id": 77}],
+         "images": [{"listing_image_id": 5, "rank": 2, "alt_text": "back"},
+                    {"listing_image_id": 4, "rank": 1, "alt_text": "front", "url_570xN": "https://i.etsystatic.com/a.jpg"}]}]}
+    monkeypatch.setattr(er.et, "shop_id", lambda: "1")
+    monkeypatch.setattr(er.et, "get", lambda path, params=None, oauth=True: calls.append(params) or page)
+    row = er.listings_list(limit=100, detail=True)["listings"][0]
+    assert calls[-1]["includes"] == "Images" and len(calls) == 1
+    assert row["title"] == "T" * 140  # the full title (a promo headline), not the compact 60
+    assert row["photo"]["alt"] == "front" and row["description_chars"] == 5 and row["shipping_profile_id"] == 9
+    assert row["tags"] == ["a", "b"] and row["taxonomy_id"] == 482 and row["production_partner_ids"] == [77]
+    assert row["images"] == {"count": 2, "photos": [
+        {"listing_image_id": 4, "rank": 1, "alt_text": "front", "url": "https://i.etsystatic.com/a.jpg"},
+        {"listing_image_id": 5, "rank": 2, "alt_text": "back", "url": None}]}  # every photo's url: a site shows them all
+    assert "tags" not in er.listings_list(photos=True)["listings"][0]
+
+
+def test_shop_get_shows_etsys_own_quota_headers_including_from_a_429(monkeypatch):
+    """2026-10-21: Etsy answered 429 "Exceeded daily rate limit"; its headers say what's left, so an app can throttle."""
+    import httpx
+    from tools.commerce import _http as h
+    monkeypatch.setattr(h, "ETSY_QUOTA", {})
+    heads = {"x-limit-per-day": "10000", "x-remaining-today": "137", "x-limit-per-second": "10",
+             "x-remaining-this-second": "9"}
+    monkeypatch.setattr(h, "_TRANSPORT", httpx.MockTransport(
+        lambda req: httpx.Response(429, headers={**heads, "x-remaining-today": "0"}, json={"error": "daily"})
+        if req.url.path.endswith("/refused") else httpx.Response(200, headers=heads, json={})))
+    h.request("etsy", "GET", "/v3/application/ok", headers={}, secrets=())
+    assert h.etsy_quota()["remaining_today"] == 137 and h.etsy_quota()["limit_per_day"] == 10000
+    with pytest.raises(h.CommerceError, match="429"):
+        h.request("etsy", "GET", "/v3/application/refused", headers={}, secrets=())
+    assert h.etsy_quota()["remaining_today"] == 0 and h.etsy_quota()["last_status"] == 429  # read from the refusal too
+    monkeypatch.setattr(er.et, "shop_id", lambda: "1")
+    monkeypatch.setattr(er.et, "get", lambda path, params=None, oauth=True: {"shop_id": 1, "shop_name": "Shop"})
+    assert er.shop_get()["api_quota"]["remaining_today"] == 0
 
 
 def test_ledger_shows_what_etsy_charged_in_pounds_with_a_sum_per_type(monkeypatch):

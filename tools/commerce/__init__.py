@@ -24,6 +24,8 @@ VAULT_NAMES = {
     "commerce_printify_shop_id_name": ("PRINTIFY_SHOP_ID", "Printify shop number"),
     "social_threads_app_id_name": ("THREADS_APP_ID", "Threads app ID"),
     "social_threads_app_secret_name": ("THREADS_APP_SECRET", "Threads app secret"),
+    "social_instagram_app_id_name": ("INSTAGRAM_APP_ID", "Instagram app ID"),
+    "social_instagram_app_secret_name": ("INSTAGRAM_APP_SECRET", "Instagram app secret"),
     "social_pinterest_app_id_name": ("PINTEREST_APP_ID", "Pinterest app ID"),
     "social_pinterest_app_secret_name": ("PINTEREST_APP_SECRET", "Pinterest app secret key"),
 }
@@ -142,6 +144,13 @@ SETTINGS = {
         "label": "Let apps post to Threads",
         "help": "The threads.publish tool: text posts to the Threads account you connect below, at most "
                 "THREADS_DAILY_MAX a day (default 25). Each post is public. Off until you switch it on.",
+    },
+    "social_instagram_enabled": {
+        "type": "bool", "default": False, "group": "Online shops",
+        "label": "Let apps post to Instagram",
+        "help": "The instagram.publish tool: image and carousel posts to the Instagram professional account (Business "
+                "or Creator) you connect below, at most INSTAGRAM_DAILY_MAX a day (default 25). Each post is public. Off "
+                "until you switch it on.",
     },
     "social_pinterest_enabled": {
         "type": "bool", "default": False, "group": "Online shops",

@@ -50,7 +50,7 @@ the change and queues it in the approvals bar ("Etsy listing details"); the owne
 | `shop_section_id` | no | The shop section to show it in (`etsy.shop.update` makes sections); 0 keeps it. |
 | `properties` | no | `{"attribute": "value" or ["values"]}`, e.g. `{"Primary color": "Black", "Holiday": "Christmas"}`. `null` removes an attribute (`{"Holiday": null}`), and a re-apply never sets it back. |
 | `reapply` | no | Set again everything this tool last set on the listing; the other arguments are ignored. Photos aren't re-applied. |
-| `images` | no | 1-5 photos to add: `[{"image": ref, "alt_text"?: up to 500 characters, "rank"?: 1-10}]`. |
+| `images` | no | 1-5 photos to add: `[{"image": ref, "alt_text"?: up to 500 characters, "rank"?: 1-10}]`. A new photo takes its rank and the others move down; after any photo change the listing's photos are re-numbered 1..n (`photos_reranked` in the result). |
 
 **Photos** (2026-10-08, the director: every listing needs 5+, and Printify's API has only the front mockup):
 - `image` is one of: `"folder/name.png"` for an image saved in a folder of the image store under its own name (e.g.

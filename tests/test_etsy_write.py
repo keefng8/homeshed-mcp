@@ -286,6 +286,112 @@ def test_bad_photo_asks_are_refused(photos, images, count, match):
     assert pp.list_pending() == []
 
 
+def test_raw_art_swap_adds_first_then_alt_text_then_deletes_on_approval(photos):
+    """2026-10-18 (designs copied from listings): add the watermarked copy, fix alt text, delete the raw art."""
+    state, writes, _ = photos
+    state["images"] = {"count": 2, "results": [{"listing_image_id": 501}, {"listing_image_id": 502}]}
+    out = ew.listing_update("4412", images=[{"image": "listing/size-guide.png", "rank": 2}], remove_images=[502],
+                            images_alt=[{"listing_image_id": 501, "alt_text": "Staffy tee, front"}])
+    assert out["pending"] is True and writes == [] and "delete photos [502] (can't be undone)" in out["etsy"]
+    [item] = pp.list_pending()
+    res = pp.decide(item["id"], True)["result"]
+    assert [(m, p.rsplit("/", 2)[-2:] if m == "DELETE" else p.rsplit("/", 1)[-1], f) for m, p, f, _ in writes] == [
+        ("POST", "images", {"rank": 2}),
+        ("POST", "images", {"listing_image_id": 501, "alt_text": "Staffy tee, front"}),
+        ("DELETE", ["images", "502"], {})]
+    assert res["photos_removed"] == [502] and res["alt_text_set"] == [501]
+
+
+RAW = {"listing_image_id": 777, "rank": 3, "alt_text": "Staffy artwork, full design", "full_width": 2400,
+       "full_height": 2400, "url_fullxfull": "https://i.etsystatic.com/1/r/il/abc/777/il_fullxfull.777.jpg"}
+
+
+@pytest.mark.parametrize("change, why", [
+    (dict(swap=False), "must be a swap"), (dict(removes=[777, 778]), "exactly one"), (dict(new=[]), "replacement"),
+    (dict(photo={"alt_text": "Staffy tee on a model"}), "artwork"),
+    (dict(photo={"alt_text": "Staffy artwork mockup"}), "mockup"),
+    (dict(photo={"full_width": 1500, "full_height": 1500}), "2048 or 2400"),
+    (dict(photo={"full_width": 2400, "full_height": 2000}), "2048 or 2400"),
+    (dict(photo={"rank": 2}), "rank 2"), (dict(photo={"rank": 1}), "rank 1"),
+])
+def test_an_automatic_swap_must_pass_every_guard(change, why):
+    """The owner's yes, 2026-10-20: FULL AUTO may delete raw artwork photos, only when every guard passes."""
+    photo = {**RAW, **change.get("photo", {})}
+    args = (change.get("swap", True), change.get("removes", [777]), change.get("new", [{"image": "x.png"}]), [photo])
+    assert why in ew._swap_problem(*args)
+    assert ew._swap_problem(True, [777], [{"image": "x.png"}], [RAW]) == ""  # the clean case passes
+
+
+def test_a_failed_guard_drops_the_automatic_approval_so_the_owner_taps_it(photos, monkeypatch):
+    state, writes, _ = photos
+    state["images"] = {"count": 2, "results": [{**RAW, "rank": 2}, {"listing_image_id": 501, "rank": 1}]}
+    seen = {}
+    monkeypatch.setattr(ew, "_queue", lambda lid, title, summary, send, wanted, reapply, thumbs, ok:
+                        seen.update(ok=ok, send=send) or {"pending": True, "id": "q1"})
+    out = ew.listing_update("4412", images=[{"image": "listing/size-guide.png"}], remove_images=[777], swap=True,
+                            owner_approval={"id": "a1", "by": "auto:full", "at": "2026-10-20T20:00:00Z"})
+    assert out["swap_held"].startswith("the photo is at rank 2") and seen["ok"] is None and "swap" not in seen["send"]
+    state["images"]["results"][0]["rank"] = 3  # all guards pass: the approval is kept and execute() is told
+    out = ew.listing_update("4412", images=[{"image": "listing/size-guide.png"}], remove_images=[777], swap=True,
+                            owner_approval={"id": "a2", "by": "auto:full", "at": "2026-10-20T20:00:00Z"})
+    assert "swap_held" not in out and seen["ok"]["id"] == "a2" and seen["send"]["swap"] is True
+    out = ew.listing_update("4412", images=[{"image": "listing/size-guide.png"}], remove_images=[777],
+                            owner_approval={"id": "a3", "by": "owner", "at": "2026-10-20T20:00:00Z"})
+    assert seen["ok"]["id"] == "a3" and "swap" not in seen["send"]  # the owner's own approval isn't held
+
+
+def test_a_swap_reads_the_replacement_back_and_backs_up_before_deleting(photos, monkeypatch, tmp_path):
+    state, writes, _ = photos
+    monkeypatch.setattr(ew, "SWAP_BACKUPS", tmp_path / "backups")
+    monkeypatch.setattr(ew, "SWAP_FILE", tmp_path / "swaps.json")
+    monkeypatch.setattr(ew, "_own_listing", lambda lid: {"listing_id": 4412})
+    monkeypatch.setattr(ew.httpx, "get", lambda url, **k: type("R", (), {"status_code": 200, "content": b"j" * 5000})())
+    state["images"] = {"count": 2, "results": [dict(RAW), {"listing_image_id": 501, "rank": 1}]}
+    send = {"fields": {}, "properties": [], "images": [], "remove_images": [777], "images_alt": [], "swap": True}
+    with pytest.raises(h.CommerceError, match="replacement isn't on the listing"):  # nothing uploaded: no delete
+        ew.execute({"listing_id": "4412", "send": send})
+    assert not [w for w in writes if w[0] == "DELETE"] and not (tmp_path / "backups").exists()
+    state["images"]["results"].append({"listing_image_id": 909, "rank": 4})
+    send["images"] = [{"image": "listing/size-guide.png", "done_id": 909}]  # uploaded by this request
+    res = ew.execute({"listing_id": "4412", "send": send})
+    assert res["photos_removed"] == [777] and (tmp_path / "backups" / "4412" / "777.jpg").read_bytes() == b"j" * 5000
+    meta = __import__("json").loads((tmp_path / "backups" / "4412" / "777.json").read_text())
+    assert meta["url"] == RAW["url_fullxfull"] and meta["alt_text"] == RAW["alt_text"] and len(ew._swaps_today()) == 1
+
+
+def test_a_hero_at_rank_1_moves_the_other_photos_down(photos):
+    """2026-10-18, live on a listing: Etsy put the hero at rank 1 but left the mockup there too, [1, 1, 2, 3, 4, 5]."""
+    state, writes, _ = photos
+    state["images"] = {"count": 5, "results": [{"listing_image_id": 8714, "rank": 1, "alt_text": "Mockup, front"}] +
+                       [{"listing_image_id": 600 + r, "rank": r, "alt_text": f"Photo {r}"} for r in (2, 3, 4)] +
+                       [{"listing_image_id": 605, "rank": 5, "alt_text": ""}]}
+    ew.listing_update("4412", images=[{"image": "listing/size-guide.png", "rank": 1}])
+    [item] = pp.list_pending()
+    state["images"]["results"].append({"listing_image_id": 901, "rank": 1})  # what Etsy reports after the upload
+    res = pp.decide(item["id"], True)["result"]
+    assert res["photos_reranked"] == [{"listing_image_id": 8714, "rank": 2}, {"listing_image_id": 602, "rank": 3},
+                                      {"listing_image_id": 603, "rank": 4}, {"listing_image_id": 604, "rank": 5},
+                                      {"listing_image_id": 605, "rank": 6}]  # the hero (901) stays at 1
+    # each re-save carries the photo's alt text, or Etsy blanks it (live, same day); an empty one isn't sent
+    assert writes[1][2] == {"listing_image_id": 8714, "rank": 2, "alt_text": "Mockup, front"} and len(writes) == 6
+    assert writes[2][2]["alt_text"] == "Photo 2" and "alt_text" not in writes[5][2]
+
+
+@pytest.mark.parametrize("kwargs, match", [
+    ({"remove_images": [999]}, "not photos of this listing"),
+    ({"remove_images": [501, 502]}, "no photo"),
+    ({"remove_images": ["abc"]}, "listing_image_ids"),
+    ({"images_alt": [{"listing_image_id": 501, "alt_text": ""}]}, "images_alt"),
+    ({"images_alt": [{"listing_image_id": 501, "alt_text": "x" * 501}]}, "500"),
+    ({"remove_images": [501], "images_alt": [{"listing_image_id": 501, "alt_text": "a"}]}, "both"),
+])
+def test_bad_photo_edits_are_refused_before_anything_queues(photos, kwargs, match):
+    photos[0]["images"] = {"count": 2, "results": [{"listing_image_id": 501}, {"listing_image_id": 502}]}
+    with pytest.raises(h.CommerceError, match=match):
+        ew.listing_update("4412", **kwargs)
+    assert pp.list_pending() == [] and photos[1] == []
+
+
 def test_only_printify_hosts_and_safe_names_are_fetched():
     with pytest.raises(h.CommerceError, match="only Printify mockup addresses"):
         ew._image("https://example.com/x.png")
@@ -330,9 +436,11 @@ def test_the_client_sends_lists_comma_joined_and_names_a_missing_scope(monkeypat
     assert seen[1] == {"value_ids": ["1,2"]}
 
 
-@pytest.mark.parametrize("value, edits, deactivations", [("150", 150, 100), ("500", 200, 100), ("x", 50, 5), ("", 50, 5)])
-def test_the_edit_limit_goes_to_200_and_deactivation_stays_at_100(monkeypatch, value, edits, deactivations):
-    """2026-10-14, the owner: raise the edit limit to 150 (30 publishes need 60 edits a night, plus repairs)."""
+@pytest.mark.parametrize("value, edits, deactivations", [("150", 150, 100), ("500", 500, 100), ("900", 500, 100),
+                                                         ("x", 50, 5), ("", 50, 5)])
+def test_the_edit_limit_goes_to_500_and_deactivation_stays_at_100(monkeypatch, value, edits, deactivations):
+    """2026-10-14, the owner: raise the edit limit to 150 (30 publishes need 60 edits a night, plus repairs);
+    2026-10-18: to 500."""
     from tools.etsy import write as w
     monkeypatch.setenv("ETSY_EDIT_DAILY_MAX", value)
     monkeypatch.setenv("ETSY_DEACTIVATE_DAILY_MAX", value)

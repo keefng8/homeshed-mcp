@@ -116,6 +116,31 @@ def test_a_retry_that_fails_otherwise_waits_for_the_owner_and_isnt_retried(fake,
     assert pp.retry_waiting() == []  # not tried again: it's the owner's now
 
 
+def test_a_rate_limited_run_is_retried_by_itself_not_left_for_the_owner(fake, monkeypatch):
+    """2026-10-20: an approved Etsy details edit hit Etsy's 429 and then sat waiting; nothing had changed on the shop."""
+    calls = []
+
+    def flaky(path, body):
+        calls.append(path)
+        if len(calls) == 1:
+            raise h.CommerceError("printify answered HTTP 429 (rate limited: try again in a minute)")
+        fake["posts"].append(path)
+        return {}
+    monkeypatch.setattr(pf, "publish_post", flaky)
+    out = pb.product_publish("abc123", owner_approval=ok("apr_429"))
+    assert out["pending"] is True and "429" in out["owner_approval"] and "by itself" in out["owner_approval"]
+    [item] = pp.list_pending()
+    assert not item.get("last_error") and fake["notes"] == []      # not the owner's problem: no error, no phone note
+    ran = pp.retry_waiting()                                       # the next round runs it through decide() again
+    assert [r["id"] for r in ran] == [out["id"]] and pp.list_pending() == [] and len(calls) == 2
+    unapproved = pp.add("def456", "Publish the other one", {})     # without an app approval a 429 stays the owner's
+    fake["product"] = {**DRAFT, "id": "def456"}
+    calls.clear()
+    with pytest.raises(h.CommerceError, match="429"):
+        pp.decide(unapproved["id"], True)
+    assert pp.list_pending()[0]["last_error"]
+
+
 def test_a_run_that_fails_stays_waiting(fake, monkeypatch):
     real_add = pp.add
 

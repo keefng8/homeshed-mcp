@@ -61,6 +61,19 @@
       "type": "integer",
       "required": false,
       "default": 0
+    },
+    "remove_images": {
+      "type": "array",
+      "description": "listing_image_ids to delete (can't be undone; never the last photo)"
+    },
+    "images_alt": {
+      "type": "array",
+      "description": "[{listing_image_id, alt_text}] for photos already on the listing"
+    },
+    "swap": {
+      "type": "boolean",
+      "required": false,
+      "default": false
     }
   },
   "execution": {

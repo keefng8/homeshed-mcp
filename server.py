@@ -583,6 +583,40 @@ async def threads_finish_route(request: Request) -> JSONResponse:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
 
+@mcp.custom_route("/instagram/connect", methods=["GET", "POST"])
+async def instagram_connect_route(request: Request) -> JSONResponse:
+    """Connect Instagram (tools/instagram/_client.py), same shape as /threads/connect. Owner only."""
+    from tools.commerce._http import CommerceError
+    from tools.instagram import _client as instagram_client
+    try:
+        if request.method == "GET":
+            return JSONResponse(instagram_client.status())
+        body = await request.json()
+        return JSONResponse(instagram_client.start(str((body or {}).get("redirect_uri") or "")))
+    except ValueError:
+        return JSONResponse({"error": "send JSON: {\"redirect_uri\": ...}"}, status_code=400)
+    except CommerceError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@mcp.custom_route("/instagram/finish", methods=["POST"])
+async def instagram_finish_route(request: Request) -> JSONResponse:
+    from tools.commerce._http import CommerceError
+    from tools.instagram import _client as instagram_client
+    try:
+        body = await request.json() or {}
+        if body.get("url"):
+            result = await asyncio.to_thread(instagram_client.finish_url, str(body["url"]))
+        else:
+            result = await asyncio.to_thread(instagram_client.finish, str(body.get("code") or ""),
+                                             str(body.get("state") or ""))
+        return JSONResponse(result)
+    except (ValueError, AttributeError):
+        return JSONResponse({"error": "send JSON: {\"code\", \"state\"} or {\"url\"}"}, status_code=400)
+    except CommerceError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
 @mcp.custom_route("/pinterest/connect", methods=["GET", "POST"])
 async def pinterest_connect_route(request: Request) -> JSONResponse:
     """Connect Pinterest (tools/pinterest/_client.py), same shape as /threads/connect. Owner only."""

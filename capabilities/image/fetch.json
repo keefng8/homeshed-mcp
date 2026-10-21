@@ -1,0 +1,44 @@
+{
+  "id": "image.fetch",
+  "name": "Fetch Full-Size Image",
+  "version": "1.0.0",
+  "description": "Download a finished image job's full-size original (byte for byte, the provider's own format) by job_id, not the 1024 px preview image.status gives.",
+  "category": "image",
+  "risk": "read",
+  "requires": [
+    "GPU image service (IMAGE_BASE_URL) for local jobs"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "download original",
+    "full size image",
+    "get the original image",
+    "fetch image file"
+  ],
+  "inputs": {
+    "job_id": {
+      "type": "string",
+      "required": true
+    },
+    "max_mb": {
+      "type": "number",
+      "required": false,
+      "default": 1.0
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.fetch.fetch"
+  },
+  "latency": {
+    "expected_ms": 3000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.generate",
+    "image.status"
+  ]
+}

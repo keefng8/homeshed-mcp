@@ -10,20 +10,21 @@ from tools.image import providers as prov
 from tools.image.generate import ImageError, base_url, raise_for_backend
 from tools.image.print_file import MAX_BYTES, NAME_RE
 
-SIZES = {"4:5": "1080x1350", "9:16": "1080x1920"}
+SIZES = {"4:5": "1080x1350", "9:16": "1080x1920", "1:1": "2000x2000"}
 WATERMARK_STYLES = ("corner", "tiled", "both")
 
 
 @tool(name="carousel", category="image", doc="image/carousel.md")
 def carousel(image_names: list[str], shape: str = "4:5", background: str = "", watermark: str = "",
-             watermark_style: str = "corner") -> dict:
+             watermark_style: str = "corner", frame: str = "", title: str = "", cta: str = "") -> dict:
     """Turn designs into social slides: each one centred on a 1080x1350 (4:5: Threads and Instagram feed posts and
     carousels) or 1080x1920 (9:16: reels and stories) canvas, on the design's own background colour so the slide
     reads as one piece. The slides are saved in the images "promo" folder; pass their names to threads.publish.
 
     Args:
         image_names: 1-10 designs by their saved_as name (local or paid).
-        shape: "4:5" (default) or "9:16".
+        shape: "4:5" (default), "9:16", or "1:1": a 2000x2000 square for an Etsy listing photo (a smaller design is
+            upscaled to fill it).
         background: "" uses each design's own corner colour (off-white for a transparent design); or "#rrggbb" for
             every slide.
         watermark: brand text (up to 40 characters) drawn small, bottom-right, about 60% opacity, in the clear space
@@ -32,17 +33,27 @@ def carousel(image_names: list[str], shape: str = "4:5", background: str = "", w
         watermark_style: "corner" (default): the small mark above. "tiled": the watermark text repeated diagonally
             across the whole slide, design included, faint (about 18% opacity, 3-4 rows on a 4:5 slide), so a crop
             can't remove it; for social posts. "both": tiled plus the corner mark. Needs watermark text.
+        frame: "hud" for the shop's Instagram post style (the owner, 2026-10-20): the photo (a worn-in hero scene)
+            fills the slide edge to edge, with green HUD corner brackets, the shop's mark top-left and a dark strip
+            near the bottom with `title` and `cta`, all inside what the profile grid keeps. A tiled watermark goes
+            under it. "" (default): the design centred on its background as before.
+        title: frame "hud": the strip's first line, up to 40 characters, e.g. "Retro Doodle Tee" (shown in capitals).
+        cta: frame "hud": the second line; empty = "SHOP: LINK IN BIO". Never a price (R&D's Instagram review).
 
     Returns:
         {"slides": [{"name", "width", "height", "bytes"}], "folder": "promo", "size"}.
     """
     if shape not in SIZES:
-        raise ImageError('shape is "4:5" or "9:16"')
+        raise ImageError('shape is "4:5", "9:16" or "1:1"')
     style = watermark_style or "corner"
     if style not in WATERMARK_STYLES:
         raise ImageError(f"watermark_style is one of {list(WATERMARK_STYLES)}")
     if style != "corner" and not (watermark or "").strip():
         raise ImageError(f'watermark_style "{style}" needs the watermark text')
+    if frame not in ("", "hud"):
+        raise ImageError('frame is "" or "hud"')
+    if frame and not (title or "").strip():
+        raise ImageError('frame "hud" needs a title, e.g. "Retro Doodle Tee"')
     names = [str(n).strip() for n in (image_names or []) if str(n).strip()]
     if not 1 <= len(names) <= 10:
         raise ImageError("give 1-10 image names")
@@ -60,7 +71,8 @@ def carousel(image_names: list[str], shape: str = "4:5", background: str = "", w
     try:
         resp = httpx.post(f"{base_url()}/image/promo-slides", timeout=120,
                           json={"items": items, "size": SIZES[shape], "background": background or "",
-                                "watermark": watermark or "", "watermark_style": style})
+                                "watermark": watermark or "", "watermark_style": style,
+                                **({"frame": frame, "title": title.strip(), "cta": (cta or "").strip()} if frame else {})})
     except httpx.HTTPError as exc:
         raise ImageError(f"image backend unreachable ({type(exc).__name__})") from None
     raise_for_backend(resp)
