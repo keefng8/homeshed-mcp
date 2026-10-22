@@ -90,6 +90,12 @@ try:  # the Proxmox alarms' switch and lines live with the monitor
 except ImportError:
     pass
 
+try:  # the agent-messages switch (on) lives with the agents tools
+    from tools.agents import SETTINGS as _AGENTS_SETTINGS
+    SCHEMA.update(_AGENTS_SETTINGS)
+except ImportError:
+    pass
+
 try:  # the to-do list's app route (off) lives with the to-do tools
     from tools.todo import SETTINGS as _TODO_SETTINGS
     SCHEMA.update(_TODO_SETTINGS)

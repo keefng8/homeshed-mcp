@@ -60,6 +60,27 @@ proxy, see [Security](../README.md#security)). Second, add the name or address t
 MCP_ALLOWED_HOSTS=localhost:8765,127.0.0.1:8765,myserver.lan:8765
 ```
 
+### Connect Claude Code to your server
+
+<a id="claude-code-server"></a>Give Claude Code its own key rather than the owner token:
+
+1. Make a key for Claude Code (the Control Panel's API access page, or `POST /clients`), granting only the tools you
+   want it to use. You can remove that key at any time without touching other apps.
+2. Put the key in an environment variable named `HOMESHED_TOKEN` in your shell profile, and open a new terminal.
+3. Run this, with your server's address in place of the example:
+
+   ```
+   claude mcp add -s user --transport http homeshed 'http://127.0.0.1:8765/mcp' --header 'Authorization: Bearer ${HOMESHED_TOKEN}'
+   ```
+
+   Keep the single quotes (they work in PowerShell, bash and zsh): Claude Code then saves only the variable's name and
+   reads the key when it connects, so the key itself never goes into its settings file.
+4. Restart Claude Code and check `/mcp`. If you also installed the HomeShed plugin, turn its local server off there so
+   the tools don't show twice.
+
+Never put the key in a project file, a commit or a chat. If it ends up somewhere it shouldn't, delete it on the server
+and make a new one.
+
 ## Where state lives
 
 | Variable | Default | What it does |

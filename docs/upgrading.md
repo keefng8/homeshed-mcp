@@ -12,6 +12,11 @@ for example, `HomeShed doctor - 0.3.0 - ...`. The newest version is on the
 
 Pick the way you installed HomeShed.
 
+### The Claude Code plugin
+
+The plugin runs one exact HomeShed version. In Claude Code, type `/plugin`, choose **homeshed**, then **Update**, and
+restart Claude Code.
+
 ### Claude Code, Cursor, VS Code and other apps (the one-line install)
 
 Your app starts HomeShed with `uvx`, which keeps the version it downloaded first until you ask for a newer one.

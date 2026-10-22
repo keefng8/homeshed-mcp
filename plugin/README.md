@@ -32,8 +32,8 @@ If you added HomeShed before with `claude mcp add` or `uvx homeshed-mcp setup`, 
 ## What it downloads and what it sends
 
 - **Downloads:** the first time Claude Code starts HomeShed, `uvx` downloads the `homeshed-mcp` package and its
-  dependencies from PyPI (https://pypi.org/project/homeshed-mcp/). Upgrades happen only when you ask for them
-  (`uvx homeshed-mcp@latest doctor`).
+  dependencies from PyPI (https://pypi.org/project/homeshed-mcp/). The plugin names one exact HomeShed version, so
+  nothing changes until you update the plugin (`/plugin`, then update `homeshed`), which moves it to the new version.
 - **Sends:** this plugin makes no network calls of its own. It has no hooks, and collects no usage data. HomeShed
   calls another service only when you set one up (your own model, a cloud model with your key, Docker, ntfy and so
   on) or when a tool's job is to reach the address you give it (for example a DNS lookup or a port check).
@@ -44,24 +44,8 @@ Full details: [PRIVACY.md](https://github.com/keefng8/homeshed-mcp/blob/main/PRI
 
 ## Already run your own HomeShed server?
 
-This plugin runs HomeShed on your computer. To use a HomeShed server you already run (Docker, or
-`homeshed-mcp serve --http`) instead:
-
-1. Make a key just for Claude Code on your server (the Control Panel's API access page, or `POST /clients`). Give it
-   only the tools you want Claude to use. Every app gets its own key, so you can remove this one at any time.
-2. Put the key in an environment variable named `HOMESHED_TOKEN` in your shell profile, and open a new terminal.
-3. Run this, with your server's address in place of the example:
-
-   ```
-   claude mcp add -s user --transport http homeshed 'http://127.0.0.1:8765/mcp' --header 'Authorization: Bearer ${HOMESHED_TOKEN}'
-   ```
-
-   Keep the single quotes (they work in PowerShell, bash and zsh): Claude Code then saves only the variable's name
-   and reads the key when it connects, so the key itself never goes into its settings file.
-4. Restart Claude Code. In `/mcp` you can turn this plugin's local HomeShed off, so the tools don't show twice.
-
-Keep the key in your shell profile or a password manager. Never put it in a project file, a commit or a chat. If it
-ends up somewhere it shouldn't, delete it on the server and make a new one.
+This plugin runs HomeShed on your computer. To connect Claude Code to a HomeShed server you already run
+(Docker, or `homeshed-mcp serve --http`) instead, follow [Connect Claude Code to your server](https://github.com/keefng8/homeshed-mcp/blob/main/docs/configuration.md#claude-code-server).
 
 ## Uninstall
 

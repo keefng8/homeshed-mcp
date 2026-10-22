@@ -1,0 +1,38 @@
+{
+  "id": "agents.send",
+  "name": "Message an Agent",
+  "version": "1.0.0",
+  "description": "Leave another connected AI app a short message (1-2000 characters) it reads with agents.inbox; to=\"owner\" goes to the owner's inbox instead.",
+  "category": "agents",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "message another agent",
+    "tell the other app",
+    "send a note to an agent",
+    "reply to an agent"
+  ],
+  "inputs": {
+    "to": {"type": "string", "required": true},
+    "text": {"type": "string", "required": true},
+    "reply_to": {"type": "string", "required": false, "default": ""},
+    "as_session": {"type": "string", "required": false, "default": ""}
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.agents.mailbox.send"
+  },
+  "latency": {
+    "expected_ms": 30
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "agents.list",
+    "agents.inbox",
+    "inbox.send"
+  ]
+}

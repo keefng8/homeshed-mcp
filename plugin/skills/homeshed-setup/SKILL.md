@@ -24,25 +24,14 @@ lists them; only switch one on when the user asks for it.
 
 ## Their own server instead
 
-For a user who already runs a HomeShed server (Docker or `homeshed-mcp serve --http`):
+For a user who already runs a HomeShed server (Docker or `homeshed-mcp serve --http`), point them to
+https://github.com/keefng8/homeshed-mcp/blob/main/docs/configuration.md#claude-code-server: it gives Claude Code its own key and adds the server with one command.
 
-1. The user makes a key for Claude Code on their server: on the Control Panel's API access page, or with
-   `POST /clients`. Suggest granting only the tools they want Claude to use.
-2. The user puts the key in an environment variable named `HOMESHED_TOKEN` in their own shell profile, and opens a
-   new terminal.
-3. They run this, with their server's address in place of the example. Keep the single quotes: they keep the key out
-   of Claude Code's settings file, which stores only the variable's name.
-
-   ```
-   claude mcp add -s user --transport http homeshed 'http://127.0.0.1:8765/mcp' --header 'Authorization: Bearer ${HOMESHED_TOKEN}'
-   ```
-4. They restart Claude Code and check `/mcp`. They can turn this plugin's local server off there, so the tools don't
-   show twice.
-
-Never ask the user to paste the key into the chat, and never write it to a file in a project or in this plugin.
+Never ask the user to paste a key into the chat, and never write one to a file in a project or in this plugin.
 If a key has been pasted into the chat, tell the user to delete that key on their server and make a new one.
 
 ## Upgrading
 
-`uvx homeshed-mcp@latest doctor`, then reconnect in `/mcp`. Data is kept. Full steps:
+The plugin runs one exact HomeShed version. To move to a newer one, the user updates the plugin (`/plugin`, then
+update `homeshed`) and restarts Claude Code. Data is kept. Other install methods:
 https://github.com/keefng8/homeshed-mcp/blob/main/docs/upgrading.md

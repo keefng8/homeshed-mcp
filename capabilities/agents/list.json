@@ -1,0 +1,33 @@
+{
+  "id": "agents.list",
+  "name": "List Agents",
+  "version": "1.0.0",
+  "description": "The other AI apps connected to this tool server that you can message (and the owner): id, label, last seen, and your unread messages from each.",
+  "category": "agents",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "who else is connected",
+    "other agents",
+    "which agents can I message"
+  ],
+  "inputs": {
+    "as_session": {"type": "string", "required": false, "default": ""}
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.agents.mailbox.list_agents"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "agents.send",
+    "agents.inbox"
+  ]
+}

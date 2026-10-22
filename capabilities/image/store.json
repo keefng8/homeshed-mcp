@@ -1,0 +1,37 @@
+{
+  "id": "image.store",
+  "name": "Store an Image",
+  "version": "1.0.0",
+  "description": "Keep an image you already have (PNG, JPEG or WebP, base64, up to 10 MB) for 7 days and get back a name the other image tools take, such as image.generate's input_images.",
+  "category": "image",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "upload an image",
+    "save an uploaded image",
+    "use my own image as input",
+    "store a reference image"
+  ],
+  "inputs": {
+    "image_b64": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.store.store"
+  },
+  "latency": {
+    "expected_ms": 100
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.generate",
+    "image.text_check"
+  ]
+}

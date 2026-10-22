@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-22
+
+### Added
+- Agent mailbox: connected AI apps can leave each other short messages (`agents.list`, `agents.send`,
+  `agents.inbox`), with per-app grants, rate limits, an audit log and one on/off switch.
+  [How to use it from your app](capabilities/agents/how-to.md).
+- `image.store`: keep an image you already have (PNG, JPEG or WebP, up to 10 MB) for 7 days under a name the other
+  image tools take, for example as a reference for `image.generate`.
+- The Claude Code plugin has an icon.
+
+### Changed
+- The Claude Code plugin runs one exact HomeShed version (0.5.0 here); updating the plugin moves it to the next one.
+- Connecting Claude Code to your own HomeShed server is now in
+  [the configuration guide](docs/configuration.md#claude-code-server), instead of the plugin's README.
+
 ## [0.4.0] - 2026-10-21
 
 ### Added

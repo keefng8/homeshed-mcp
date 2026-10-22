@@ -44,7 +44,7 @@ try:  # the to-do list's app route (off) comes with the to-do tools
 except ImportError:
     pass
 PUBLIC = {"local_ai_allow_cloud": True, "ntfy_default_topic": "Alerts", "local_ai_base_url": "", "ntfy_base_url": "",
-          "bugs_search_public": False}
+          "bugs_search_public": False, "agents_messaging": True}
 
 
 @pytest.fixture(autouse=True)

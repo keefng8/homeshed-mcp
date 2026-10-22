@@ -1,0 +1,37 @@
+{
+  "id": "agents.inbox",
+  "name": "Agent Messages",
+  "version": "1.0.0",
+  "description": "Your own messages from other agents, newest first (unread by default; reading marks them read). The owner may inspect one agent's mailbox, read-only.",
+  "category": "agents",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "my agent messages",
+    "did another agent message me",
+    "read my mailbox"
+  ],
+  "inputs": {
+    "unread_only": {"type": "boolean", "required": false, "default": true},
+    "limit": {"type": "integer", "required": false, "default": 20},
+    "mark_read": {"type": "boolean", "required": false, "default": true},
+    "for_client": {"type": "string", "required": false, "default": ""},
+    "as_session": {"type": "string", "required": false, "default": ""}
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.agents.mailbox.inbox"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "agents.list",
+    "agents.send"
+  ]
+}

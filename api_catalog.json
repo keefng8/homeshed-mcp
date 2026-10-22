@@ -28,7 +28,7 @@
       "status": "needs-setup",
       "auth": "bearer via env NVIDIA_API_KEY",
       "how_to_use": "Set NVIDIA_API_KEY; local_ai.ask then uses it automatically as a cloud fallback",
-      "notes": "OpenAI-compatible at https://integrate.api.nvidia.com/v1. A free key for prototyping. Prompts leave your machine. Its reasoning models need enable_thinking=false, which local_ai.ask sends by default.",
+      "notes": "OpenAI-compatible at https://integrate.api.nvidia.com/v1. A free key for prototyping. Prompts leave your machine. Its reasoning models need \"chat_template_kwargs\": {\"enable_thinking\": false} (a top-level enable_thinking is ignored and the budget goes on thinking), which local_ai.ask sends by default.",
       "tags": [
         "llm",
         "reasoning",

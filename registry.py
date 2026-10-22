@@ -67,6 +67,19 @@ def get_capability(capability_id: str) -> "Capability | None":
     return next((c for c in _REGISTRY if f"{c.category}.{c.name}" == capability_id), None)
 
 
+def _with_agents_note(result, client: str | None, category: str, capability_id: str):
+    """A client with unread agent messages hears so on its next tool reply (2026-10-21): "_agents" on a dict reply
+    to the tool it named, never on agents.* replies or nested calls. An in-memory counter; never fails the call."""
+    if client is None or category == "agents" or type(result) is not dict or clients.current_tool.get() != capability_id:
+        return result
+    try:
+        import agents_mailbox
+        line = agents_mailbox.note(client)
+    except Exception:  # noqa: BLE001 - the note is a courtesy; the tool's own reply always goes back
+        return result
+    return {**result, "_agents": line} if line else result
+
+
 @dataclass
 class Capability:
     name: str
@@ -117,7 +130,7 @@ def tool(*, name: str, category: str, doc: str):
                     }
                 )
                 usage.record(shown, kwargs, result, ok=True, client=client)  # sizes only; never raises
-                return result
+                return _with_agents_note(result, client, category, capability_id)
             except Exception as exc:
                 _ACTIVITY_LOG.append(
                     {
