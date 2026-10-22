@@ -14,7 +14,11 @@ is for the times quality matters, and it is off until the owner switches it on.
 |---|---|---|---|---|
 | `xai` | `XAI_API_KEY` | `api.x.ai` (`POST /v1/responses`) | `grok-4.3` | `grok-4.7`, `grok-4.6`, `grok-4.5`, `grok-4.20-0309-non-reasoning`, `grok-4.20-0309-reasoning`, `grok-build-0.1` |
 
-Planned, same switches and caps: `openai`, `anthropic`. Prices per 1M tokens are in `llm.providers.list`
+`anthropic` (Claude, 2026-10-22): the Messages API, key `CLAUDE_WORKSPACE_API`, default `claude-haiku-5-5` (sees
+images), temperature not sent (its models refuse it). Every provider also has a monthly spend limit (Settings >
+Language models, "most spend a month", default no monthly stop): requests stop once the calendar month's estimated
+spend reaches it. `llm.providers.list` shows `monthly_credit_usd`, `cost_month_usd` and `credit_left_usd`.
+Planned, same switches and caps: `openai`. Prices per 1M tokens are in `llm.providers.list`
 (docs.x.ai/docs/models, 2026-10-04; grok-4.3 $1.25 in / $0.20 cached / $2.50 out). xAI reports each request's exact
 cost (`cost_in_usd_ticks`), used when present (`cost_source: "xai"`); otherwise it's estimated from the table.
 

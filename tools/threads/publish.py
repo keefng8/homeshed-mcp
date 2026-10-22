@@ -143,7 +143,7 @@ AI_LINES = {"TEXT": "Made with AI.", "IMAGE": "Image made with AI.", "VIDEO": "V
 
 
 def ai_line(text: str, kind: str) -> str:
-    """The caption with its AI disclosure (the Director, 2026-10-08: the Threads API has no AI-label field, so the
+    """The caption with its AI disclosure (2026-10-08: the Threads API has no AI-label field, so the
     caption says it). Nothing added when the text already says "made with AI"."""
     if "made with ai" in text.lower():
         return text

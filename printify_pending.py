@@ -24,11 +24,11 @@ Rules this module keeps:
   re-checks still apply. It's audited, and each approval id works only once. The tool server can't see the app's
   approval, so this trusts the app's word: it's off until the owner names the app. Without owner_approval, or when a
   check fails, the request waits here as before; a run that fails waits too.
-- AUTO with zero taps (the owner, 2026-10-09: "auto and full auto on means zero taps from me, director and pm is in
-  control. important info to my phone only"): an approval whose "by" is an automatic actor ("auto...") counts only for
+- AUTO with zero taps (the owner, 2026-10-09: "auto and full auto on means zero taps from me ... important info to
+  my phone only"): an approval whose "by" is an automatic actor ("auto...") counts only for
   an app named in approvals_trusted_auto_clients. The phone hears only what matters: a publish that ran, and anything
   that couldn't run and now waits for the owner.
-- A bot's approval (the owner, 2026-10-14: the Director may approve Etsy listing details that match the plan): "by"
+- A bot's approval (the owner, 2026-10-14: a trusted bot may approve Etsy listing details that match the plan): "by"
   as "bot:<name>" counts only for an Etsy details edit and only for a bot named in approvals_trusted_bots (empty by
   default). It's logged as the bot's, so nobody mistakes it for the owner's own tap.
 """
@@ -55,7 +55,7 @@ APPROVALS_FILE = Path(os.environ.get("PRINTIFY_APP_APPROVALS_FILE") or data_path
 TRUST_SETTING = "approvals_trusted_clients"
 AUTO_TRUST_SETTING = "approvals_trusted_auto_clients"
 BOT_TRUST_SETTING = "approvals_trusted_bots"  # bots whose "bot:<name>" approval counts, for BOT_ACTIONS only
-BOT_ACTIONS = ("etsy",)  # Etsy listing details (owner, 2026-10-14: the Director may approve those), never a publish
+BOT_ACTIONS = ("etsy",)  # Etsy listing details (owner, 2026-10-14: a trusted bot may approve those), never a publish
 APPROVAL_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{3,80}$")
 APPROVAL_MAX_AGE_S = 3600
 APPROVAL_SKEW_S = 300
@@ -412,7 +412,7 @@ def decide(item_id: str, approve: bool, via: str = "") -> dict:
                 result["result"] = run()
             except h.CommerceError as exc:
                 if "HTTP 429" in str(exc) and item.get("owner_approval"):
-                    # a shop's per-second limit (the Director, 2026-10-20: an Etsy details edit hit 429 and then sat
+                    # a shop's per-second limit (2026-10-20: an Etsy details edit hit 429 and then sat
                     # waiting): nothing changed on the shop, so an app-approved request is held like a daily limit
                     # and retry_waiting runs it again next round, instead of waiting for the owner
                     clients._audit(f"printify {action} rate limited", item.get("client"), item=item_id)
@@ -433,7 +433,7 @@ def decide(item_id: str, approve: bool, via: str = "") -> dict:
     clients._audit(f"printify {action} " + ("approved" if approve else "declined"), item.get("client"), item=item_id,
                    product=item.get("product_id"), **({"via": via} if via else {}))
     lid = (result.get("result") or {}).get("reapply_etsy") if approve else None
-    if lid:  # the director's rule: a re-publish never leaves the listing's Etsy details undone (queued after the lock)
+    if lid:  # the re-publish rule: a re-publish never leaves the listing's Etsy details undone (queued after the lock)
         from tools.commerce import _http as h
         from tools.etsy.write import queue_reapply
         try:

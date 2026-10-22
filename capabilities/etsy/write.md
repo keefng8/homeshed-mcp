@@ -1,8 +1,8 @@
 # Etsy — Listing details, shop texts and deactivate
 
 ## IDs
-`etsy.listing.update`, `etsy.listing.deactivate` (2026-10-08, the shop's director: both behind one reconnect),
-`etsy.shop.update` (2026-10-10, the Director's decisions item 10)
+`etsy.listing.update`, `etsy.listing.deactivate` (2026-10-08: both behind one reconnect),
+`etsy.shop.update` (2026-10-10)
 
 ## Before the first use
 1. Switch on "Let apps ask to edit your Etsy listings' details", "Let apps deactivate your Etsy listings" and/or
@@ -51,8 +51,15 @@ the change and queues it in the approvals bar ("Etsy listing details"); the owne
 | `properties` | no | `{"attribute": "value" or ["values"]}`, e.g. `{"Primary color": "Black", "Holiday": "Christmas"}`. `null` removes an attribute (`{"Holiday": null}`), and a re-apply never sets it back. |
 | `reapply` | no | Set again everything this tool last set on the listing; the other arguments are ignored. Photos aren't re-applied. |
 | `images` | no | 1-5 photos to add: `[{"image": ref, "alt_text"?: up to 500 characters, "rank"?: 1-10}]`. A new photo takes its rank and the others move down; after any photo change the listing's photos are re-numbered 1..n (`photos_reranked` in the result). |
+| `remove_images` | no | `listing_image_id`s to delete (`etsy.listing.get` lists them). Can't be undone; never the listing's last photo: add the new ones in the same call, they go up first. |
+| `images_alt` | no | New alt text for photos already on the listing: `[{"listing_image_id", "alt_text": up to 500}]`. |
+| `swap` | no | A raw-artwork swap: an automatic (`auto…` / `bot:…`) approval may delete a photo only when one is removed and its watermarked copy added in the same call, the removed one's alt text says "artwork", it's a 2048 or 2400 px square, not at rank 1 or 2, and not a mockup, worn-in hero or info card; at most `ETSY_SWAP_DAILY_MAX` (60) a day. Any guard failing: it waits for the owner's tap. |
+| `hero_swap` | no | Replace the AI lifestyle hero with its copy carrying the AI disclosure bar: an automatic approval may delete only when one photo is removed and one added in the same call, the removed one is at rank 1, both alt texts match `ETSY_HERO_ALT` (a regex; default `worn in`) and neither says "artwork", and a photo that isn't an AI scene (the mockup) stays. Same daily maximum as `swap`. |
 
-**Photos** (2026-10-08, the director: every listing needs 5+, and Printify's API has only the front mockup):
+Both swaps, on approval: the new photo is read back on Etsy and the old one backed up (file and link) before it's
+deleted; either failing stops the delete. An owner's own approval is never held by these guards.
+
+**Photos** (2026-10-08: every listing needs 5+, and Printify's API has only the front mockup):
 - `image` is one of: `"folder/name.png"` for an image saved in a folder of the image store under its own name (e.g.
   `"listing/krc-staffy-artwork-2400.png"`, served by the image service's `/image/folder-files/`); a generated image's
   name; an image the tool server keeps (`printify-...jpg` from `printify.mockup.fetch`, paid designs); or a Printify
@@ -72,7 +79,7 @@ the change and queues it in the approvals bar ("Etsy listing details"); the owne
 - **Only what differs is sent**, checked against the listing and its current attributes when asked.
 - **Title, description, tags and prices stay with Printify** (`printify.product.update_live`): set on Etsy directly,
   Printify's next publish would undo them.
-- **The re-publish rule** (the director): what this tool last set on each listing is kept
+- **The re-publish rule**: what this tool last set on each listing is kept
   (`usage/etsy_attributes.json`). When the owner approves a `printify.product.update_live` of that listing that
   re-sends its variants (a price change), images or delivery template, the same details are queued again straight
   after, for approval once Printify has finished (a few minutes). Its approval card says so up front. A words-only

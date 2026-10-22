@@ -50,13 +50,28 @@ PROVIDERS: dict[str, dict] = {
             "grok-build-0.1": {"in": 1.00, "cached": 0.20, "out": 2.00, "note": "coding"},
         },
     },
+    # Prices from platform.claude.com/docs/en/about-claude/pricing (checked 2026-10-22; Haiku's <= 100k-prompt row,
+    # which llm.chat's input cap keeps every request under).
+    "anthropic": {
+        "label": "Anthropic Claude", "key": "CLAUDE_WORKSPACE_API", "host": "api.anthropic.com",
+        "path": "/v1/messages", "pricing_url": "https://platform.claude.com/docs/en/about-claude/pricing",
+        "default_model": "claude-haiku-5-5",
+        "models": {
+            "claude-haiku-5-5": {"in": 0.10, "cached": 0.01, "out": 0.50,
+                                 "note": "fast and cheapest; sees images; good for checks"},
+            "claude-sonnet-5-5": {"in": 2.00, "cached": 0.10, "out": 10.00, "note": "strong all-rounder"},
+            "claude-opus-5-5": {"in": 4.00, "cached": 0.20, "out": 20.00, "note": "most capable here"},
+        },
+    },
 }
-PLANNED = ["openai", "anthropic"]  # same switches and caps when added; not callable yet
+PLANNED = ["openai"]  # same switches and caps when added; not callable yet
 
 SETTINGS_GROUP = "Language models"
 CAP_OPTIONS = ["0", "10", "25", "50", "100", "250", "500", "1000"]
 TOKEN_CAP_OPTIONS = ["0", "50000", "100000", "250000", "500000", "1000000", "2000000"]
+MONTHLY_OPTIONS = ["0", "5", "10", "25", "50", "100", "250", "500"]  # dollars a calendar month; 0 = no monthly stop
 DAILY_FILE_DEFAULT = "usage/llm_daily.json"
+MONTHLY_FILE_DEFAULT = "usage/llm_monthly.json"
 LOG_FILE_DEFAULT = "usage/llm_usage.jsonl"
 LOG_MAX_BYTES = 2 * 1024 * 1024  # then rotated once to .1
 
@@ -89,6 +104,10 @@ def token_cap_setting(provider: str) -> str:
     return f"llm_daily_tokens_{provider}"
 
 
+def monthly_setting(provider: str) -> str:
+    return f"llm_monthly_usd_{provider}"
+
+
 def _build_settings() -> dict:
     out: dict = {}
     for name, p in PROVIDERS.items():
@@ -113,6 +132,13 @@ def _build_settings() -> dict:
             "label": f"{p['label']}: most tokens a day",
             "help": "Input plus output tokens allowed per day, a second limit on spend. No token limit leaves only "
                     "the request cap above.",
+        }
+        out[monthly_setting(name)] = {  # the owner, 2026-10-22: a user-set monthly stop, not a hard-coded $100
+            "type": "select", "default": "0", "group": SETTINGS_GROUP, "options": MONTHLY_OPTIONS,
+            "option_labels": {o: ("No monthly stop" if o == "0" else f"${o} a month") for o in MONTHLY_OPTIONS},
+            "label": f"{p['label']}: most spend a month",
+            "help": "Requests stop once this calendar month's estimated spend reaches it, and start again on the 1st. "
+                    "Set it to a monthly credit or budget so it's never overrun; the overview shows what's left.",
         }
     return out
 
@@ -147,6 +173,11 @@ def daily_cap(provider: str) -> int:
 def daily_token_cap(provider: str) -> int | None:
     """Tokens allowed today, or None for no token limit."""
     return _int_setting(token_cap_setting(provider)) or None
+
+
+def monthly_cap(provider: str) -> float | None:
+    """Dollars allowed this calendar month, or None for no monthly stop."""
+    return float(_int_setting(monthly_setting(provider))) or None
 
 
 # --- today's counts and the usage log ------------------------------------------------------------------------------
@@ -199,6 +230,38 @@ def clients_today(provider: str) -> dict:
     return {c: dict(_row(v, provider)) for c, v in _daily()["clients"].items() if provider in v}
 
 
+def _monthly_file() -> Path:
+    return Path(os.environ.get("LLM_MONTHLY_FILE") or data_path(MONTHLY_FILE_DEFAULT))
+
+
+def month_cost(provider: str) -> float:
+    """Dollars spent on provider so far this calendar month (0 in a new month)."""
+    try:
+        data = json.loads(_monthly_file().read_text(encoding="utf-8"))
+        if isinstance(data, dict) and data.get("month") == time.strftime("%Y-%m"):
+            return float((data.get("providers") or {}).get(provider, 0.0) or 0.0)
+    except (OSError, ValueError, TypeError):
+        pass
+    return 0.0
+
+
+def _add_month_cost(provider: str, cost: float) -> None:
+    month = time.strftime("%Y-%m")
+    try:
+        data = json.loads(_monthly_file().read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or data.get("month") != month:
+            raise ValueError
+    except (OSError, ValueError):
+        data = {"month": month, "providers": {}}
+    prov = data.setdefault("providers", {})
+    prov[provider] = round(float(prov.get(provider, 0.0) or 0.0) + cost, 6)
+    f = _monthly_file()
+    f.parent.mkdir(parents=True, exist_ok=True)
+    tmp = f.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data), encoding="utf-8")
+    os.replace(tmp, f)
+
+
 def unusable_reason(provider: str, hint: bool = True) -> str | None:
     """Why provider can't be used right now, or None if it can. Never mentions a key's value."""
     if provider not in PROVIDERS:
@@ -217,6 +280,9 @@ def unusable_reason(provider: str, hint: bool = True) -> str | None:
     tcap = daily_token_cap(provider)
     if tcap is not None and used["tokens"] >= tcap:
         return f"{provider} has reached today's cap of {tcap:,} tokens{tail}"
+    credit = monthly_cap(provider)
+    if credit and month_cost(provider) >= credit:
+        return f"{provider} has reached this month's ${credit:.0f} spend limit; it starts again next month{tail}"
     return None
 
 
@@ -252,6 +318,8 @@ def record(provider: str, client: str, model: str, usage: dict | None, ok: bool,
                 r["tokens"] += tokens
                 r["cost_usd"] = round(r["cost_usd"] + cost, 6)
             _write_daily(data)
+            if cost:
+                _add_month_cost(provider, cost)
             line = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "client": client, "provider": provider,
                     "model": model, "ok": ok, "input_tokens": u.get("input_tokens"),
                     "output_tokens": u.get("output_tokens"), "reasoning_tokens": u.get("reasoning_tokens"),
@@ -307,14 +375,16 @@ HINTS = {400: " (the request was refused: check the model and messages)", 401: "
          404: " (unknown model or endpoint)", 429: " (rate limited or out of quota: try again later)"}
 
 
-def post_json(provider: str, key: str, body: dict) -> dict:
-    """One POST to the provider's own host and path. The key goes in the Authorization header only."""
+def post_json(provider: str, key: str, body: dict, auth: dict | None = None) -> dict:
+    """One POST to the provider's own host and path. The key goes in one header only (Authorization unless the
+    provider's adapter passes its own auth headers)."""
     p = PROVIDERS[provider]
     host, name = p["host"], p["label"]
     kwargs: dict = {"timeout": TIMEOUT, "follow_redirects": False}
     if _TRANSPORT is not None:
         kwargs["transport"] = _TRANSPORT
-    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json", "Accept": "application/json"}
+    headers = {**(auth or {"Authorization": f"Bearer {key}"}), "Content-Type": "application/json",
+               "Accept": "application/json"}
     try:
         with httpx.Client(**kwargs) as http:
             resp = http.post(f"https://{host}{p['path']}", json=body, headers=headers)
@@ -388,17 +458,77 @@ def _xai(key: str, model: str, messages: list[dict], system: str, max_tokens: in
                       "cached_tokens": cached, "cost_usd": cost, "cost_source": source if cost is not None else None}}
 
 
-ADAPTERS = {"xai": _xai}
+def _anthropic_content(content) -> str | list[dict]:
+    """llm.chat's message content (text, or the Responses-style parts _with_images builds) as Messages API content."""
+    if isinstance(content, str):
+        return content
+    out: list[dict] = []
+    for part in content:
+        if part.get("type") == "input_text":
+            out.append({"type": "text", "text": part["text"]})
+        elif part.get("type") == "input_image":
+            head, _, data = part["image_url"].partition(",")  # data:<mime>;base64,<data>
+            out.append({"type": "image", "source": {"type": "base64", "media_type": head[5:].split(";")[0],
+                                                     "data": data}})
+    return out
+
+
+def _anthropic(key: str, model: str, messages: list[dict], system: str, max_tokens: int,
+               temperature: float | None, schema: dict | None = None) -> dict:
+    """Anthropic's Messages API (POST /v1/messages, anthropic-version 2023-06-01). A "system" message joins the
+    system prompt (the API takes it only there). Temperature isn't sent: the Claude 5.5 models refuse it (HTTP 400
+    "temperature is deprecated for this model", seen live 2026-10-22)."""
+    sys_parts = [system] if system else []
+    msgs = []
+    for m in messages:
+        if m["role"] == "system":
+            sys_parts.append(m["content"] if isinstance(m["content"], str) else "")
+        else:
+            msgs.append({"role": m["role"], "content": _anthropic_content(m["content"])})
+    if not msgs:
+        raise LLMError("Anthropic Claude needs at least one user message")
+    # Prompt caching (docs: build-with-claude/prompt-caching, 2026-10-22): a breakpoint on the system prompt, so calls
+    # that share instructions but differ in the message (one rule set, a new photo each time) read it back at 0.1x;
+    # plus the top-level automatic one, which follows a growing conversation. Under 512 tokens nothing is cached and
+    # nothing fails; a write costs 1.25x, counted in the estimate below.
+    body: dict = {"model": model, "max_tokens": max_tokens, "messages": msgs, "cache_control": {"type": "ephemeral"}}
+    if any(sys_parts):
+        body["system"] = [{"type": "text", "text": "\n\n".join(s for s in sys_parts if s),
+                           "cache_control": {"type": "ephemeral"}}]
+    if schema:  # structured output: the answer is JSON in this shape (output_config.format, GA)
+        body["output_config"] = {"format": {"type": "json_schema", "schema": schema}}
+    d = post_json("anthropic", key, body, auth={"x-api-key": key, "anthropic-version": "2023-06-01"})
+    if d.get("type") == "error" and isinstance(d.get("error"), dict):
+        raise LLMError(f"Anthropic Claude reported an error: {clean(d['error'].get('message'), (key,))}")
+    text = "".join(c["text"] for c in d.get("content") or []
+                   if isinstance(c, dict) and c.get("type") == "text" and isinstance(c.get("text"), str))
+    u = d.get("usage") if isinstance(d.get("usage"), dict) else {}
+    cached, written = int(u.get("cache_read_input_tokens") or 0), int(u.get("cache_creation_input_tokens") or 0)
+    in_t = int(u.get("input_tokens") or 0) + cached + written
+    out_t = int(u.get("output_tokens") or 0)
+    cost = estimate_cost("anthropic", model, in_t, cached, out_t)
+    if cost is not None and written:  # a 5-minute cache write is 1.25x the input price: add the 0.25x
+        cost = round(cost + written * PROVIDERS["anthropic"]["models"][model]["in"] * 0.25 / 1_000_000, 6)
+    stop = str(d.get("stop_reason") or "end_turn")
+    return {"text": text, "model": str(d.get("model") or model)[:60], "finish": stop[:20],
+            "incomplete": stop == "max_tokens",
+            "usage": {"input_tokens": in_t, "output_tokens": out_t, "reasoning_tokens": 0, "cached_tokens": cached,
+                      "cost_usd": cost, "cost_source": "estimate" if cost is not None else None}}
+
+
+ADAPTERS = {"xai": _xai, "anthropic": _anthropic}
 
 
 def call(provider: str, model: str, messages: list[dict], system: str, max_tokens: int,
-         temperature: float | None) -> dict:
+         temperature: float | None, schema: dict | None = None) -> dict:
+    """schema: a JSON schema the answer must follow (anthropic only; the tools that need one call this directly)."""
     p = PROVIDERS[provider]
     key = _secret(p["key"])
     if not key:
         raise LLMError(f"{provider} isn't configured: add {p['key']} under the Control Panel's Keys and passwords")
     try:
-        return ADAPTERS[provider](key, model, messages, system, max_tokens, temperature)
+        return ADAPTERS[provider](key, model, messages, system, max_tokens, temperature,
+                                  **({"schema": schema} if schema else {}))
     except LLMError as exc:  # every message is scrubbed already; this is belt and braces
         raise LLMError(str(exc).replace(key, "<secret>")) from None
 
@@ -419,6 +549,9 @@ def catalogue() -> list[dict]:
                                                       "output": v["out"]}, **({"note": v["note"]} if v.get("note")
                                                                               else {})}
                           for m, v in p["models"].items()]}
+        credit, spent = monthly_cap(name), round(month_cost(name), 4)
+        row.update(monthly_credit_usd=credit, cost_month_usd=spent,
+                   credit_left_usd=round(max(0.0, credit - spent), 4) if credit else None)
         if why:
             row["why_not"] = why
         rows.append(row)

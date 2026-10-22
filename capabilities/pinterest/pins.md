@@ -38,9 +38,9 @@ owner, one pin at a time.
 - **AI disclosure**: with `ai_generated`, the description ends "AI-assisted design." (unless it says so already) and
   the pin carries Pinterest's own AI field, `ai_disclosures: {"values": ["AI_MODIFIED"]}` (API v5 5.28.0's pins/create;
   checked 2026-10-10).
-- **No repeats**: the same image with the same link within 30 days is refused (a spam signal, R&D), and so is any pin
-  of a listing pinned in the last 7 days, whatever the image, or one already waiting for the owner (the Director's
-  terms check, 2026-10-10). Checked when asked and again on approval.
+- **No repeats**: the same image with the same link within 30 days is refused (a spam signal), and so is any pin
+  of a listing pinned in the last 7 days, whatever the image, or one already waiting for the owner (a terms check,
+  2026-10-10). Checked when asked and again on approval.
 - **The image is fingerprinted** (sha256) when asked; on approval it's fetched again, and if it changed the approval
   fails ("decline this and ask again"). It goes to Pinterest as `image_base64`.
 - **Capped**: `PINTEREST_DAILY_MAX` approved pins in 24 hours (default 5). Over it, the approval waits.

@@ -328,7 +328,7 @@ def test_video_post_refusals_post_nothing(meta, monkeypatch, tmp_path):
 
 
 def test_ai_made_posts_say_so_in_the_caption(meta):
-    """The Director, 2026-10-08: the Threads API has no AI-label field, so an AI-made post says it in its caption."""
+    """2026-10-08: the Threads API has no AI-label field, so an AI-made post says it in its caption."""
     staged = []
     pub, calls = _ready(meta, staged)
     out = pub.publish("Which breed next?", ai_generated=True)

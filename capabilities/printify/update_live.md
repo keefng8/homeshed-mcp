@@ -5,7 +5,7 @@
 
 ## Purpose
 Correct a PUBLISHED product's title, description, tags or prices on the owner's Etsy shop without hand edits
-(2026-10-08, the shop's project manager and director). A call never changes anything: it checks the change and
+(2026-10-08). A call never changes anything: it checks the change and
 queues it for the owner. Only on the owner's approval (the Control Panel's approvals bar) is the product edited in
 Printify and re-published, with only the changed parts sent to Etsy.
 
@@ -21,8 +21,8 @@ Printify and re-published, with only the changed parts sent to Etsy.
 ## Safety
 - **Published products only.** A draft is refused (use `printify.product.update`), and so is one Printify has locked
   mid-publish or one already waiting for the owner (a publish or an update).
-- **Never re-publishes a listing that's off on Etsy** (the re-activation guard, the Director's decisions 2026-10-10 item
-  9: on 10 Oct an approved update's re-publish switched the Black Staffy tee back on). The Etsy listing's state is read
+- **Never re-publishes a listing that's off on Etsy** (the re-activation guard, 2026-10-10:
+  on 10 Oct an approved update's re-publish switched the Black Staffy tee back on). The Etsy listing's state is read
   when asked, on approval, and again right before the publish; anything but `active` holds it with "listing is off on
   Etsy: the owner turns it on first", for every client. Etsy unreadable also holds it. Turned off in the seconds between
   the edit and the publish: the edit stays in Printify, unpublished.

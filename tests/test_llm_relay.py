@@ -56,6 +56,7 @@ def fake(monkeypatch, tmp_path):
     monkeypatch.setattr(rs, "_cache", (None, {}))
     monkeypatch.setenv("LLM_USAGE_FILE", str(tmp_path / "llm_daily.json"))
     monkeypatch.setenv("LLM_USAGE_LOG", str(tmp_path / "llm_usage.jsonl"))
+    monkeypatch.setenv("LLM_MONTHLY_FILE", str(tmp_path / "llm_monthly.json"))
     monkeypatch.setenv("XAI_API_KEY", KEY)
     f = Fake()
     monkeypatch.setattr(prov, "_TRANSPORT", httpx.MockTransport(f))
@@ -324,7 +325,7 @@ def test_providers_list_when_off(fake):
     assert row["configured"] is True and row["key_name"] == "XAI_API_KEY" and "switched off" in row["why_not"]
     assert row["daily_cap"] == 0 and row["used_today"] == 0 and row["daily_token_cap"] is None
     assert row["default_model"] == "grok-4.3" and {"model": "grok-4.3"}.items() <= row["models"][0].items()
-    assert out["planned"] == ["openai", "anthropic"] and KEY not in blob(out) and len(blob(out)) < 5000
+    assert out["planned"] == ["openai"] and KEY not in blob(out) and len(blob(out)) < 5000
     assert fake.calls == []
 
 

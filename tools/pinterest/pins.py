@@ -33,7 +33,7 @@ MAX_IMAGE_BYTES = 10 * 1024 * 1024
 IMAGE_MIMES = ("image/jpeg", "image/png")
 AI_LINE = "AI-assisted design."
 REPEAT_S = 30 * 86400
-LISTING_GAP_S = 7 * 86400  # one pin per listing a week (the Director's terms check, 2026-10-10)
+LISTING_GAP_S = 7 * 86400  # one pin per listing a week (a terms check, 2026-10-10)
 LISTING_RE = re.compile(r"^https://(?:www\.)?etsy\.com/(?:[a-z]{2}(?:-[a-z]{2})?/)?listing/(\d{6,12})(?:[/?#].*)?$", re.I)
 _lock = threading.Lock()
 

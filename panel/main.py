@@ -1041,6 +1041,17 @@ async def _poll_local_ai_once(client: httpx.AsyncClient) -> None:
                     hist.append(sample)
                     del hist[: len(hist) - LOCAL_AI_HISTORY_LEN]
                     continue
+                if server["type"] == "llm":  # a paid language model: requests today, monthly credit left
+                    stats = resp.json()
+                    sample.update(online=bool(stats.get("enabled")), requests_total=stats.get("used_today"),
+                                  cap=stats.get("daily_cap"), cost_today_usd=stats.get("cost_today_usd"),
+                                  credit_left_usd=stats.get("credit_left_usd"),
+                                  monthly_credit_usd=stats.get("monthly_credit_usd"),
+                                  cost_month_usd=stats.get("cost_month_usd"))
+                    hist = _local_ai_history[server["name"]]
+                    hist.append(sample)
+                    del hist[: len(hist) - LOCAL_AI_HISTORY_LEN]
+                    continue
                 if server["type"] == "decider":  # a decision server: counts decisions, not tokens
                     stats = resp.json()
                     sample["online"] = stats.get("status") == "ok"
@@ -1516,10 +1527,14 @@ async def local_ai_usage():
                 "window_seconds": (latest["timestamp"] - first_online["timestamp"]) if first_online else 0,
                 "avg_ms": latest.get("avg_ms"),
                 **({"cap": latest.get("cap"), "cost_today_usd": latest.get("cost_today_usd")}
-                   if server["type"] == "images" else {}),
+                   if server["type"] in ("images", "llm") else {}),
+                **({"credit_left_usd": latest.get("credit_left_usd"),
+                    "monthly_credit_usd": latest.get("monthly_credit_usd"),
+                    "cost_month_usd": latest.get("cost_month_usd")} if server["type"] == "llm" else {}),
                 **({"hidden": True} if server.get("hidden") else {}),  # polled for status, not shown as a tile
-                # Decisions or images are counted, the others tokens: each sparkline follows its own counter.
-                "sparkline": [s.get("requests_total" if server["type"] in ("decider", "images") else "total_tokens")
+                # Decisions, images or paid requests are counted, the others tokens: each sparkline its own counter.
+                "sparkline": [s.get("requests_total" if server["type"] in ("decider", "images", "llm")
+                                    else "total_tokens")
                               for s in hist if s.get("online")],
             }
         )

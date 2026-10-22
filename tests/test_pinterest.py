@@ -129,7 +129,7 @@ def test_the_daily_cap_holds_approvals(fake, monkeypatch):
 
 
 def test_one_pin_per_listing_a_week_whatever_the_image(fake):
-    """The Director's terms check (10 Oct): no duplicate pins of the same listing within 7 days."""
+    """A terms check (10 Oct): no duplicate pins of the same listing within 7 days."""
     state, _, _ = fake
     pins.pin_create("a.png", "T", "D", LINK, "Staffy", ai_generated=False)
     state["image"] = PNG + b"other"

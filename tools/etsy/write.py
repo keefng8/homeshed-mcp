@@ -1,4 +1,4 @@
-"""etsy.listing.update and etsy.listing.deactivate (2026-10-08, the shop's director: both behind one listings_w
+"""etsy.listing.update and etsy.listing.deactivate (2026-10-08: both behind one listings_w
 reconnect). See ../../capabilities/etsy/write.md.
 
 etsy.listing.update sets the details of one of the shop's listings that Printify doesn't manage: its category
@@ -7,7 +7,7 @@ recipient, holiday...). It changes a public listing, so a call only checks it an
 action "etsy"); the owner approves it in the Control Panel. Title, description, tags and prices go through Printify
 (printify.product.update_live): set here, Printify's next publish would undo them.
 
-The director's rule: details are set after a listing's last publish, and a re-publish never leaves them undone. What
+The re-publish rule: details are set after a listing's last publish, and a re-publish never leaves them undone. What
 was last set on each listing is kept (ATTRS_FILE). An approved printify.product.update_live of that listing that
 re-sends its variants, images or delivery template queues them again straight after (queue_reapply), for the owner to
 approve once Printify has finished publishing; a words-only one doesn't (update_live.RESETS_ETSY_DETAILS).
@@ -238,7 +238,7 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
                    properties: dict | None = None, reapply: bool = False, images: list[dict] | None = None,
                    owner_approval: dict | None = None, shop_section_id: int = 0,
                    remove_images: list[int] | None = None, images_alt: list[dict] | None = None,
-                   swap: bool = False) -> dict:
+                   swap: bool = False, hero_swap: bool = False) -> dict:
     """Ask to set an Etsy listing's details that Printify doesn't manage: category, materials, production partners,
     delivery profile, attributes (colour, occasion, recipient, holiday...) and extra photos. It is NOT changed by this
     call: it's checked against the listing and Etsy's own lists, then waits for the owner's approval in the Control
@@ -274,6 +274,11 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
             rank 1 or 2, and not a mockup, a "worn in" hero or an info card; at most ETSY_SWAP_DAILY_MAX (60) a day.
             On approval the replacement is read back on Etsy and the old photo backed up (file and link) before the
             delete. Fail any guard and an automatic approval isn't used: it waits for the owner's tap.
+        hero_swap: true to replace the AI lifestyle hero with its copy carrying the AI disclosure bar (the owner's
+            go, 2026-10-22): an automatic approval may delete ONLY when one photo is removed and one added in the same
+            call, the removed one is at rank 1, both alt texts read as a hero (ETSY_HERO_ALT, default "worn in"; never
+            "artwork"), and a photo that isn't an AI scene (the mockup) stays on the listing. Same read-back, backup
+            and daily maximum as swap.
 
     Returns:
         {"pending": true, "id", "etsy": summary, "expires_in_h", "how"}: the approval request, not a change on the
@@ -350,7 +355,8 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
             "images_alt": alts}
     held = None
     if removes and _automatic(owner_approval):  # a machine never approves a delete outside a guarded swap
-        held = _swap_problem(swap, removes, new_images, listed) or None
+        held = (_hero_swap_problem(removes, new_images, listed) if hero_swap and not swap
+                else _swap_problem(swap, removes, new_images, listed)) or None
         if held:
             owner_approval = None
         else:
@@ -359,7 +365,7 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
     return {**out, "swap_held": held} if held else out
 
 
-SWAP_SIDES = (2048, 2400)  # the raw artwork's square sizes (the Director's guard 1)
+SWAP_SIDES = (2048, 2400)  # the raw artwork's square sizes (guard 1)
 SWAP_NEVER = ("mockup", "worn in", "info", "size guide", "size chart")  # guard 5: photos a swap never deletes
 SWAP_FILE = Path(os.environ.get("ETSY_SWAPS_FILE") or data_path("usage/etsy_photo_swaps.json"))
 SWAP_BACKUPS = Path(os.environ.get("ETSY_SWAP_BACKUP_DIR") or data_path("usage/etsy_photo_backups"))
@@ -402,6 +408,41 @@ def _swap_problem(swap: bool, removes: list[int], new_images: list[dict], listed
         return f"the photo is {w}x{hgt}, not a 2048 or 2400 px square: it waits for the owner"
     if not isinstance(rank, int) or rank <= 2:
         return f"the photo is at rank {rank}: a swap never deletes rank 1 or 2, it waits for the owner"
+    if len(_swaps_today()) >= swap_daily_max():
+        return f"{swap_daily_max()} automatic swaps in the last 24 hours: this one waits for the owner"
+    return ""
+
+
+HERO_ALT_DEFAULT = "worn in"  # what a shop's AI lifestyle hero alt text says; ETSY_HERO_ALT (a regex) sets its own
+NOT_A_MOCKUP = ("artwork", "size guide", "size chart", "colours", "colors", "printed to order", "info")
+
+
+def hero_alt() -> re.Pattern:
+    """The hero alt-text pattern: ETSY_HERO_ALT, or "worn in". A broken pattern falls back to the default."""
+    try:
+        return re.compile(os.environ.get("ETSY_HERO_ALT") or HERO_ALT_DEFAULT, re.IGNORECASE)
+    except re.error:
+        return re.compile(HERO_ALT_DEFAULT, re.IGNORECASE)
+
+
+def _hero_swap_problem(removes: list[int], new_images: list[dict], listed: list) -> str:
+    """Why an automatic approval can't swap this hero for its barred copy, or "" when every guard passes (2026-10-22:
+    one out, one in, both read as a hero, rank 1, and a non-AI photo stays)."""
+    HERO_ALT = hero_alt()
+    if len(removes) != 1 or len(new_images) != 1:
+        return "a hero swap removes exactly one photo and adds exactly one: it waits for the owner"
+    photo = next((p for p in listed if isinstance(p, dict) and int(p.get("listing_image_id") or 0) == removes[0]), {})
+    old_alt, new_alt = str(photo.get("alt_text") or ""), str(new_images[0].get("alt_text") or "")
+    if not HERO_ALT.search(old_alt) or "artwork" in old_alt.lower():
+        return "the removed photo's alt text doesn't read as an AI hero: it waits for the owner"
+    if not HERO_ALT.search(new_alt) or "artwork" in new_alt.lower():
+        return "the added photo's alt text doesn't read as a hero: it waits for the owner"
+    if photo.get("rank") != 1:
+        return f"the hero is at rank {photo.get('rank')}: a hero swap deletes only rank 1, it waits for the owner"
+    others = [str(p.get("alt_text") or "").lower() for p in listed
+              if isinstance(p, dict) and int(p.get("listing_image_id") or 0) != removes[0]]
+    if not any(a and not HERO_ALT.search(a) and not any(w in a for w in NOT_A_MOCKUP) for a in others):
+        return "no non-AI photo (the mockup) would stay on the listing: it waits for the owner"
     if len(_swaps_today()) >= swap_daily_max():
         return f"{swap_daily_max()} automatic swaps in the last 24 hours: this one waits for the owner"
     return ""

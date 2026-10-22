@@ -1,0 +1,60 @@
+{
+  "id": "image.ip_check",
+  "name": "Image IP and Safety Check",
+  "version": "1.0.0",
+  "description": "Vision check before listing: a brand, a known character, a real person or unsafe content in an image; for a lifestyle hero photo, a visible child (blurred background included) or something covering the print (pass image.compare's print box). Claude Haiku via the llm relay, about $0.0005 a call. Fail closed: ok false means NOT clear.",
+  "category": "image",
+  "risk": "write",
+  "requires": [
+    "the owner's llm_provider_anthropic_enabled switch and an llm_daily_cap_anthropic above 0",
+    "CLAUDE_WORKSPACE_API in the vault"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "ip check",
+    "brand check",
+    "trademark check",
+    "character check",
+    "child in photo",
+    "print covered",
+    "is this image safe to list"
+  ],
+  "inputs": {
+    "image_name": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "image_b64": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "purpose": {
+      "type": "string",
+      "required": false,
+      "default": "upload"
+    },
+    "print_box": {
+      "type": "array",
+      "required": false,
+      "default": null
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.ip_check.ip_check"
+  },
+  "latency": {
+    "expected_ms": 4000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.compare",
+    "image.text_check",
+    "llm.chat"
+  ]
+}

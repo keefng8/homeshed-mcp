@@ -27,6 +27,6 @@ the edges is removed, so white inside the design stays. Runs on the image servic
 A design whose corners differ (not a plain background), a size outside 500-8,000 px, unknown variants, an unknown
 image. A source enlarged more than 1.25x (xAI's 1024 px designs: ~3.6x) is first upscaled 4x with Real-ESRGAN x4plus
 (BSD-3; 2026-10-09, a dog's fur came out mushy from a plain resize), loaded for each call and freed after, never
-resident (the Director's condition), on the GPU when 1.5 GB is free there, else the CPU; `checks.upscaled` says so.
+resident, on the GPU when 1.5 GB is free there, else the CPU; `checks.upscaled` says so.
 Isolated opaque specks under 10x10 px (under 1 mm) are dropped, except in vignette mode (`checks.specks_removed`).
 Vectorising can come later.

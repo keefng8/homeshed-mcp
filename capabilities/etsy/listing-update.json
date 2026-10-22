@@ -74,6 +74,11 @@
       "type": "boolean",
       "required": false,
       "default": false
+    },
+    "hero_swap": {
+      "type": "boolean",
+      "required": false,
+      "default": false
     }
   },
   "execution": {

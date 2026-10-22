@@ -22,7 +22,7 @@ takes a minute or two; `etsy.listings.list` then shows the listing and `printify
 - Refused: switched off; no such product; already published (it has a shop listing); locked (Printify is busy with it);
   no enabled variants; the same product already waiting; 30 already waiting.
 - On approval, checked again (it may have been published by hand meanwhile), and at most
-  `PRINTIFY_PUBLISH_DAILY_MAX` publishes in 24 hours (default 20; 5 until 2026-10-09, raised on the owner's OK at the Director's ask, about
+  `PRINTIFY_PUBLISH_DAILY_MAX` publishes in 24 hours (default 20; 5 until 2026-10-09, raised on the owner's OK, about
   $0.20 each in Etsy listing fees): past that it stays waiting.
 - A request older than 24 hours can't be approved. A publish that fails stays waiting with its error.
 - Everything goes to the client audit trail (`printify_pending.py`).
@@ -58,5 +58,5 @@ A request that passes but can't run (a daily limit, a re-check) waits too, with 
 the app's approval, so this trusts the app's word; the app must send it only when the owner's own login granted that
 request.
 Etsy details re-queued after an approved live update (`queue_reapply`) carry no approval: they wait in the bar.
-AUTO with zero taps (the owner, 2026-10-09: "auto and full auto on means zero taps from me, director and pm is in control"): for an app in that second list, an approval whose `by` is an automatic actor runs the same way. Both lists are empty until the owner fills them in.
+AUTO with zero taps (the owner, 2026-10-09: "auto and full auto on means zero taps from me"): for an app in that second list, an approval whose `by` is an automatic actor runs the same way. Both lists are empty until the owner fills them in.
 Tests: `tests/test_app_approvals.py`.

@@ -16,7 +16,8 @@ WATERMARK_STYLES = ("corner", "tiled", "both")
 
 @tool(name="carousel", category="image", doc="image/carousel.md")
 def carousel(image_names: list[str], shape: str = "4:5", background: str = "", watermark: str = "",
-             watermark_style: str = "corner", frame: str = "", title: str = "", cta: str = "") -> dict:
+             watermark_style: str = "corner", frame: str = "", title: str = "", cta: str = "",
+             caption: str = "") -> dict:
     """Turn designs into social slides: each one centred on a 1080x1350 (4:5: Threads and Instagram feed posts and
     carousels) or 1080x1920 (9:16: reels and stories) canvas, on the design's own background colour so the slide
     reads as one piece. The slides are saved in the images "promo" folder; pass their names to threads.publish.
@@ -33,12 +34,16 @@ def carousel(image_names: list[str], shape: str = "4:5", background: str = "", w
         watermark_style: "corner" (default): the small mark above. "tiled": the watermark text repeated diagonally
             across the whole slide, design included, faint (about 18% opacity, 3-4 rows on a 4:5 slide), so a crop
             can't remove it; for social posts. "both": tiled plus the corner mark. Needs watermark text.
-        frame: "hud" for the shop's Instagram post style (the owner, 2026-10-20): the photo (a worn-in hero scene)
+        frame: "hud" for an Instagram post in a HUD style: the photo (a worn-in hero scene)
             fills the slide edge to edge, with green HUD corner brackets, the shop's mark top-left and a dark strip
             near the bottom with `title` and `cta`, all inside what the profile grid keeps. A tiled watermark goes
             under it. "" (default): the design centred on its background as before.
         title: frame "hud": the strip's first line, up to 40 characters, e.g. "Retro Doodle Tee" (shown in capitals).
-        cta: frame "hud": the second line; empty = "SHOP: LINK IN BIO". Never a price (R&D's Instagram review).
+        cta: frame "hud": the second line; empty = "SHOP: LINK IN BIO". Never a price (a price in a post image dates
+            it and reads as an ad).
+        caption: a disclosure line, up to 70 characters, e.g. "AI-generated scene and model. Print shown exactly as
+            it ships.", in a thin translucent black bar (7% of the height) edge to edge along the bottom, small
+            white text centred. Goes over a tiled watermark; replaces the corner mark. Not with frame "hud".
 
     Returns:
         {"slides": [{"name", "width", "height", "bytes"}], "folder": "promo", "size"}.
@@ -54,6 +59,11 @@ def carousel(image_names: list[str], shape: str = "4:5", background: str = "", w
         raise ImageError('frame is "" or "hud"')
     if frame and not (title or "").strip():
         raise ImageError('frame "hud" needs a title, e.g. "Retro Doodle Tee"')
+    caption = " ".join((caption or "").split())
+    if len(caption) > 70:
+        raise ImageError("caption is up to 70 characters")
+    if caption and frame:
+        raise ImageError('caption is for plain slides; frame "hud" has its own strip')
     names = [str(n).strip() for n in (image_names or []) if str(n).strip()]
     if not 1 <= len(names) <= 10:
         raise ImageError("give 1-10 image names")
@@ -72,6 +82,7 @@ def carousel(image_names: list[str], shape: str = "4:5", background: str = "", w
         resp = httpx.post(f"{base_url()}/image/promo-slides", timeout=120,
                           json={"items": items, "size": SIZES[shape], "background": background or "",
                                 "watermark": watermark or "", "watermark_style": style,
+                                **({"caption": caption} if caption else {}),
                                 **({"frame": frame, "title": title.strip(), "cta": (cta or "").strip()} if frame else {})})
     except httpx.HTTPError as exc:
         raise ImageError(f"image backend unreachable ({type(exc).__name__})") from None

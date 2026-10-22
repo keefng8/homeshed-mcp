@@ -1,6 +1,6 @@
 """printify.product.update. See ../../capabilities/printify/update.md.
 
-2026-10-07 (the shop's project manager and director agents): every draft needed hand fixes in Printify before
+2026-10-07: every draft needed hand fixes in Printify before
 publishing (delivery and material bullets, tag swaps, prices). This edits an UNPUBLISHED draft only. Anything on a
 sales channel, locked mid-publish, waiting for the owner's publish approval or published today is refused. A price
 never goes under the margin floor, and every edit keeps the old values, so it can be undone.

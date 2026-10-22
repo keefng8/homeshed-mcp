@@ -1,6 +1,6 @@
-"""Pinterest (API v5) for pinterest.* and the Control Panel's Connect Pinterest card. The owner's decision, 2026-10-10
-(Director's decisions item 5): an approval-gated posting tool, built up to the point where the business account can be
-connected. R&D's scope: researchandimprovements/pinterest-scope-review.md.
+"""Pinterest (API v5) for pinterest.* and the Control Panel's Connect Pinterest card. The owner's decision, 2026-10-10:
+an approval-gated posting tool, built up to the point where the business account can be
+connected.
 
 Pinterest's spec (github.com/pinterest/api-description, v5 5.28.0, read 2026-10-10) and docs:
 - Sign-in: www.pinterest.com/oauth/ (response_type=code, comma-separated scopes, state). The code is swapped at

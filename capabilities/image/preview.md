@@ -4,8 +4,7 @@
 `image.preview`
 
 ## Purpose
-Show a print file on a plain flat tee, so the owner rates exactly what will be printed (the Director's standard,
-2026-10-08). The file is pasted at its true size: 300 DPI against a size-M tee (20" chest), under the collar, with a
+Show a print file on a plain flat tee, so the owner rates exactly what will be printed (2026-10-08). The file is pasted at its true size: 300 DPI against a size-M tee (20" chest), under the collar, with a
 faint dashed outline of the whole print area. No person, no model, no download: drawn on the image service's CPU in
 about a second, free. The backdrop is a neutral dark grey for light tees and a light grey for dark ones, so the tee
 never blends into it (the owner, 2026-10-09).

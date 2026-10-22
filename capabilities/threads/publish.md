@@ -26,7 +26,7 @@ nothing is uploaded or posted if one fails), then staged in the private R2 bucke
 presigned link that works for an hour, and deleted again once the post is published or fails. Local images go as the
 image service's JPEG fitted in 1440 px (its originals can be 20 MB upscales); paid images (tool server) go as they are.
 
-## AI disclosure (2026-10-08, the Director)
+## AI disclosure (2026-10-08)
 The Threads API has no AI-label field (checked 2026-10-08: none of `POST /{user}/threads`'s parameters; Instagram's
 API has `is_ai_generated`, Threads' doesn't). Meta requires disclosure for photorealistic video and realistic-sounding
 audio, and labels images itself only from C2PA/IPTC metadata, which re-encoded images lose. So the caption says it.

@@ -161,7 +161,7 @@ def test_reapply_queues_the_saved_set(fake):
 
 
 def test_a_printify_price_re_publish_queues_the_etsy_details_again_a_words_one_doesnt(fake, monkeypatch):
-    """The director, 2026-10-09: a title, description or tags publish left every Etsy detail intact (5 listings,
+    """2026-10-09: a title, description or tags publish left every Etsy detail intact (5 listings,
     checked on Etsy), so only a publish that re-sends variants, images or the delivery template queues them again."""
     from tools.printify import _client as pf
     from tools.printify import update_live as ul
@@ -320,6 +320,56 @@ def test_an_automatic_swap_must_pass_every_guard(change, why):
     args = (change.get("swap", True), change.get("removes", [777]), change.get("new", [{"image": "x.png"}]), [photo])
     assert why in ew._swap_problem(*args)
     assert ew._swap_problem(True, [777], [{"image": "x.png"}], [RAW]) == ""  # the clean case passes
+
+
+HERO = {"listing_image_id": 888, "rank": 1, "alt_text": "Our hoodie worn in a winter market, by Kind Retro Co."}
+MOCKUP = {"listing_image_id": 889, "rank": 2, "alt_text": "Staffy hoodie by Kind Retro Co."}
+BARRED = {"image": "promo/x.png", "alt_text": "Our hoodie worn in a winter market, by Kind Retro Co."}
+
+
+@pytest.mark.parametrize("change, why", [
+    (dict(removes=[888, 889]), "exactly one"), (dict(new=[]), "exactly one"), (dict(new=[BARRED, BARRED]), "exactly one"),
+    (dict(photo={"alt_text": "Staffy artwork, full design"}), "removed photo"),
+    (dict(photo={"alt_text": "Staffy artwork worn in a cafe"}), "removed photo"),  # never artwork
+    (dict(new=[{"image": "promo/x.png", "alt_text": "Size guide"}]), "added photo"),
+    (dict(new=[{"image": "promo/x.png"}]), "added photo"),
+    (dict(photo={"rank": 2}), "rank 2"),
+    (dict(others=[{"listing_image_id": 890, "alt_text": "Size guide for the hoodie"}]), "non-AI photo"),
+    (dict(others=[{"listing_image_id": 890, "alt_text": "Our hoodie worn in a park"}]), "non-AI photo"),
+])
+def test_an_automatic_hero_swap_must_pass_every_guard(change, why):
+    """The owner's go, 2026-10-22: the AI hero swapped for its barred copy, guarded."""
+    photo = {**HERO, **change.get("photo", {})}
+    listed = [photo, *change.get("others", [MOCKUP])]
+    assert why in ew._hero_swap_problem(change.get("removes", [888]), change.get("new", [BARRED]), listed)
+    assert ew._hero_swap_problem([888], [BARRED], [HERO, MOCKUP]) == ""  # the clean case passes
+
+
+def test_the_hero_alt_pattern_is_a_setting(monkeypatch):
+    """ETSY_HERO_ALT: a shop's own hero wording; a broken pattern falls back to "worn in"."""
+    hero = {**HERO, "alt_text": "Our hoodie on a teddy bear"}
+    barred = {"image": "promo/x.png", "alt_text": "Our hoodie on a teddy bear"}
+    assert "removed photo" in ew._hero_swap_problem([888], [barred], [hero, MOCKUP])  # the default doesn't know it
+    monkeypatch.setenv("ETSY_HERO_ALT", "worn in|on a teddy")
+    assert ew._hero_swap_problem([888], [barred], [hero, MOCKUP]) == ""
+    monkeypatch.setenv("ETSY_HERO_ALT", "([")
+    assert ew.hero_alt().pattern == "worn in"
+
+
+def test_hero_swap_is_used_only_when_asked_and_keeps_the_swap_path(photos, monkeypatch):
+    state, writes, _ = photos
+    state["images"] = {"count": 2, "results": [dict(HERO), dict(MOCKUP)]}
+    seen = {}
+    monkeypatch.setattr(ew, "_queue", lambda lid, title, summary, send, wanted, reapply, thumbs, ok:
+                        seen.update(ok=ok, send=send) or {"pending": True, "id": "q1"})
+    auto = {"id": "a1", "by": "auto:full", "at": "2026-10-22T20:00:00Z"}
+    new = [{"image": "listing/size-guide.png", "alt_text": BARRED["alt_text"]}]
+    out = ew.listing_update("4412", images=new, remove_images=[888], owner_approval=auto)
+    assert out["swap_held"].startswith("a photo delete with an automatic approval must be a swap") and seen["ok"] is None
+    out = ew.listing_update("4412", images=new, remove_images=[888], hero_swap=True, owner_approval=auto)
+    assert "swap_held" not in out and seen["ok"]["id"] == "a1" and seen["send"]["swap"] is True  # read-back + backup
+    out = ew.listing_update("4412", images=new, remove_images=[888], swap=True, hero_swap=True, owner_approval=auto)
+    assert out["swap_held"] and seen["ok"] is None  # both set: the strict raw-art guards apply, and a hero fails them
 
 
 def test_a_failed_guard_drops_the_automatic_approval_so_the_owner_taps_it(photos, monkeypatch):

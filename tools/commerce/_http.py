@@ -57,7 +57,7 @@ def _reason(resp: httpx.Response) -> str:
     return ""
 
 
-ETSY_QUOTA: dict = {}  # the last Etsy answer's own limit headers (the Director, 2026-10-21: a 429 "daily rate limit")
+ETSY_QUOTA: dict = {}  # the last Etsy answer's own limit headers (2026-10-21: a 429 "daily rate limit")
 
 
 def _note_quota(resp: httpx.Response) -> None:

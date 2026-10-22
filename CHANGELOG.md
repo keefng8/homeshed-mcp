@@ -6,9 +6,36 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-22
+
+Highlights: Claude joins the model relay, a vision check for images before they're listed, and a reminder that since
+0.5.0 every AI app connected to HomeShed can message every other one (`agents.list`, `agents.send`,
+`agents.inbox`): Claude Code sessions, other assistants and bots, each on its own key and grants
+([how to use it](capabilities/agents/how-to.md)). On mcprush, HomeShed is rated grade A for security and listed as
+working with 14 MCP clients.
+
+### Added
+- `llm.chat` can use Claude (`provider="anthropic"`, key `CLAUDE_WORKSPACE_API`, default model `claude-haiku-5-5`,
+  images supported). Off until the owner switches it on and sets a daily cap. Requests use prompt caching, so a
+  repeated system prompt costs less.
+- A monthly spend limit for every model provider (Settings > Language models, default no monthly stop): requests stop
+  once the month's estimated spend reaches it. `llm.providers.list` shows the month's spend and what's left.
+- `image.ip_check`: checks an image for a brand, a known character, a real person or unsafe content before you use
+  it, and for a lifestyle photo, a visible child or something covering the printed design. It runs on Claude through
+  `llm.chat`, and when the check can't run it answers "not clear", never "clear".
+- `image.carousel`: a `caption` option, a thin disclosure bar along the bottom (up to 70 characters), for example to
+  say a scene is AI-made.
+- `etsy.listing.update`: `hero_swap` lets an automatic approval replace the first photo with its copy carrying a
+  disclosure bar, only when the alt texts match `ETSY_HERO_ALT` and a non-AI photo stays on the listing. Anything
+  else waits for the owner.
+- README: an mcprush badge.
+
 ### Changed
-- The Claude Code plugin's README and setup skill: when uv hasn't seen a new version yet, the fix is now
-  `uvx --refresh-package homeshed-mcp homeshed-mcp doctor` (`uv cache clean` didn't always clear it).
+- `llm.chat` no longer sends a temperature to Claude models, which refuse it.
+- The Claude Code plugin runs HomeShed 0.6.0. Its README, its setup skill and the upgrading guide now say
+  `uvx --refresh-package homeshed-mcp ...` when uv hasn't seen a new version yet (`uv cache clean` didn't always
+  clear it).
+- `etsy.listing.update` docs list `swap`, `remove_images` and `images_alt`, which were missing.
 
 ## [0.5.1] - 2026-10-22
 

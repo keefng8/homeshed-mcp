@@ -257,8 +257,8 @@ def set_spend_cap(name: str, usd: float | None) -> None:
 
 
 def set_cap_delegated(name: str, on: bool) -> None:
-    """Whether the owner's AI sessions may set this app's spend cap with spend.cap_set (2026-10-11: the shop's
-    director sets its seat bots' caps). Off by default, so an app the owner didn't pick keeps the cap he set."""
+    """Whether the owner's AI sessions may set this app's spend cap with spend.cap_set (2026-10-11: a lead bot sets
+    its helper bots' caps). Off by default, so an app the owner didn't pick keeps the cap the owner set."""
     with _lock:
         data = _editable()
         c = _get(data, name)

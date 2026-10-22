@@ -17,6 +17,7 @@ from paths import data_path
 
 SETTINGS_FILE = Path(os.environ.get("TOOL_SETTINGS_FILE") or data_path("usage/settings.json"))
 TOPIC_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+SPACED_RE = re.compile(r"^[A-Za-z0-9_-](?:[A-Za-z0-9 _-]{0,62}[A-Za-z0-9_-])?$")  # a name with single inner spaces
 URL_RE = re.compile(r"^https?://[^\s/$.?#][^\s]{0,199}$")
 
 SCHEMA = {
@@ -120,10 +121,11 @@ def validate(key: str, value):
     if spec["type"] == "select" and value not in spec["options"]:
         raise ValueError(f"{spec['label']}: choose one of the listed options.")
     if spec["type"] == "names":  # a list of names, e.g. apps: "a,b", or empty for none (2026-10-09)
-        parts = [p.strip() for p in value.split(",") if p.strip()] if isinstance(value, str) else None
-        if parts is None or len(parts) > 20 or not all(TOPIC_RE.fullmatch(p) for p in parts):
-            raise ValueError(f"{spec['label']}: names separated by commas (letters, numbers, dashes or underscores), "
-                             "or empty for none.")
+        parts = [" ".join(p.split()) for p in value.split(",") if p.strip()] if isinstance(value, str) else None
+        name_re = SPACED_RE if spec.get("spaces") else TOPIC_RE  # agents' names have spaces: "Planner bot"
+        if parts is None or len(parts) > 20 or not all(name_re.fullmatch(p) for p in parts):
+            raise ValueError(f"{spec['label']}: names separated by commas (letters, numbers, "
+                             f"{'spaces, ' if spec.get('spaces') else ''}dashes or underscores), or empty for none.")
         return ",".join(parts)
     return value.strip() if isinstance(value, str) else value
 

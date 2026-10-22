@@ -99,7 +99,8 @@ def chat(messages: list[Message], system: str = "", model: str = "", max_tokens:
         model: one of the provider's models in llm.providers.list; empty means its default (xai: grok-4.3).
         max_tokens: most answer tokens, 1-2048 (default 1024). Reasoning tokens are billed on top.
         temperature: 0-2, optional (the model's default when left out).
-        provider: "xai" (openai and anthropic planned).
+        provider: "xai" or "anthropic" (Claude; default model claude-haiku-5-5, temperature ignored: its models
+            don't take it). Either stops at the owner's monthly spend limit when one is set. openai planned.
         images: optional, up to 4 image names for the model to look at with the last user message: a generated or
             paid image's name, "folder/name.png" from the image store, or a Printify mockup address. Image tokens are
             billed as input.
@@ -107,6 +108,7 @@ def chat(messages: list[Message], system: str = "", model: str = "", max_tokens:
     Returns:
         {"text", "provider", "model", "truncated", "finish", "usage": {"input_tokens", "output_tokens",
          "reasoning_tokens", "cached_tokens", "cost_usd", "cost_source": "xai"|"estimate"}, "used_today", "daily_cap"}
+        (with a monthly spend limit set, also "credit_left_usd": the limit minus this month's spend so far).
         truncated is true when the model stopped at max_tokens or the text was cut to fit 4,200 characters.
     """
     provider = str(provider or "xai").strip().lower()
@@ -133,4 +135,6 @@ def chat(messages: list[Message], system: str = "", model: str = "", max_tokens:
     used = prov.today(provider)
     return {"text": text, "provider": provider, "model": out["model"], "truncated": bool(cut or out["incomplete"]),
             "finish": out["finish"], "usage": out["usage"], "used_today": used["requests"],
-            "daily_cap": prov.daily_cap(provider)}
+            "daily_cap": prov.daily_cap(provider),
+            **({"credit_left_usd": round(max(0.0, cap - prov.month_cost(provider)), 4)}
+               if (cap := prov.monthly_cap(provider)) else {})}

@@ -38,8 +38,9 @@ Your app starts HomeShed with `uvx`, which keeps the version it downloaded first
 3. **If you use rule packs:** paste `uvx homeshed-mcp packs on` and press **Enter**. It shows the change and asks
    first. Only needed when `doctor` says the hook needs refreshing.
 
-**Still the old version?** Quit your AI app, paste `uv cache clean homeshed-mcp` and press **Enter**, then open the app
-again. This removes only the downloaded program, never your data.
+**Still the old version?** Quit your AI app, paste `uvx --refresh-package homeshed-mcp homeshed-mcp@latest doctor` and
+press **Enter**, then open the app again. It fetches a fresh version list and touches only the downloaded program,
+never your data.
 
 ### Claude Desktop (the `.mcpb` file)
 
@@ -83,7 +84,8 @@ otherwise.
    server is still the old version until they do.
 4. After the restart, run `uvx homeshed-mcp doctor --json` again. If `packs.state` is `broken`, the rule-pack hook
    needs refreshing: ask the user first, then run `uvx homeshed-mcp packs on --yes`.
-5. If `version` is still old, ask the user to quit the app, then run `uv cache clean homeshed-mcp`. It deletes only
-   the downloaded program, not the data folder.
+5. If `version` is still old, ask the user to quit the app, then run
+   `uvx --refresh-package homeshed-mcp homeshed-mcp@latest doctor --json`. It refreshes only the downloaded program,
+   not the data folder.
 
 Don't edit the app's MCP settings to pin `homeshed-mcp@latest`: that checks the network every time the app starts.

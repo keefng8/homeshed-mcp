@@ -3228,10 +3228,15 @@ async function loadLocalAi() {
         : { val: s.requests_processing != null ? s.requests_processing : '0', lbl: 'In flight' };
       const decider = s.type === 'decider';  // a decision server counts decisions, not tokens
       const images = s.type === 'images';    // Nano Banana: images today against the owner's daily cap
-      const m1 = images ? { val: s.requests_total != null ? s.requests_total.toLocaleString() : '—', lbl: 'Today' }
+      const llm = s.type === 'llm';          // Claude: the free monthly API credit left
+      // with a monthly limit set (Settings > Language models): what's left of it; without one, this month's spend
+      const m1 = llm ? (s.credit_left_usd != null ? { val: '$' + Number(s.credit_left_usd).toFixed(2), lbl: 'Credit left' }
+                        : { val: s.cost_month_usd != null ? '$' + Number(s.cost_month_usd).toFixed(2) : '—', lbl: 'This month' })
+               : images ? { val: s.requests_total != null ? s.requests_total.toLocaleString() : '—', lbl: 'Today' }
                : decider ? { val: s.requests_total != null ? s.requests_total.toLocaleString() : '—', lbl: 'Decisions' }
                       : { val: s.total_tokens != null ? s.total_tokens.toLocaleString() : '—', lbl: 'Tokens' };
-      const m2 = images ? { val: s.cap ? `of ${s.cap}` + (s.cost_today_usd ? ` · ~$${s.cost_today_usd}` : '') : 'no cap set', lbl: 'Daily cap' }
+      const m2 = llm ? { val: `${s.requests_total || 0} today` + (s.monthly_credit_usd ? ` · of $${s.monthly_credit_usd}/month` : ''), lbl: 'Use' }
+               : images ? { val: s.cap ? `of ${s.cap}` + (s.cost_today_usd ? ` · ~$${s.cost_today_usd}` : '') : 'no cap set', lbl: 'Daily cap' }
                : decider ? { val: s.avg_ms != null ? s.avg_ms + ' ms' : '—', lbl: 'Average' }
                       : { val: s.delta_tokens_window != null ? '+' + s.delta_tokens_window.toLocaleString() : '—', lbl: 'Recent' };
       const busy = s.online && (s.requests_processing || 0) > 0;
@@ -3240,7 +3245,7 @@ async function loadLocalAi() {
       <div class="ai-cell ${s.online ? 'online' : ''} ${busy ? 'busy' : ''} ${changed ? 'flash' : ''}" title="${escAttr(tip)}">
         <span class="dot" aria-hidden="true"></span>
         <div style="min-width:0"><div class="ai-cell-name">${escapeHtml(s.name)}</div>
-          <div class="ai-cell-sub">${escapeHtml(s.online ? s.label : images ? 'Switched off (Settings > Image generation)' : 'Offline')}</div></div>
+          <div class="ai-cell-sub">${escapeHtml(s.online ? s.label : images ? 'Switched off (Settings > Image generation)' : llm ? 'Switched off (Settings > Language models)' : 'Offline')}</div></div>
         <canvas id="spark-${i}" aria-hidden="true"></canvas>
         <div class="ai-cell-num">${escapeHtml(String(m1.val))}<span>${escapeHtml(m1.lbl)}</span></div>
       </div>`;

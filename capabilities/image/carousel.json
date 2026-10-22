@@ -1,7 +1,7 @@
 {
   "id": "image.carousel",
   "name": "Social Slides From Designs",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Designs as 1080x1350 (4:5) or 1080x1920 (9:16) social slides, or a 2000x2000 (1:1) Etsy listing photo, on their own background, saved in the images promo folder for threads.publish.",
   "category": "image",
   "risk": "write",
@@ -48,6 +48,11 @@
       "default": ""
     },
     "cta": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "caption": {
       "type": "string",
       "required": false,
       "default": ""

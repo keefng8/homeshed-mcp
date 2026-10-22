@@ -36,7 +36,7 @@ def fake(monkeypatch, tmp_path):
 
 
 def test_a_listing_off_on_etsy_is_held_when_asked_and_on_approval(fake):
-    """The Director's decisions item 9 (10 Oct): a re-publish switched the Black Staffy tee back on after it was off."""
+    """10 Oct: a re-publish switched the Black Staffy tee back on after it was off."""
     state, sent, _ = fake
     state["etsy"] = ["inactive"]
     with pytest.raises(h.CommerceError, match="listing is off on Etsy: the owner turns it on first"):

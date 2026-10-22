@@ -126,7 +126,7 @@ SETTINGS = {
     "approvals_trusted_bots": {
         "type": "names", "default": "", "group": "Online shops",
         "label": "Bots that may approve Etsy listing details",
-        "help": "Bot names, separated by commas (e.g. director). An approval an app sends as \"bot:<name>\" counts for "
+        "help": "Bot names, separated by commas (e.g. planner). An approval an app sends as \"bot:<name>\" counts for "
                 "Etsy listing details edits only (category, materials, partners, delivery, attributes, section, "
                 "photos), never for publishing or price changes, and only from an app in \"Apps whose own approval "
                 "counts\". Each is logged as that bot's, not yours. Empty: no bot.",

@@ -179,7 +179,7 @@ def test_auto_counts_only_for_an_app_named_for_auto(fake):
 
 
 def test_a_bot_approves_etsy_details_only_when_named_and_never_a_publish(fake, monkeypatch):
-    """The owner, 2026-10-14: the Director may approve Etsy listing details. "bot:director" counts for an Etsy edit
+    """The owner, 2026-10-14: a trusted bot may approve Etsy listing details. "bot:planner" counts for an Etsy edit
     once the owner names the bot; never for a publish; and it's logged as the bot's, not the owner's."""
     from tools.etsy import write as ew
     monkeypatch.setattr(ew, "execute", lambda payload: {"note": "set"})
@@ -191,14 +191,14 @@ def test_a_bot_approves_etsy_details_only_when_named_and_never_a_publish(fake, m
 
     def etsy(i):
         return ew._queue(f"{i}", "Tee", "Set Etsy details", {"fields": {}, "properties": []}, {}, False,
-                         owner_approval=ok(f"apr_b{i}", by="bot:director"))
+                         owner_approval=ok(f"apr_b{i}", by="bot:planner"))
     out = etsy(1)
     assert out["pending"] is True and "isn't a bot the owner lets approve" in out["owner_approval"]  # off by default
-    bots["value"] = "Director"
+    bots["value"] = "Planner"
     out = etsy(2)
-    assert out["pending"] is False                                     # named: the Director's approval counts
-    assert "bot:director" in pp.history()[0]["note"]                    # and it says whose approval it was
-    out = pb.product_publish("abc123", owner_approval=ok("apr_b3", by="bot:director"))
+    assert out["pending"] is False                                     # named: the bot's approval counts
+    assert "bot:planner" in pp.history()[0]["note"]                    # and it says whose approval it was
+    out = pb.product_publish("abc123", owner_approval=ok("apr_b3", by="bot:planner"))
     assert out["pending"] is True and "only for Etsy listing details" in out["owner_approval"] and fake["posts"] == []
     fake["trusted"] = ""                                                # the app itself must be trusted too
     assert "aren't trusted" in etsy(4)["owner_approval"]

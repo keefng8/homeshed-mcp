@@ -4,8 +4,7 @@
 `image.promo_card`
 
 ## Purpose
-A branded promo card for a social post, built around the real product mockup (2026-10-07, the Director bot's
-promo-card spec). The mockup is the hero, about half the card's height: its plain backdrop margin is trimmed so the
+A branded promo card for a social post, built around the real product mockup (2026-10-07). The mockup is the hero, about half the card's height: its plain backdrop margin is trimmed so the
 product fills the frame, and the product itself is only scaled, never cropped, retouched or covered. Around it: the brand's logo, the product name as a big headline, a one-line benefit, the real £ price, a
 "Shop now" button and the shop link. Two templates for an A/B test:
 - `drop`: bold, for younger buyers: dark navy, a glowing gradient frame, retro sunset stripes, confetti, a gradient

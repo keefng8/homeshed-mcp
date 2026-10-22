@@ -1,6 +1,6 @@
 """printify.product.update_live. See ../../capabilities/printify/update_live.md.
 
-2026-10-08 (the shop's project manager and director): live listings needed hand edits in Printify. A published
+2026-10-08: live listings needed hand edits in Printify. A published
 product's title, description, tags and prices reach Etsy only through Printify: an edit (PUT), then a publish of just
 the changed parts. That changes a public listing, so this tool only checks the change and queues it
 (printify_pending.py, action "update"); the owner approves each one in the Control Panel, and execute_update runs then,
@@ -18,7 +18,7 @@ from tools.printify import _client as pf
 from tools.printify import update as up
 
 PUBLISH_FLAGS = ("title", "description", "images", "variants", "tags", "keyFeatures", "shipping_template")
-# What a publish re-sends that can undo a listing's Etsy details (the director, 2026-10-09): a words-only publish left
+# What a publish re-sends that can undo a listing's Etsy details (2026-10-09): a words-only publish left
 # them alone (category, materials, partners, delivery profile and attributes all intact on 5 listings, checked on Etsy;
 # the shop app also re-checks each listing after a words change), so only these queue them again. A price change
 # re-sends the variants (Etsy's inventory): kept, to be safe.
