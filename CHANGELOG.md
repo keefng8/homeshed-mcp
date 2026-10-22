@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-22
+
+### Added
+- `image.delete`: delete a kept image now instead of waiting for the 7-day sweep. An app can delete only its own;
+  "not found:" and "not yours:" errors are final, so callers know not to retry.
+
+### Security
+- `image.store` re-encodes every image: EXIF and all other metadata (camera, GPS location, time) are removed, and
+  images over 4096 px a side or built to blow up when decoded are refused.
+
+### Changed
+- The Claude Code plugin runs HomeShed 0.5.1, and its README and setup skill say what to do when uv hasn't seen a
+  new version yet (`uv cache clean homeshed-mcp`).
+
 ## [0.5.0] - 2026-10-22
 
 ### Added

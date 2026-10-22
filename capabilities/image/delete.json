@@ -1,0 +1,36 @@
+{
+  "id": "image.delete",
+  "name": "Delete an Image",
+  "version": "1.0.0",
+  "description": "Delete one image the tool server keeps (an image.store upload or a paid provider's image) straight away. An app deletes only its own; the owner token may delete any.",
+  "category": "image",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "delete an uploaded image",
+    "remove a stored image",
+    "delete customer upload"
+  ],
+  "inputs": {
+    "name": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.delete.delete"
+  },
+  "latency": {
+    "expected_ms": 50
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.store",
+    "image.generate"
+  ]
+}

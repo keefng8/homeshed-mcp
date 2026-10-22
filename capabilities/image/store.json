@@ -2,7 +2,7 @@
   "id": "image.store",
   "name": "Store an Image",
   "version": "1.0.0",
-  "description": "Keep an image you already have (PNG, JPEG or WebP, base64, up to 10 MB) for 7 days and get back a name the other image tools take, such as image.generate's input_images.",
+  "description": "Keep an image you already have (PNG, JPEG or WebP, base64, up to 10 MB and 4096 px a side) for 7 days and get back a name the other image tools take, such as image.generate's input_images. Re-encoded on the way in: EXIF/GPS metadata removed.",
   "category": "image",
   "risk": "write",
   "requires": [],
@@ -32,6 +32,7 @@
   },
   "related": [
     "image.generate",
+    "image.delete",
     "image.text_check"
   ]
 }

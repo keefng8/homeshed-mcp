@@ -13,6 +13,7 @@ adapts from other open-source projects, and the optional services it can connect
 | httpx | BSD-3-Clause | HTTP client |
 | graphifyy | Apache-2.0 | Code-graph queries |
 | z3-solver | MIT | Constraint solving for `reasoning.solve` |
+| Pillow | MIT-CMU | Re-encoding images `image.store` keeps (strips metadata) |
 | cryptography | Apache-2.0 OR BSD-3-Clause | Encrypting stored credentials (vault) |
 | fastapi | MIT | The optional Control Panel (the `panel` extra) |
 | tzdata | Apache-2.0 | Time-zone data (the `timezones` extra; the Docker image installs it) |

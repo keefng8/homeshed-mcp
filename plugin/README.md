@@ -24,7 +24,8 @@ In Claude Code:
 ```
 
 Then restart Claude Code and type `/mcp`: `plugin:homeshed:homeshed` should say connected. The first start downloads
-HomeShed, so if it says it timed out, choose it in `/mcp` and reconnect.
+HomeShed, so if it says it timed out, choose it in `/mcp` and reconnect. If it still fails just after a new version
+came out, run `uv cache clean homeshed-mcp` (it removes only the downloaded program, never your data) and reconnect.
 
 If you added HomeShed before with `claude mcp add` or `uvx homeshed-mcp setup`, remove that entry
 (`claude mcp remove homeshed-mcp -s user`) so its tools don't show twice.
