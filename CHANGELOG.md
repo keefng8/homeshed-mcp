@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- The Claude Code plugin's README and setup skill: when uv hasn't seen a new version yet, the fix is now
+  `uvx --refresh-package homeshed-mcp homeshed-mcp doctor` (`uv cache clean` didn't always clear it).
+
 ## [0.5.1] - 2026-10-22
 
 ### Added

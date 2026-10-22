@@ -20,8 +20,8 @@ This plugin runs HomeShed on this computer with `uvx homeshed-mcp` (the `plugin:
    Claude Code waits, so a failure straight after installing usually goes away on a reconnect.
 
 If it still fails and `uvx homeshed-mcp==<version> doctor` says there is no such version, uv is using an old list of
-versions it saved earlier. `uv cache clean homeshed-mcp` clears it (only the downloaded program, never the user's
-data); then reconnect.
+versions it saved earlier. `uvx --refresh-package homeshed-mcp homeshed-mcp doctor` fetches a fresh list (it
+touches only the downloaded program, never the user's data); then reconnect.
 
 Optional tool groups (Docker, git writes, build and test runners) start switched off. `uvx homeshed-mcp setup`
 lists them; only switch one on when the user asks for it.
