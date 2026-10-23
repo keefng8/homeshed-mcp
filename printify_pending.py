@@ -409,7 +409,8 @@ def decide(item_id: str, approve: bool, via: str = "") -> dict:
             else:
                 raise PendingError(f"request {item_id} is of an unknown kind ({action}): decline it")
             try:
-                result["result"] = run()
+                with h.counted_as(f"approvals:{action}"):  # the Etsy request counter, when no tool call is running
+                    result["result"] = run()
             except h.CommerceError as exc:
                 if "HTTP 429" in str(exc) and item.get("owner_approval"):
                     # a shop's per-second limit (2026-10-20: an Etsy details edit hit 429 and then sat
@@ -437,7 +438,8 @@ def decide(item_id: str, approve: bool, via: str = "") -> dict:
         from tools.commerce import _http as h
         from tools.etsy.write import queue_reapply
         try:
-            result["etsy_reapply"] = queue_reapply(str(lid))
+            with h.counted_as("approvals:etsy_reapply"):
+                result["etsy_reapply"] = queue_reapply(str(lid))
         except (h.CommerceError, PendingError) as exc:
             result["etsy_reapply_error"] = f"re-apply the Etsy details by hand (etsy.listing.update reapply=true): {exc}"
     return result

@@ -524,7 +524,8 @@ async def add_host(request: Request):
     try:
         return save_host(await request.json() or {})
     except (ValueError, AttributeError) as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
+        from main import _public_error  # the panel\'s one failure answer (CodeQL stack-trace-exposure)
+        return _public_error(exc, 400)
 
 
 @router.delete("/api/term/hosts/{hid}")
@@ -555,7 +556,8 @@ async def host_action(hid: str, action: str, request: Request):
     try:
         out = await setup_access(h, password)
     except ConnectionError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=502)
+        from main import _public_error  # the panel\'s one failure answer (CodeQL stack-trace-exposure)
+        return _public_error(exc, 502)
     finally:
         password = ""
     _audit("terminal access set up", h)

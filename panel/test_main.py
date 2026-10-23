@@ -1330,7 +1330,9 @@ def test_connect_etsy_routes_pass_through_and_the_callback_lands_on_settings(mon
     r = c.get("/api/etsy/callback", params={"code": "abc", "state": "bad"}, follow_redirects=False)
     assert "etsy=failed" in r.headers["location"] and "Connect" in r.headers["location"]
     r = c.get("/api/etsy/callback", params={"error": "access_denied"}, follow_redirects=False)
-    assert "etsy=failed&why=access_denied" in r.headers["location"]
+    assert r.headers["location"] == "/#settings?etsy=failed&why=you%20said%20no%20on%20the%20sign-in%20page"
+    r = c.get("/api/etsy/callback", params={"error": "https://evil.example/x"}, follow_redirects=False)
+    assert r.headers["location"] == "/#settings?etsy=failed&why=the%20sign-in%20didn%27t%20finish"  # never its text
     assert ("POST", "/etsy/finish", {"code": "abc", "state": "s1"}) in calls
     assert not any(p.startswith("/api/etsy") for p in main.VIEWER_ROUTES)
 
@@ -1951,7 +1953,10 @@ def test_send_to_phone(owner, monkeypatch):
     monkeypatch.setattr(main, "DASHBOARD_PUBLIC_URL", "https://panel.example.com")
     d = client.post("/api/viewers", json={"name": "dave", "send_to_phone": True}).json()
     assert d["sent"] is True and sent[0][0] == "notify.send"
-    assert d["password"] in sent[0][1]["message"] and "https://panel.example.com" in sent[0][1]["message"]
+    from urllib.parse import urlsplit
+    message = sent[0][1]["message"]
+    assert d["password"] in message
+    assert any(urlsplit(u).hostname == "panel.example.com" for u in re.findall(r"https?://\S+", message))
 
 
 def test_no_viewers_means_no_viewer_login(owner):
@@ -2010,7 +2015,8 @@ def test_page_script_parses(tmp_path):
     if shutil.which("node") is None:
         pytest.skip("node is not installed")
     html = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
-    blocks = re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.DOTALL)
+    from check_page_js import inline_scripts
+    blocks = inline_scripts(html)
     assert blocks
     for i, js in enumerate(blocks):
         f = tmp_path / f"script_{i}.js"

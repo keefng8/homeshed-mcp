@@ -345,6 +345,16 @@ def test_an_automatic_hero_swap_must_pass_every_guard(change, why):
     assert ew._hero_swap_problem([888], [BARRED], [HERO, MOCKUP]) == ""  # the clean case passes
 
 
+def test_a_blank_alt_mockup_counts_as_the_photo_that_stays():
+    """2026-10-23, the Labrador listing: the Printify mockup had no alt text yet; its new alt came in the same call."""
+    blank = {"listing_image_id": 889, "rank": 2, "alt_text": ""}
+    assert ew._hero_swap_problem([888], [BARRED], [HERO, blank]) == ""
+    alts = [{"listing_image_id": 889, "alt_text": "Labrador tee by Kind Retro Co."}]
+    assert ew._hero_swap_problem([888], [BARRED], [HERO, blank], alts) == ""
+    hero_alt = [{"listing_image_id": 889, "alt_text": "Our tee worn in a park"}]  # renamed into a hero: none stays
+    assert "non-AI photo" in ew._hero_swap_problem([888], [BARRED], [HERO, blank], hero_alt)
+
+
 def test_the_hero_alt_pattern_is_a_setting(monkeypatch):
     """ETSY_HERO_ALT: a shop's own hero wording; a broken pattern falls back to "worn in"."""
     hero = {**HERO, "alt_text": "Our hoodie on a teddy bear"}

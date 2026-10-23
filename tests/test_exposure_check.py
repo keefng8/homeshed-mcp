@@ -5,6 +5,18 @@ import pytest
 import tools.network.exposure_check as ec
 
 
+@pytest.mark.parametrize("location,want", [
+    ("https://team.cloudflareaccess.com/cdn-cgi/access/login", "protected (Cloudflare Access)"),
+    ("https://cloudflareaccess.com/", "protected (Cloudflare Access)"),
+    ("https://x.com/?cloudflareaccess.com", "redirects to"),          # CodeQL #36: only in the query
+    ("https://cloudflareaccess.com.evil.example/", "redirects to"),   # a look-alike host
+    ("https://x.com/?next=login", "redirects to"),                    # sign-in words count on the path only
+    ("/login?next=/admin", "protected (redirects to a sign-in page)"),
+])
+def test_a_redirect_is_judged_by_its_host_and_path_never_its_query(location, want):
+    assert ec.verdict("/admin", 302, location, "", False).startswith(want)
+
+
 def fake_site(monkeypatch, pages: dict, catch_all=False, address="203.0.113.7"):
     """pages: path -> (status, location, body). Anything else: 200 for a catch-all site, else 404."""
     asked = []

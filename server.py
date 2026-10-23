@@ -165,8 +165,24 @@ def _version() -> str:
 
 # What an app sees when it connects (serverInfo). The installed package's own name and version; it said
 # "homelab-capabilities" with no version until the 2026-09-30 wheel smoke test. Apps name the server themselves.
+def _instructions() -> str:
+    """The server's MCP instructions: what HomeShed offers and how to pick a tool. Clients defer 145 tool schemas
+    behind tool search (measured 2026-10-22: ~16k tokens a turn in full, ~1.7k deferred), so a few lines naming the
+    groups help it find the right one. Built from this install's own tools, so it never names one it lacks."""
+    try:
+        import registry
+        groups = sorted({c.category for c in registry.discover()})
+    except Exception:  # noqa: BLE001 - instructions are a hint; the server must start without them
+        groups = []
+    return ("HomeShed: tools for this machine and its services, grouped by prefix"
+            + (f" ({', '.join(groups)})" if groups else "") + ". Not sure which tool fits? Call registry.find "
+            "with the task in plain words. If a local model is set up, local_ai.* handles drafts and summaries for "
+            "free. Use memory.* to recall and save facts across sessions, and bugs.find before debugging. Tools that change something "
+            "real may queue for the owner's approval instead of acting at once; the reply says so.")
+
+
 mcp = GuardedMCPServer(name="homeshed-mcp", title="HomeShed", version=_version(),
-                       description="Every tool your AI needs, in one install")
+                       description="Every tool your AI needs, in one install", instructions=_instructions())
 
 def _description(capability) -> str:
     """The capability doc is the real description source, kept short here and pointing back at the .md for detail.

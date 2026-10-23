@@ -7,18 +7,45 @@ doesn't either. Usage: python check_page_js.py [page.html]   (exit 1 when a scri
 from __future__ import annotations
 
 import os
-import re
 import subprocess
 import sys
 import tempfile
+from html.parser import HTMLParser
 
 PAGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "index.html")
-SCRIPT_RE = re.compile(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", re.DOTALL)
+
+
+class _Scripts(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=False)
+        self.found: list[str] = []
+        self._in = False
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "script" and not any(k == "src" for k, _ in attrs):
+            self._in = True
+            self.found.append("")
+
+    def handle_endtag(self, tag):
+        if tag == "script":
+            self._in = False
+
+    def handle_data(self, data):
+        if self._in:
+            self.found[-1] += data
+
+
+def inline_scripts(html: str) -> list[str]:
+    """Every inline <script>'s code, by an HTML parser (a regex misses </script > and the like: CodeQL bad-tag-filter)."""
+    p = _Scripts()
+    p.feed(html)
+    p.close()
+    return p.found
 
 
 def problems(html: str) -> list[str]:
     out = []
-    for i, js in enumerate(SCRIPT_RE.findall(html)):
+    for i, js in enumerate(inline_scripts(html)):
         fd, path = tempfile.mkstemp(suffix=".js")
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:

@@ -87,9 +87,10 @@ def _refresh(key: str, sec: str) -> str:
     stored = _state["refresh"] or h.secret(_refresh_token())
     if not stored:
         raise h.missing([_refresh_token()], "Etsy shop access")
-    resp = h.request("etsy", "POST", TOKEN_PATH, headers={"x-api-key": f"{key}:{sec}"},
-                     secrets=(key, sec, stored),
-                     data={"grant_type": "refresh_token", "client_id": key, "refresh_token": stored})
+    with h.counted_as("etsy.token_refresh", force=True):
+        resp = h.request("etsy", "POST", TOKEN_PATH, headers={"x-api-key": f"{key}:{sec}"},
+                         secrets=(key, sec, stored),
+                         data={"grant_type": "refresh_token", "client_id": key, "refresh_token": stored})
     body = h.json_of("etsy", resp)
     access, new = body.get("access_token"), body.get("refresh_token")
     if not isinstance(access, str) or not access:

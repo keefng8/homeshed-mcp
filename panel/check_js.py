@@ -4,14 +4,14 @@ Run before every dashboard deploy (the page is one big HTML file; a JS syntax er
 Exit code 0 = every page parses; 1 = a page failed (the error is printed); 2 = node is missing.
 Usage: python check_js.py            (checks static/*.html next to this file)
 """
-import re
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-SCRIPT = re.compile(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", re.S)
+sys.path.insert(0, str(Path(__file__).parent))
+from check_page_js import inline_scripts  # noqa: E402 - one HTML parser for both checks
 
 
 def main() -> int:
@@ -21,7 +21,7 @@ def main() -> int:
         return 2
     failed = 0
     for page in sorted((Path(__file__).parent / "static").glob("*.html")):
-        code = "\n;\n".join(SCRIPT.findall(page.read_text(encoding="utf-8")))
+        code = "\n;\n".join(inline_scripts(page.read_text(encoding="utf-8")))
         with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False, encoding="utf-8") as f:
             f.write(code)
         r = subprocess.run([node, "--check", f.name], capture_output=True, text=True)

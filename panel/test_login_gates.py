@@ -44,13 +44,18 @@ def signed_in(password=SAVED):
 
 # --- C7: no default password, no open mode ---------------------------------------------------------------------
 
-def test_first_start_makes_a_password_and_keeps_only_its_hash(fresh):
+def test_first_start_makes_a_password_and_keeps_only_its_hash(fresh, monkeypatch):
     made = main.first_run_password()
     assert made and len(made) >= 19 and made.count("-") == 3
     saved = (fresh / "owner.json").read_text(encoding="utf-8")
     assert made not in saved and all(k in saved for k in ("salt", "hash", "session_secret"))
     assert main.first_run_password() is None  # the next start keeps it and prints nothing
     assert main._owner_ok(made) and not main._owner_ok("guess")
+    monkeypatch.setattr(main, "FIRST_RUN_FILE", fresh / "first-run-password.txt")
+    where = main._keep_first_run_password(made)  # kept for the owner, not logged; gone once they choose their own
+    assert where.read_text(encoding="utf-8").strip() == made
+    main._save_owner("a-new-chosen-password")  # secret-scan: allow (fake)
+    assert not where.exists()
 
 
 def test_with_no_password_anywhere_nothing_is_open():

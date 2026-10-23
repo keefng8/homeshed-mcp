@@ -6,7 +6,14 @@ the request scrubbed out; never a header, a token or a URL with a query.
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
+import json
+import os
 import re
+import threading
+import time
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -62,7 +69,6 @@ ETSY_QUOTA: dict = {}  # the last Etsy answer's own limit headers (2026-10-21: a
 
 def _note_quota(resp: httpx.Response) -> None:
     """Etsy sends x-limit-per-day / x-remaining-today (and per-second) on every answer, refusals included."""
-    import time
     got = {}
     for key, head in (("limit_per_day", "x-limit-per-day"), ("remaining_today", "x-remaining-today"),
                       ("limit_per_second", "x-limit-per-second"), ("remaining_this_second", "x-remaining-this-second")):
@@ -77,6 +83,67 @@ def _note_quota(resp: httpx.Response) -> None:
 def etsy_quota() -> dict | None:
     """What Etsy last said about this app's quota, or None before any call since the server started."""
     return dict(ETSY_QUOTA) or None
+
+
+# Real Etsy requests per UTC day, client and tool, refusals included (2026-10-23: 3,600 of the 5,000 a day were gone
+# with no way to say who used them). One tool call can make several requests (shop.get makes 4), so this counts what
+# Etsy counts, not tool calls. Kept for KEEP_DAYS.
+_REQ_LOCK = threading.Lock()
+KEEP_DAYS = 14
+# Background work has no tool of its own (2026-10-23: 73 of 342 requests were "?"): the approvals queue, signals and
+# the token refresh name themselves. (tag, force): force wins over the tool; otherwise the tag is only used outside one.
+_COUNT_AS: contextvars.ContextVar[tuple[str, bool] | None] = contextvars.ContextVar("etsy_count_as", default=None)
+
+
+@contextlib.contextmanager
+def counted_as(tag: str, force: bool = False):
+    token = _COUNT_AS.set((tag, force))
+    try:
+        yield
+    finally:
+        _COUNT_AS.reset(token)
+
+
+def _requests_file() -> Path:
+    from paths import data_path
+    return Path(os.environ.get("ETSY_REQUESTS_FILE") or data_path("usage/etsy_requests.json"))
+
+
+def _read_requests() -> dict:
+    try:
+        d = json.loads(_requests_file().read_text(encoding="utf-8"))
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _count_request(status: int) -> None:
+    import clients
+    client = clients.current_client.get() or "owner"
+    tag, force = _COUNT_AS.get() or ("", False)
+    tool = (force and tag) or clients.current_tool.get() or tag or "?"
+    day = time.strftime("%Y-%m-%d", time.gmtime())
+    with _REQ_LOCK:
+        d = _read_requests()
+        row = d.setdefault(day, {}).setdefault(client, {}).setdefault(tool, {"requests": 0, "refused_429": 0})
+        row["requests"] += 1
+        row["refused_429"] += status == 429
+        for old in sorted(d)[:-KEEP_DAYS]:
+            del d[old]
+        path = _requests_file()
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(d), encoding="utf-8")
+            tmp.replace(path)
+        except OSError:
+            pass  # counting never stops the call
+
+
+def etsy_requests(day: str = "") -> dict:
+    """{client: {tool: {"requests", "refused_429"}}} for one UTC day (default today)."""
+    with _REQ_LOCK:
+        return _read_requests().get(day or time.strftime("%Y-%m-%d", time.gmtime()), {})
 
 
 def request(service: str, method: str, path: str, *, headers: dict, secrets: tuple[str, ...],
@@ -102,6 +169,7 @@ def request(service: str, method: str, path: str, *, headers: dict, secrets: tup
         raise CommerceError(f"{name} answered from an unexpected host; ignored")
     if service == "etsy":
         _note_quota(resp)
+        _count_request(resp.status_code)
     if 300 <= resp.status_code < 400:
         raise CommerceError(f"{name} tried to redirect (HTTP {resp.status_code}); redirects are refused")
     if resp.status_code >= 400:

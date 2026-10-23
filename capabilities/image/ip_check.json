@@ -39,6 +39,11 @@
       "type": "array",
       "required": false,
       "default": null
+    },
+    "garment": {
+      "type": "string",
+      "required": false,
+      "default": ""
     }
   },
   "execution": {

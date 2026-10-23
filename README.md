@@ -306,13 +306,17 @@ docker compose up -d                 # listens on 127.0.0.1:8765
 
 Then, on the machine where your AI app runs (the same machine here):
 
+Put the token `init` printed in an environment variable named `HOMESHED_TOKEN` (in your shell profile), open a new
+terminal, and run:
+
 ```bash
-claude mcp add -s user --transport http homeshed-mcp http://127.0.0.1:8765/mcp --header "Authorization: Bearer YOUR_TOKEN"
+claude mcp add -s user --transport http homeshed-mcp 'http://127.0.0.1:8765/mcp' --header 'Authorization: Bearer ${HOMESHED_TOKEN}'
 ```
-Replace `YOUR_TOKEN` with the token `init` printed. The server keeps its copy in `.env` (git ignores it; back it up,
-since `init` shows the token only once). On the app's side, keep the token in an environment variable rather than a
-file you might share: to share the setup with a team, commit a `.mcp.json` that names the variable
-(`"Authorization": "Bearer ${MCP_TOKEN}"`), never the token itself. To connect from other machines, see
+Keep the single quotes: Claude Code then saves only the variable's name and reads the token when it connects, so the
+token never goes into its settings file. The server keeps its copy in `.env` (git ignores it; back it up, since
+`init` shows the token only once). To share the setup with a team, commit a `.mcp.json` that names the variable
+(`"Authorization": "Bearer ${HOMESHED_TOKEN}"`), never the token itself. Better still, give each app its own key:
+[Connect Claude Code to your server](docs/configuration.md#claude-code-server). To connect from other machines, see
 [configuration](docs/configuration.md#http-and-docker).
 
 ### Add the Control Panel (optional)

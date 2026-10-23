@@ -22,7 +22,7 @@ for var, name in (("USAGE_FILE", "usage.json"), ("CLIENTS_FILE", "clients.json")
                   ("PRINTIFY_PENDING_FILE", "printify_pending.json"), ("PRINTIFY_PUBLISHED_FILE", "printify_published.json"),
                   ("PRINTIFY_DECISIONS_FILE", "printify_decisions.json"), ("PRINTIFY_EDITS_FILE", "printify_edits.json"),
                   ("ETSY_ATTRIBUTES_FILE", "etsy_attributes.json"), ("ETSY_DEACTIVATED_FILE", "etsy_deactivated.json"),
-                  ("ETSY_CONNECTION_FILE", "etsy_connection.json")):
+                  ("ETSY_CONNECTION_FILE", "etsy_connection.json"), ("ETSY_REQUESTS_FILE", "etsy_requests.json")):
     os.environ[var] = os.path.join(_STATE, name)
 
 

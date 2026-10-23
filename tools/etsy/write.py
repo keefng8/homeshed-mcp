@@ -355,7 +355,7 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
             "images_alt": alts}
     held = None
     if removes and _automatic(owner_approval):  # a machine never approves a delete outside a guarded swap
-        held = (_hero_swap_problem(removes, new_images, listed) if hero_swap and not swap
+        held = (_hero_swap_problem(removes, new_images, listed, alts) if hero_swap and not swap
                 else _swap_problem(swap, removes, new_images, listed)) or None
         if held:
             owner_approval = None
@@ -425,7 +425,7 @@ def hero_alt() -> re.Pattern:
         return re.compile(HERO_ALT_DEFAULT, re.IGNORECASE)
 
 
-def _hero_swap_problem(removes: list[int], new_images: list[dict], listed: list) -> str:
+def _hero_swap_problem(removes: list[int], new_images: list[dict], listed: list, alts: list[dict] | None = None) -> str:
     """Why an automatic approval can't swap this hero for its barred copy, or "" when every guard passes (2026-10-22:
     one out, one in, both read as a hero, rank 1, and a non-AI photo stays)."""
     HERO_ALT = hero_alt()
@@ -439,9 +439,13 @@ def _hero_swap_problem(removes: list[int], new_images: list[dict], listed: list)
         return "the added photo's alt text doesn't read as a hero: it waits for the owner"
     if photo.get("rank") != 1:
         return f"the hero is at rank {photo.get('rank')}: a hero swap deletes only rank 1, it waits for the owner"
-    others = [str(p.get("alt_text") or "").lower() for p in listed
+    # Each photo that stays, with the alt text it will have after this request (images_alt may set it in the same
+    # call: 2026-10-23, the Labrador mockup's alt was blank until then). A blank alt counts as non-AI: a hero always
+    # carries its hero wording, and Printify's mockups arrive with none.
+    new_alt = {a["listing_image_id"]: a["alt_text"] for a in alts or []}
+    others = [str(new_alt.get(int(p.get("listing_image_id") or 0), p.get("alt_text")) or "").lower() for p in listed
               if isinstance(p, dict) and int(p.get("listing_image_id") or 0) != removes[0]]
-    if not any(a and not HERO_ALT.search(a) and not any(w in a for w in NOT_A_MOCKUP) for a in others):
+    if not any(not HERO_ALT.search(a) and not any(w in a for w in NOT_A_MOCKUP) for a in others):
         return "no non-AI photo (the mockup) would stay on the listing: it waits for the owner"
     if len(_swaps_today()) >= swap_daily_max():
         return f"{swap_daily_max()} automatic swaps in the last 24 hours: this one waits for the owner"

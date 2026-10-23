@@ -81,12 +81,35 @@ def test_clear_image_with_the_schema_and_cached_rules(fake):
     ("upload", {"person": "a real face"}, "person"),
     ("upload", {"child": "a child"}, "clear"),         # upload/design: a child is a person case, not its own flag
     ("design", {"character": "a cartoon mouse", "unsafe": "weapon"}, "unsafe"),
+    # copyright (2026-10-23): someone else's photo or artwork
+    ("upload", {"watermark": "stock agency mark", "person": "a face"}, "watermark"),
+    ("upload", {"artwork": "a photo of a poster", "brand": "logo"}, "artwork"),
+    ("upload", {"celebrity": "a famous singer", "watermark": "x", "person": "x"}, "celebrity"),
+    ("upload", {"unsafe": "partial nudity", "celebrity": "x"}, "unsafe"),
+    ("design", {"artwork": "it is a design"}, "clear"),   # every design is artwork: it doesn't count there
+    ("hero", {"watermark": "the shop's tiled mark"}, "clear"),
+    ("hero", {"unsafe": "nudity", "child": "a child"}, "unsafe"),
 ])
 def test_the_worst_flag_for_the_context_wins(fake, context, found, verdict):
     fake.answers = [flags(**found)]
     out = ic.ip_check(image_b64=png(), purpose=context)
     assert out["verdict"] == verdict
     assert set(out["flags"]) == {k for k in found if k in ic.ORDER[context]}
+
+
+@pytest.mark.parametrize("purpose,garment,found,verdict,named", [
+    ("hero", "hoodie", {"garment": "shows a t-shirt", "brand": "logo"}, "garment", True),
+    ("hero", "Hoodie", {"garment": "shows a t-shirt", "print_covered": "a cord"}, "covered", True),
+    ("hero", "", {"garment": "x"}, "clear", False),           # no garment named: the flag doesn't count
+    ("hero", "jacket", {"garment": "x"}, "clear", False),     # an unknown value is ignored
+    ("upload", "tee", {"garment": "x"}, "clear", False),      # hero only
+])
+def test_garment_flags_another_garment_type_on_a_hero(fake, purpose, garment, found, verdict, named):
+    fake.answers = [flags(**found)]
+    out = ic.ip_check(image_b64=png(), purpose=purpose, garment=garment)
+    assert out["ok"] is True and out["verdict"] == verdict
+    assert ("garment" in out["flags"]) is (named and "garment" in found)
+    assert ("The listing's garment is" in fake.calls[0]["messages"][0]["content"][0]["text"]) is named
 
 
 def test_print_box_sends_a_close_crop_too(fake):

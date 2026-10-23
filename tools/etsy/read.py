@@ -45,7 +45,9 @@ def shop_get() -> dict:
          {"last_24h", "daily_max" (ETSY_EDIT_DAILY_MAX), "queued" (approved, waiting for room under the limit),
          "waiting_for_owner"}, "api_quota": what Etsy's own headers said on the server's last Etsy call (refusals
          included): {"limit_per_day", "remaining_today", "limit_per_second", "remaining_this_second", "seen_at",
-         "last_status"}, or null before any call since the server started; throttle on remaining_today}
+         "last_status"}, or null before any call since the server started; throttle on remaining_today,
+         "api_requests_today": real Etsy requests this UTC day by client and tool, refusals included:
+         {client: {tool: {"requests", "refused_429"}}} (one tool call can be several requests; shop.get is 4)}
     """
     sid = et.shop_id()
     s = et.get(f"/v3/application/shops/{sid}", oauth=False) or {}
@@ -69,7 +71,8 @@ def shop_get() -> dict:
                     for r in rows or [] if isinstance(r, dict)][:30]
     except h.CommerceError:
         sections = None
-    return et.note({"listing_edits": _listing_edits(), "api_quota": h.etsy_quota(), "shop_id": s.get("shop_id"), "shop_name": s.get("shop_name"), "title": h.trim(s.get("title"), 120),
+    return et.note({"listing_edits": _listing_edits(), "api_quota": h.etsy_quota(),
+                    "api_requests_today": h.etsy_requests(), "shop_id": s.get("shop_id"), "shop_name": s.get("shop_name"), "title": h.trim(s.get("title"), 120),
                     "return_policies": returns, "sections": sections,
                     "currency": s.get("currency_code"), "active_listings": s.get("listing_active_count"),
                     "sold": s.get("transaction_sold_count"), "review_average": s.get("review_average"),

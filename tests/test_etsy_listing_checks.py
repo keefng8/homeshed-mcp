@@ -203,6 +203,41 @@ def test_shop_get_shows_etsys_own_quota_headers_including_from_a_429(monkeypatch
     assert er.shop_get()["api_quota"]["remaining_today"] == 0
 
 
+def test_every_real_etsy_request_is_counted_per_day_client_and_tool_429s_included(monkeypatch, tmp_path):
+    """2026-10-23: 3,600 of the day's 5,000 requests were gone with no way to say who made them."""
+    import httpx
+    import clients
+    from tools.commerce import _http as h
+    monkeypatch.setenv("ETSY_REQUESTS_FILE", str(tmp_path / "req.json"))
+    monkeypatch.setattr(h, "_TRANSPORT", httpx.MockTransport(
+        lambda req: httpx.Response(429 if req.url.path.endswith("/refused") else 200, json={})))
+    tc, tt = clients.current_client.set("app-1"), clients.current_tool.set("etsy.listing.get")
+    try:
+        h.request("etsy", "GET", "/v3/application/ok", headers={}, secrets=())
+        with pytest.raises(h.CommerceError):
+            h.request("etsy", "GET", "/v3/application/refused", headers={}, secrets=())
+    finally:
+        clients.current_client.reset(tc)
+        clients.current_tool.reset(tt)
+    h.request("etsy", "GET", "/v3/application/ok", headers={}, secrets=())  # the owner, no tool
+    h.request("printify", "GET", "/v1/ok", headers={}, secrets=())          # not Etsy: not counted
+    assert h.etsy_requests() == {"app-1": {"etsy.listing.get": {"requests": 2, "refused_429": 1}},
+                                 "owner": {"?": {"requests": 1, "refused_429": 0}}}
+    with h.counted_as("approvals:etsy"):  # background work names itself; a running tool still wins
+        h.request("etsy", "GET", "/v3/application/ok", headers={}, secrets=())
+        tt = clients.current_tool.set("etsy.listing.update")
+        h.request("etsy", "GET", "/v3/application/ok", headers={}, secrets=())
+        with h.counted_as("etsy.token_refresh", force=True):  # forced: wins over the tool
+            h.request("etsy", "GET", "/v3/application/ok", headers={}, secrets=())
+        clients.current_tool.reset(tt)
+    owner = h.etsy_requests()["owner"]
+    assert {k: v["requests"] for k, v in owner.items()} == {"?": 1, "approvals:etsy": 1, "etsy.listing.update": 1,
+                                                           "etsy.token_refresh": 1}
+    monkeypatch.setattr(er.et, "shop_id", lambda: "1")
+    monkeypatch.setattr(er.et, "get", lambda path, params=None, oauth=True: {"shop_id": 1})
+    assert er.shop_get()["api_requests_today"]["app-1"]["etsy.listing.get"]["requests"] == 2
+
+
 def test_ledger_shows_what_etsy_charged_in_pounds_with_a_sum_per_type(monkeypatch):
     """2026-10-14: an app's spend tile estimated Etsy fees (20c a listing + VAT); the ledger has the real ones."""
     calls = []

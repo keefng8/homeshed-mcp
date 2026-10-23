@@ -6,6 +6,41 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-23
+
+### Security
+- Every code-scanning finding on the repository is fixed:
+  - `network.exposure_check` no longer calls a redirect "protected (Cloudflare Access)" just because that name
+    appears somewhere in the address. It checks the redirect's real host, and looks for sign-in words in the path
+    only.
+  - Control Panel errors go through one helper, which removes addresses, paths and tracebacks and keeps the detail
+    in the log.
+  - Sign-in failures show a fixed sentence, never the provider's text.
+  - Session keys are signed with HMAC. **You'll be signed out of the Control Panel once after upgrading.**
+  - The first-run panel password is written to a private file (`/data/first-run-password.txt` in Docker) instead of
+    the log, and the file is deleted when you change the password
+    ([panel README](panel/README.md)).
+  - Long inputs are refused before a pattern match that could slow down on them.
+
+### Added
+- HomeShed now tells connecting apps which tool groups it has and to use `registry.find` to pick one, so an app's
+  tool search finds the right tool.
+- `image.ip_check`: copyright verdicts `celebrity`, `watermark` and `artwork`, and `unsafe` now covers partial
+  nudity. A `garment` option for hero photos (`tee`, `hoodie`, `sweatshirt`, `kids_tee`) flags a scene showing a
+  different garment.
+- `etsy.shop.get`: `api_requests_today`, the real Etsy requests made today by each app and tool, refusals included.
+
+### Fixed
+- `image.ip_check`: `artwork` means someone else's identifiable work, not any polished illustration, and `watermark`
+  needs a visible mark, so clear original designs are no longer flagged.
+- `etsy.listing.update` `hero_swap`: the photo that stays is judged by its alt text after this request's changes, and
+  a photo with no alt text counts as not AI-made.
+
+### Changed
+- README and the plugin's setup skill: connecting Claude Code to your own server keeps the key in an environment
+  variable (`HOMESHED_TOKEN`), never in a settings file or the chat, and the skill never repeats a key back.
+- The Claude Code plugin runs HomeShed 0.6.1.
+
 ## [0.6.0] - 2026-10-22
 
 Highlights: Claude joins the model relay, a vision check for images before they're listed, and a reminder that since

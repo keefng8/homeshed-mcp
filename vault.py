@@ -355,7 +355,8 @@ def _secret_one(name: str) -> str | None:
         try:
             return f.decrypt(entry["value"].encode("ascii")).decode("utf-8")
         except InvalidToken:
-            _logger.error("vault entry %s can't be decrypted: using the environment", name)
+            # never the entry's name next to a secret's (CodeQL clear-text-logging): Settings > Credentials shows which
+            _logger.error("a vault entry can't be decrypted (was the vault key changed?): using the environment")
     return os.environ.get(name)
 
 

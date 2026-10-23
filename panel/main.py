@@ -309,6 +309,21 @@ def _save_owner(password: str) -> None:
     os.chmod(tmp, 0o600)
     tmp.replace(OWNER_FILE)
     _owner_cache["key"] = None
+    FIRST_RUN_FILE.unlink(missing_ok=True)  # a chosen password: the made one is gone
+
+
+# The made first-run password lives here (owner-only) until the owner sets their own, never in the log: docker logs
+# kept it for good (CodeQL clear-text-logging, 2026-10-23).
+FIRST_RUN_FILE = PANEL_DATA_DIR / "first-run-password.txt"
+
+
+def _keep_first_run_password(password: str) -> Path:
+    FIRST_RUN_FILE.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(FIRST_RUN_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(password + "\n")
+    os.chmod(FIRST_RUN_FILE, 0o600)
+    return FIRST_RUN_FILE
 
 
 def first_run_password() -> str | None:
@@ -365,7 +380,9 @@ def _session_key() -> bytes:
     secret = (os.environ.get("DASHBOARD_SESSION_SECRET")
               or (f"session:{_server_secret()}:{DASHBOARD_PASSWORD}" if DASHBOARD_PASSWORD else "")
               or str((owner or {}).get("session_secret") or ""))
-    return hashlib.sha256(secret.encode()).digest() if secret else secrets.token_bytes(32)
+    # a keyed MAC, not a plain hash of the secret (CodeQL weak-sensitive-data-hashing, 2026-10-23: signs everyone out once)
+    return hmac.new(secret.encode(), b"homeshed-panel-session", hashlib.sha256).digest() if secret \
+        else secrets.token_bytes(32)
 
 
 def _revoked() -> dict[str, float]:
@@ -481,7 +498,7 @@ def _viewer_for_password(password: str) -> str | None:
 
 
 def _viewer_key(name: str, salt: str) -> bytes:
-    return hashlib.sha256(f"viewer-session:{name}:{salt}".encode()).digest()
+    return hmac.new(salt.encode(), f"viewer-session:{name}".encode(), hashlib.sha256).digest()
 
 
 def _make_session(days: int, role: str = "owner", name: str = "") -> str:
@@ -683,7 +700,7 @@ def _proxy_trusted(peer: str) -> bool:
             try:
                 _trusted_nets.append(ipaddress.ip_network(p, strict=False))
             except ValueError:
-                _log.warning("TRUSTED_PROXIES: %r isn't an address or range, ignored", p)
+                _log.warning("TRUSTED_PROXIES: an entry isn't an address or range, ignored")  # never the value
     try:
         ip = ipaddress.ip_address(peer)
     except ValueError:
@@ -803,9 +820,12 @@ async def login(request: Request):
         data = _load_viewers()
         data["viewers"][name]["last_login"] = time.time()
         _save_viewers(data)
-    resp = JSONResponse({"ok": True, "role": role})
-    resp.set_cookie(SESSION_COOKIE, _make_session(days, role, name or ""), max_age=days * 86400, httponly=True,
-                    samesite="lax", secure=https, path="/")
+    return _with_session(JSONResponse({"ok": True, "role": role}), _make_session(days, role, name or ""), days, https)
+
+
+def _with_session(resp: JSONResponse, token: str, days: int, https: bool) -> JSONResponse:
+    """The session cookie: only the signed token (expiry, role, a viewer's name and its HMAC), never a password."""
+    resp.set_cookie(SESSION_COOKIE, token, max_age=days * 86400, httponly=True, samesite="lax", secure=https, path="/")
     return resp
 
 
@@ -956,10 +976,7 @@ async def owner_password(request: Request):
     _save_owner(new)
     days = panel_value("session_days")
     https = request.headers.get("x-forwarded-proto") == "https" or request.url.scheme == "https"
-    resp = JSONResponse({"ok": True})
-    resp.set_cookie(SESSION_COOKIE, _make_session(days, "owner"), max_age=days * 86400, httponly=True,
-                    samesite="lax", secure=https, path="/")
-    return resp
+    return _with_session(JSONResponse({"ok": True}), _make_session(days, "owner"), days, https)
 
 
 # ---------------------------------------------------------------------------
@@ -1098,9 +1115,10 @@ async def _local_ai_poller() -> None:
 @app.on_event("startup")
 async def _start_poller() -> None:
     made = first_run_password()
-    if made:  # shown this once, where only whoever started the panel can see it (its terminal, or docker logs)
-        print(f"HomeShed Control Panel, first start: sign in with this password: {made}\n"
-              "It's shown only this once. Change it in Settings > Account and sharing.", flush=True)
+    if made:  # the log says where it is, never what it is
+        where = _keep_first_run_password(made)
+        print(f"HomeShed Control Panel, first start: your sign-in password is in {where} (readable by the owner "
+              "only). Change it in Settings > Account and sharing, and that file is deleted.", flush=True)
     asyncio.create_task(_local_ai_poller())
     for start in ADD_ONS["startup"]:
         start()
@@ -1249,7 +1267,7 @@ async def capabilities():
                 headers={"Host": MCP_HOST_HEADER, "Authorization": f"Bearer {MCP_AUTH_TOKEN}"},
             )
         except httpx.RequestError as exc:
-            return JSONResponse({"error": f"mcp-server unreachable: {exc}"}, status_code=502)
+            return _public_error(exc, 502, reached="mcp-server unreachable")
     if resp.status_code != 200:
         return JSONResponse({"error": f"mcp-server returned {resp.status_code}"}, status_code=502)
     return resp.json()
@@ -1442,7 +1460,7 @@ async def memory_category(category: str, request: Request, limit: int = 50, agen
                 },
             )
         except httpx.RequestError as exc:
-            return JSONResponse({"error": f"memory-core unreachable: {exc}"}, status_code=502)
+            return _public_error(exc, 502, reached="memory-core unreachable")
     if resp.status_code != 200:
         return JSONResponse({"error": f"memory-core returned {resp.status_code}"}, status_code=502)
     data = resp.json()
@@ -1463,7 +1481,7 @@ async def activity():
                 headers={"Host": MCP_HOST_HEADER, "Authorization": f"Bearer {MCP_AUTH_TOKEN}"},
             )
         except httpx.RequestError as exc:
-            return JSONResponse({"error": f"mcp-server unreachable: {exc}"}, status_code=502)
+            return _public_error(exc, 502, reached="mcp-server unreachable")
     if resp.status_code != 200:
         return JSONResponse({"error": f"mcp-server returned {resp.status_code}"}, status_code=502)
     return resp.json()
@@ -1544,10 +1562,10 @@ async def local_ai_usage():
 def _not_connected(exc: RuntimeError, marks: tuple, say: str = "") -> JSONResponse:
     """A companion that isn't connected (no Docker socket, no Kuma database) is "not set up" with what to connect, not
     a failure to retry (the prepper's clean-VM test, 2026-10-01)."""
-    text = _tool_message(exc)
-    if any(m in text for m in marks):
-        return JSONResponse({"error": say or text, "not_set_up": True})  # 200: not a failure (gate 6)
-    return JSONResponse({"error": text}, status_code=502)
+    if any(m in str(exc) for m in marks):
+        return _public_error(exc, 200, not_set_up=True) if not say else \
+            JSONResponse({"error": say, "not_set_up": True})  # 200: not a failure (gate 6)
+    return _public_error(exc)
 
 
 @app.get("/api/monitors")
@@ -1592,7 +1610,7 @@ async def docker_action(action: str, request: Request):
     try:
         return await _mcp_call_tool(f"docker.container.{action}", args)
     except RuntimeError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=502)
+        return _public_error(exc, 502)
 
 
 # ---------------------------------------------------------------------------
@@ -1614,7 +1632,7 @@ async def reasoning_solve(request: Request):
     try:
         return await _mcp_call_tool("reasoning.solve", args)
     except RuntimeError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=502)
+        return _public_error(exc, 502)
 
 
 @app.post("/api/reasoning/decompose")
@@ -1629,7 +1647,7 @@ async def reasoning_decompose(request: Request):
     try:
         return await _mcp_call_tool("reasoning.decompose_task", args)
     except RuntimeError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=502)
+        return _public_error(exc, 502)
 
 
 @app.post("/api/reasoning/route")
@@ -1646,7 +1664,7 @@ async def reasoning_route(request: Request):
     try:
         return await _mcp_call_tool("reasoning.route", args)
     except RuntimeError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=502)
+        return _public_error(exc, 502)
 
 
 @app.post("/api/reasoning/delegate")
@@ -1663,7 +1681,7 @@ async def reasoning_delegate(request: Request):
     try:
         return await _mcp_call_tool("reasoning.delegate", args)
     except RuntimeError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=502)
+        return _public_error(exc, 502)
 
 
 # ---------------------------------------------------------------------------
@@ -1697,7 +1715,7 @@ async def observations_list(status: str = "all"):
     try:
         return await _mcp_call_tool("observe.list", {"status": status, "limit": 200}, quiet=True)
     except RuntimeError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=502)
+        return _public_error(exc, 502)
 
 
 @app.post("/api/observations")
@@ -1713,7 +1731,7 @@ async def observations_log(request: Request):
     try:
         return await _mcp_call_tool("observe.log", args)
     except RuntimeError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=502)
+        return _public_error(exc, 502)
 
 
 @app.post("/api/observations/{obs_id}")
@@ -1728,7 +1746,7 @@ async def observations_update(obs_id: str, request: Request):
     try:
         return await _mcp_call_tool("observe.update", args)
     except RuntimeError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=502)
+        return _public_error(exc, 502)
 
 
 # The helper service on the owner's PC (optional): rule packs, guard modes, Claude's context and past sessions.
@@ -1950,7 +1968,7 @@ async def settings_put(request: Request):
         try:
             return {"source": source, "key": key, "value": panel_update({key: value})[key]}
         except ValueError as exc:
-            return JSONResponse({"error": str(exc)}, status_code=400)
+            return _public_error(exc, 400)
     if source not in ("main-pc", "tool-server"):
         return JSONResponse({"error": f"Unknown place: {source}"}, status_code=400)
     url, headers = ((f"{GPU_SERVICE_URL}/settings", _GPU_AUTH) if source == "main-pc"
@@ -2238,7 +2256,7 @@ async def run_tool(request: Request):
     try:
         result = await _mcp_call_tool(tool, args, timeout=RUN_TIMEOUT_S)
     except RuntimeError as exc:
-        return JSONResponse({"ok": False, "error": str(exc)[:2000], "ms": round((time.monotonic() - started) * 1000)})
+        return _public_error(exc, 200, ok=False, ms=round((time.monotonic() - started) * 1000))
     except httpx.TimeoutException:
         return JSONResponse({"ok": False, "error": f"No answer within {RUN_TIMEOUT_S} s. It may still be running.",
                              "ms": RUN_TIMEOUT_S * 1000})
@@ -2491,7 +2509,7 @@ async def apis_catalog():
     try:
         return await _mcp_call_tool("apis.list", {}, quiet=True)
     except RuntimeError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=502)
+        return _public_error(exc, 502)
 
 
 @app.get("/api/progress")
@@ -2504,7 +2522,7 @@ async def release_progress():
     try:
         data = await _mcp_call_tool("repo.progress", {}, quiet=True)
     except RuntimeError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=502)
+        return _public_error(exc, 502)
     rows = data.get("projects") if isinstance(data, dict) else None
     if rows and any(r.get("workspace") for r in rows):
         folders = await _project_folders()
@@ -2540,7 +2558,7 @@ async def release_progress_next(project: str, request: Request):
         return JSONResponse({"error": "no such project"}, status_code=404)
     body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     version = str((body or {}).get("version") or "").strip()
-    if not re.fullmatch(r"v?\d+(?:\.\d+){1,3}(?:[-+.][A-Za-z0-9.]{1,20})?", version):
+    if len(version) > 40 or not re.fullmatch(r"v?\d+(?:\.\d+){1,3}(?:[-+.][A-Za-z0-9.]{1,20})?", version):
         return JSONResponse({"error": "Give the next version, like v0.1.1."}, status_code=400)
     try:
         return await _mcp_call_tool("repo.progress_update", {
@@ -2548,7 +2566,7 @@ async def release_progress_next(project: str, request: Request):
             "next_step": f"Prep {version}: the agent reports its gates", "note": f"started {version} from the panel"},
             quiet=True)
     except RuntimeError as exc:
-        return JSONResponse({"error": _tool_message(exc)}, status_code=502)
+        return _public_error(exc, 502)
 
 
 @app.get("/api/progress/{project}")
@@ -2559,15 +2577,28 @@ async def release_progress_one(project: str):
     try:
         return await _mcp_call_tool("repo.progress", {"project": project}, quiet=True)
     except RuntimeError as exc:
-        message = _tool_message(exc)
-        return JSONResponse({"error": message}, status_code=404 if "no progress" in message else 502)
+        return _public_error(exc, 404 if "no progress" in str(exc) else 502)
 
 
 TODO_PRO_ONLY = "comes with HomeShed Pro"  # the todo.* tools' refusal on the free plan (mcp-server tools/todo/store.py)
 
 
+# What a failed call may show (CodeQL stack-trace-exposure, 2026-10-23): the tool's own sentence, without links,
+# addresses, file paths or a traceback. The full text goes to the panel's log instead.
+_PRIVATE_BITS = re.compile(r"\b(?:https?|wss?)://\S+|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b|\[[0-9A-Fa-f:]+\](?::\d+)?"
+                           r"|(?<![\w.])(?:/[\w.-]+){2,}|\b[A-Za-z]:\\\S+")
+
+
 def _tool_message(exc: Exception) -> str:
-    return re.sub(r"^Error executing tool [^:]+: ", "", str(exc))
+    detail = str(exc)
+    _log.warning("a panel call failed: %s", detail[:2000])
+    text = re.sub(r"^Error executing tool [^:]+: ", "", detail).split("Traceback (most recent call last)")[0]
+    return _PRIVATE_BITS.sub("<hidden>", text).strip()[:500] or "It didn't work; the panel's log has the detail."
+
+
+def _public_error(exc: Exception, status: int = 502, **extra) -> JSONResponse:
+    """The one way a route answers with a failure it caught."""
+    return JSONResponse({"error": _tool_message(exc), **extra}, status_code=status)
 
 
 @app.get("/api/todo")
@@ -2584,7 +2615,7 @@ async def todo_list(status: str = "open"):
             return {"pro": False, "note": _tool_message(exc)}
         if re.search(r"(?i)unknown tool", str(exc)):  # the public build ships without the Pro todo.* tools
             return {"pro": False, "note": "The to-do list comes with HomeShed Pro."}
-        return JSONResponse({"error": _tool_message(exc)}, status_code=502)
+        return _public_error(exc, 502)
 
 
 @app.post("/api/todo")
@@ -2596,7 +2627,7 @@ async def todo_add(request: Request):
     try:
         return await _mcp_call_tool("todo.add", args)
     except RuntimeError as exc:
-        return JSONResponse({"error": _tool_message(exc)}, status_code=502)
+        return _public_error(exc, 502)
 
 
 @app.get("/api/todo/runner")
@@ -2640,7 +2671,7 @@ async def todo_change(item_id: int, request: Request):
     try:
         return await _mcp_call_tool("todo.update", args)
     except RuntimeError as exc:
-        return JSONResponse({"error": _tool_message(exc)}, status_code=502)
+        return _public_error(exc, 502)
 
 
 @app.get("/api/connections")
@@ -2779,7 +2810,7 @@ async def todo_replies():
     except RuntimeError as exc:
         if TODO_PRO_ONLY in str(exc) or re.search(r"(?i)unknown tool", str(exc)):
             return {"replies": [], "count": 0, "seen_at": seen}
-        return JSONResponse({"error": _tool_message(exc)}, status_code=502)
+        return _public_error(exc, 502)
     rows = []
     for item in data.get("items") or []:
         comments = [c for c in item.get("comments") or [] if isinstance(c, dict)]
@@ -2867,13 +2898,27 @@ async def etsy_finish(request: Request):
     return await _mcp_admin("POST", "/etsy/finish", {"url": str((body or {}).get("url") or "")[:2000]})
 
 
+# A sign-in that came back with an error: Settings shows a fixed sentence for the OAuth error code (RFC 6749 4.1.2.1),
+# never the provider's own text in the address (CodeQL url-redirection, 2026-10-23). The detail goes to the log.
+SIGN_IN_ERRORS = {"access_denied": "you said no on the sign-in page",
+                  "invalid_request": "the sign-in request was refused", "unauthorized_client": "this app isn't allowed",
+                  "invalid_scope": "the app asked for access it doesn't have", "server_error": "the site had a problem",
+                  "temporarily_unavailable": "the site is busy: try again", "": "no sign-in code came back"}
+
+
+def _sign_in_failed(service: str, error: str, code: str) -> RedirectResponse:
+    from urllib.parse import quote
+    _log.warning("%s sign-in came back with %r", service, error[:80])
+    why = SIGN_IN_ERRORS.get(error, "the sign-in didn't finish") if error else SIGN_IN_ERRORS[""]
+    return RedirectResponse(f"/#settings?{service}=failed&why={quote(why)}", status_code=303)
+
+
 @app.get("/api/etsy/callback")
 async def etsy_callback(code: str = "", state: str = "", error: str = "", error_description: str = ""):
     """Where Etsy sends the browser back (the panel on https). Finishes, then lands on Settings with the result."""
     from urllib.parse import quote
     if error or not code:
-        why = error_description or error or "Etsy sent no code"
-        return RedirectResponse(f"/#settings?etsy=failed&why={quote(why[:200])}", status_code=303)
+        return _sign_in_failed("etsy", error, code)
     resp = await _mcp_admin("POST", "/etsy/finish", {"code": code[:500], "state": state[:200]})
     try:
         data = json.loads(resp.body)
@@ -2907,8 +2952,7 @@ async def threads_callback(code: str = "", state: str = "", error: str = "", err
     """Where Threads sends the browser back (the panel on https)."""
     from urllib.parse import quote
     if error or not code:
-        why = error_description or error or "Threads sent no code"
-        return RedirectResponse(f"/#settings?threads=failed&why={quote(why[:200])}", status_code=303)
+        return _sign_in_failed("threads", error, code)
     resp = await _mcp_admin("POST", "/threads/finish", {"code": code[:600], "state": state[:200]})
     try:
         data = json.loads(resp.body)
@@ -2942,8 +2986,7 @@ async def instagram_callback(code: str = "", state: str = "", error: str = "", e
     """Where Instagram sends the browser back (the panel on https)."""
     from urllib.parse import quote
     if error or not code:
-        why = error_description or error or "Instagram sent no code"
-        return RedirectResponse(f"/#settings?instagram=failed&why={quote(why[:200])}", status_code=303)
+        return _sign_in_failed("instagram", error, code)
     resp = await _mcp_admin("POST", "/instagram/finish", {"code": code[:600], "state": state[:200]})
     try:
         data = json.loads(resp.body)
@@ -2979,8 +3022,7 @@ async def pinterest_callback(code: str = "", state: str = "", error: str = "", e
     """Where Pinterest sends the browser back (the panel on https)."""
     from urllib.parse import quote
     if error or not code:
-        why = error_description or error or "Pinterest sent no code"
-        return RedirectResponse(f"/#settings?pinterest=failed&why={quote(why[:200])}", status_code=303)
+        return _sign_in_failed("pinterest", error, code)
     resp = await _mcp_admin("POST", "/pinterest/finish", {"code": code[:600], "state": state[:200]})
     try:
         data = json.loads(resp.body)

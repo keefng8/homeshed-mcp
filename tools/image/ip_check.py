@@ -32,34 +32,56 @@ For each question first write a short note (under 15 words) saying what you see 
 false to match the note.
 
 brand: a recognisable logo, wordmark, trademark, team or club badge, or a famous product design (on the print, on
-clothing, on objects or signs anywhere in the image). Plain generic text or shapes are not a brand.
+clothing, on objects or signs anywhere in the image). Plain generic text or shapes are not a brand, and nor is a
+faint word repeated across the whole image: that is a watermark (see watermark), never a brand.
 character: a cartoon, film, TV, game, anime, comic or toy character, a mascot, or fan art that is close enough to be
 recognised as one. Generic animals, people or creatures drawn in a common style are not characters.
-person: a real, identifiable person's face as the subject (a photo of a real individual or a celebrity likeness).
-unsafe: sexual or nude content, hate symbols, graphic violence, drugs, or weapons as the focus.
+person: a real, identifiable person's face as the subject (a photo of a real individual).
+celebrity: a famous person or public figure (an actor, musician, athlete, politician, influencer, royal), in a photo
+or as a drawing or likeness close enough to be recognised. An ordinary private person is not a celebrity.
+watermark: a mark you can actually see and point to: a stock agency's name or logo, faint text or a pattern repeated
+across the image, a photographer's signature, or a copyright line. A photo that merely looks polished or professional
+but carries no visible mark is false.
+artwork: someone else's identifiable finished work: a known painting or artwork, a film, game, book or album cover, a
+poster or print with a credit, signature or title on it, stock art with its source shown, a screenshot (app or game
+interface, browser, phone screen), or a photo of a screen. A polished illustration or design by itself is NOT artwork,
+whatever its style (pop art, retro, cartoon); nor is a drawing that is clearly the customer's own.
+unsafe: sexual content, nudity or partial nudity, hate symbols, graphic violence, drugs, or weapons as the focus.
 child: anyone who looks under 18, a child-sized person, or a baby, anywhere in the image, including small, partly
 hidden or blurred figures in the background.
 print_covered: anything lying over any part of the printed design on the garment, hiding even a small part of it:
 drawstrings, cords, a scarf or its fringe, hair, a hand or arm, a bag strap, a fold or crease, jewellery, or another
 object. Check every edge of the print, especially the top edge near the neck and the sides. Something hanging near
 the print without overlapping it is false. If no print is visible, answer false and say so in the note.
+garment: only when the request names the listing's garment. The garment the model is wearing is clearly a different
+type (a t-shirt where a hoodie is named: no hood and no front pocket; a crew-neck tee where a sweatshirt is named:
+short sleeves). Colour, fit and print don't count here. If no garment is named, answer false.
 
 Also give confidence: how sure you are of the whole answer, from 0 to 1. Be strict: if you are unsure whether
 something is there, answer found true and lower the confidence.
 
 Reply in the JSON shape you are given."""
 
-FLAGS = ("brand", "character", "person", "unsafe", "child", "print_covered")
+FLAGS = ("brand", "character", "person", "celebrity", "watermark", "artwork", "unsafe", "child", "print_covered",
+         "garment")
+# hero only (2026-10-23): the garment the listing sells, so a scene showing another type is caught (image.compare
+# checks the print and colour, not the garment). An unknown value is ignored, as if none was given.
+GARMENTS = {"tee": "a t-shirt (short sleeves, no hood)", "hoodie": "a hoodie (a hood, usually a front pocket)",
+            "sweatshirt": "a crew-neck sweatshirt (long sleeves, no hood)",
+            "kids_tee": "a children's t-shirt (short sleeves, no hood)"}
 _FLAG = {"type": "object", "properties": {"note": {"type": "string"}, "found": {"type": "boolean"}},
          "required": ["note", "found"], "additionalProperties": False}
 SCHEMA = {"type": "object", "properties": {**{f: _FLAG for f in FLAGS}, "confidence": {"type": "number"}},
           "required": [*FLAGS, "confidence"], "additionalProperties": False}
 
 # Which flags count, worst first, per purpose. A lifestyle hero has a model in it by design (an AI person), so
-# "person" doesn't count there; a child or a covered print does.
-ORDER = {"upload": ("unsafe", "character", "brand", "person"),
-         "design": ("unsafe", "character", "brand", "person"),
-         "hero": ("unsafe", "child", "print_covered", "character", "brand")}
+# "person" doesn't count there; a child or a covered print does. Copyright (2026-10-23): someone else's photo or art
+# (celebrity, watermark, artwork) counts on an upload; a design can't carry a watermark or a celebrity ("artwork" would
+# fire on every design); a hero carries the shop's own tiled watermark, so "watermark" doesn't count there.
+# "person" stays last: the verdict is "person" only when nothing worse is there, so a caller may allow it.
+ORDER = {"upload": ("unsafe", "celebrity", "watermark", "artwork", "character", "brand", "person"),
+         "design": ("unsafe", "celebrity", "watermark", "character", "brand", "person"),
+         "hero": ("unsafe", "child", "print_covered", "garment", "celebrity", "character", "brand")}
 VERDICT = {"print_covered": "covered"}
 
 
@@ -126,7 +148,7 @@ def _parse(text: str) -> dict:
 
 @tool(name="ip_check", category="image", doc="image/ip_check.md")
 def ip_check(image_name: str = "", image_b64: str = "", purpose: str = "upload",
-             print_box: list[int] | None = None) -> dict:
+             print_box: list[int] | None = None, garment: str = "") -> dict:
     """Vision check before listing: a brand, a known character, a real person or unsafe content in an image, and for a
     lifestyle hero photo a visible child (blurred background included) or something covering the print. Claude Haiku
     through the llm relay (about $0.0005 a call). Fail closed: ok false means the
@@ -139,9 +161,12 @@ def ip_check(image_name: str = "", image_b64: str = "", purpose: str = "upload",
             photo with a model in it: a person doesn't count, a child or a covered print does).
         print_box: hero only, optional: [x0, y0, x1, y1], the print's box in the image's pixels from image.compare;
             a close crop of it is checked too, for strings, a scarf, hair or a hand over the print.
+        garment: hero only, optional: "tee", "hoodie", "sweatshirt" or "kids_tee", the garment the listing sells;
+            a scene showing another type gives verdict "garment". Any other value is ignored.
 
     Returns:
-        {"ok": true, "verdict": "clear"|"brand"|"character"|"person"|"unsafe"|"child"|"covered", "confidence": 0-1,
+        {"ok": true, "verdict": "clear"|"brand"|"character"|"person"|"celebrity"|"watermark"|"artwork"|"unsafe"|"child"|
+         "covered"|"garment", "confidence": 0-1,
          "found": "what and where", "flags": {name: note} for every flag that counts here, "model", "cost_usd"},
         or {"ok": false, "verdict": null, "reason"}.
     """
@@ -151,13 +176,16 @@ def ip_check(image_name: str = "", image_b64: str = "", purpose: str = "upload",
         return _fail("give exactly one of image_name or image_b64")
     if print_box and purpose != "hero":
         return _fail('print_box goes with purpose "hero"')
+    wear = GARMENTS.get(str(garment or "").strip().lower(), "") if purpose == "hero" else ""
     try:
         urls, size = _images(_load(image_name, image_b64), print_box)
     except ValueError as exc:
         return _fail(str(exc))
     ask = (f'Purpose: {purpose}. The image is {size[0]}x{size[1]} px.'
            + (" The second image is a close crop of the print." if len(urls) > 1 else "")
+           + (f" The listing's garment is {wear}." if wear else "")
            + " Check it against every rule.")
+    order = tuple(k for k in ORDER[purpose] if k != "garment" or wear)
     parts = [{"type": "input_text", "text": ask}] + [{"type": "input_image", "image_url": u} for u in urls]
     import clients
     from tools.llm import providers as llm
@@ -179,7 +207,7 @@ def ip_check(image_name: str = "", image_b64: str = "", purpose: str = "upload",
             if out["incomplete"]:
                 raise ValueError("the answer was cut off")
             d = _parse(out["text"])
-            flags = {k: str((d.get(k) or {}).get("note") or "")[:120] for k in ORDER[purpose]
+            flags = {k: str((d.get(k) or {}).get("note") or "")[:120] for k in order
                      if (d.get(k) or {}).get("found") is True}
             conf = max(0.0, min(1.0, float(d.get("confidence"))))
             break
@@ -187,7 +215,7 @@ def ip_check(image_name: str = "", image_b64: str = "", purpose: str = "upload",
             why = str(exc)
     else:
         return _fail(f"the model's answer couldn't be read ({why})")
-    worst = next((k for k in ORDER[purpose] if k in flags), None)
+    worst = next((k for k in order if k in flags), None)
     return {"ok": True, "verdict": VERDICT.get(worst, worst) if worst else "clear", "confidence": round(conf, 2),
             "found": flags.get(worst, "") if worst else "", "flags": flags, "model": MODEL,
             "cost_usd": round(cost, 6)}

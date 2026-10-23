@@ -69,9 +69,15 @@ def verdict(path: str, status: int, location: str, body: str, catch_all: bool) -
             return "OPEN: a secret file is readable" if SECRET_BODIES[path].search(body) else "answers, but not with that file"
         return "answers every path (catch-all page)" if catch_all else "OPEN: answers without signing in"
     if status in (301, 302, 303, 307, 308):
-        if "cloudflareaccess.com" in location:
+        # the host and path of the redirect, never its query: https://x.com/?cloudflareaccess.com isn't Access (CodeQL #36)
+        try:
+            where = urlsplit(location)
+            target, where_path = (where.hostname or "").lower(), where.path
+        except ValueError:
+            target, where_path = "", ""
+        if target == "cloudflareaccess.com" or target.endswith(".cloudflareaccess.com"):
             return "protected (Cloudflare Access)"
-        return "protected (redirects to a sign-in page)" if re.search(r"(?i)log-?in|sign-?in|auth", location) \
+        return "protected (redirects to a sign-in page)" if re.search(r"(?i)log-?in|sign-?in|auth", where_path) \
             else f"redirects to {location[:80] or 'somewhere'}"
     if status in (401, 403):
         return "protected"

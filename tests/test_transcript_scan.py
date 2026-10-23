@@ -47,7 +47,8 @@ def test_no_secret_ever_comes_back(config):
     assert key not in json.dumps(out) and key[4:12] not in json.dumps(out)
     row = out["checks"][0]
     assert (row["kind"], row["prefix"], row["length"]) == ("Anthropic API key", key[:4], len(key))
-    assert len(row["fingerprint"]) == 12 and "console.anthropic.com" in out["actions"]["Anthropic API key"]
+    assert len(row["fingerprint"]) == 12
+    assert out["actions"]["Anthropic API key"] == "rotate it at console.anthropic.com > API keys"
     assert "action" not in row  # said once per kind in `actions`, not in every row
 
 

@@ -43,13 +43,14 @@ under **Settings > Account and sharing**.
    docker compose --profile panel up -d
    ```
 
-2. Find the first-run password (it's printed once):
+2. Show the first-run password (the panel made it on its first start and keeps it in a file only it can read):
 
    ```
-   docker compose logs panel
+   docker compose exec panel cat /data/first-run-password.txt
    ```
 
-3. Open http://127.0.0.1:9090 and sign in.
+3. Open http://127.0.0.1:9090 and sign in. Then change the password in Settings > Account and sharing: the file is
+   deleted when you do.
 
 ## What you'll see
 

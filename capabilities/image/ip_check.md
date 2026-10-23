@@ -12,10 +12,17 @@ or a scarf lying over the print.
 | `image_b64` | one of | The image itself: PNG, JPEG or WebP, base64, up to 10 MB. |
 | `purpose` | no | `"upload"` (a buyer's photo, default), `"design"` (a generated design) or `"hero"` (a lifestyle photo with a model: a person doesn't count there, a child or a covered print does). |
 | `print_box` | no | Hero only: `[x0, y0, x1, y1]` in the image's pixels, from `image.compare`. A close crop of it is checked too. |
+| `garment` | no | Hero only: `"tee"`, `"hoodie"`, `"sweatshirt"` or `"kids_tee"`, the garment the listing sells. A scene showing another type gives `garment`. Any other value is ignored. |
 
 ## Returns
 `{"ok": true, "verdict", "confidence", "found", "flags", "model", "cost_usd"}`:
-- `verdict`: `"clear"`, or the worst flag: `"unsafe"`, `"child"`, `"covered"`, `"character"`, `"brand"`, `"person"`.
+- `verdict`: `"clear"`, or the worst flag that counts for the purpose, worst first:
+  - upload: `unsafe`, `celebrity`, `watermark` (a watermark, stock mark or pro-studio photo), `artwork` (someone
+    else's artwork, a poster, a screenshot or a photo of a screen), `character`, `brand`, `person`.
+  - design: `unsafe`, `celebrity`, `watermark`, `character`, `brand`, `person`.
+  - hero: `unsafe`, `child`, `covered`, `garment` (only when `garment` is given), `celebrity`, `character`, `brand` (a hero's own tiled watermark doesn't count).
+  - `person` is always last, so a verdict of `person` means nothing worse was found: a caller whose photos are
+    private (a custom order from the buyer's own photo) may allow it.
 - `confidence`: 0-1, the model's certainty in the whole answer. It's told to flag when unsure.
 - `found`: what and where, for the verdict. `flags`: every flag that counts for this purpose, with its note.
 
