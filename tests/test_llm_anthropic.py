@@ -152,3 +152,26 @@ def test_errors_are_scrubbed(fake):
     with pytest.raises(prov.LLMError) as e:
         ask()
     assert "401" in str(e.value) and KEY not in str(e.value)
+
+
+def test_continue_if_cut_makes_one_more_call_and_joins(fake):
+    replies = iter([answer("Part one, ", stop="max_tokens"), answer("part two.", stop="max_tokens")])
+    fake.reply = lambda req: httpx.Response(200, json=next(replies))
+    out = ask(continue_if_cut=True)
+    assert len(fake.calls) == 2  # at most one extra call, even when the second is cut too
+    sent = fake.body()["messages"]
+    assert sent[-2] == {"role": "assistant", "content": "Part one, "} and sent[-1]["content"] == lc.CONTINUE_ASK
+    assert out["text"] == "Part one, part two." and out["continued"] is True and out["truncated"] is True
+    assert out["usage"]["output_tokens"] == 400 and out["usage"]["input_tokens"] == 2000
+    assert out["used_today"] == 2  # both calls count against the cap
+
+
+def test_continue_if_cut_does_nothing_when_the_answer_finished(fake):
+    out = ask(continue_if_cut=True)
+    assert len(fake.calls) == 1 and "continued" not in out
+
+
+def test_a_cut_answer_is_not_continued_unless_asked(fake):
+    fake.reply = lambda req: httpx.Response(200, json=answer("Part one", stop="max_tokens"))
+    out = ask()
+    assert len(fake.calls) == 1 and out["truncated"] is True and "continued" not in out

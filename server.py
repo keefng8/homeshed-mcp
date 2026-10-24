@@ -989,6 +989,80 @@ async def vault_test(request: Request) -> JSONResponse:
         return _vault_error(exc)
 
 
+@mcp.custom_route("/bugs/suggested", methods=["GET"])
+async def bugs_suggested(request: Request) -> JSONResponse:
+    """Failed tool calls seen in 2+ sessions, waiting for the owner (tools/bugs/seen.py). Owner only, as every custom
+    route."""
+    from tools.bugs import seen
+    try:
+        return JSONResponse(seen.suggestions())
+    except seen.SeenError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@mcp.custom_route("/bugs/suggested/{key}/{action}", methods=["POST"])
+async def bugs_suggested_decide(request: Request) -> JSONResponse:
+    """keep (it becomes a known bug; optional body {"title", "symptom"}) | dismiss (never suggested again)."""
+    from tools.bugs import known, seen
+    try:
+        body = await _body(request)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    try:
+        return JSONResponse(await asyncio.to_thread(seen.decide, request.path_params["key"], request.path_params["action"],
+                                                    str(body.get("title") or ""), str(body.get("symptom") or "")))
+    except (seen.SeenError, known.BugsError) as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@mcp.custom_route("/agents/roster", methods=["GET"])
+async def agents_roster_list(request: Request) -> JSONResponse:
+    """Who's who among the agents (agents_roster.py): every row, `brief` (the lines a session starts with) and `items`
+    (the rows waiting for the owner: the Control Panel's approvals bar)."""
+    import agents_roster
+    try:
+        return JSONResponse({**agents_roster.roster(), "brief": agents_roster.brief(), "items": agents_roster.waiting()})
+    except agents_roster.RosterError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@mcp.custom_route("/agents/roster/{name}/{action}", methods=["POST"])
+async def agents_roster_decide(request: Request) -> JSONResponse:
+    """The owner: confirm a row (optional body {"role"}: their own wording) or remove it. Owner only, as every custom
+    route; the agents' tool can only add or propose."""
+    import agents_roster
+    try:
+        body = await _body(request)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    try:
+        return JSONResponse(agents_roster.decide(request.path_params["name"], request.path_params["action"],
+                                                 str(body.get("role") or "")))
+    except agents_roster.RosterError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@mcp.custom_route("/publisher/sign", methods=["GET"])
+async def publisher_sign_waiting(request: Request) -> JSONResponse:
+    """Requests to sign a library script (library_signing.py), with the code: the Control Panel's approvals bar."""
+    import library_signing
+    try:
+        return JSONResponse({"items": library_signing.waiting()})
+    except library_signing.SigningError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@mcp.custom_route("/publisher/sign/{id}/{action}", methods=["POST"])
+async def publisher_sign_decide(request: Request) -> JSONResponse:
+    """The owner: approve (sign the content they read, if unchanged) or decline. Owner only, as every custom route."""
+    import library_signing
+    try:
+        return JSONResponse(await asyncio.to_thread(library_signing.decide, request.path_params["id"],
+                                                    request.path_params["action"]))
+    except library_signing.SigningError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
 @mcp.custom_route("/bugs/export", methods=["GET"])
 async def bugs_export(request: Request) -> JSONResponse:
     """The public bugs as a cleaned known-bugs pack, ready to publish on the Pro API."""
@@ -1148,8 +1222,14 @@ def serve_http(port: int | None = None) -> None:
         pass
     import proxmox_monitor  # the Proxmox alarms, every minute (nothing without a Proxmox token)
     proxmox_monitor.start()
+    import stray_watch  # a one-off `docker exec` command hogging a core for 10 minutes is stopped, and the owner told
+    stray_watch.start()
     import printify_pending  # approved requests a daily limit held back run once there's room (every 10 minutes)
     printify_pending.start()
+    from tools.schedule import engine as schedules  # schedule.*: the owner's and apps' timetabled read-only tools
+    schedules.start()
+    from tools.email import send as email_outbox  # approved emails go out within a minute
+    email_outbox.start()
     # This machine only, unless MCP_BIND says otherwise (release v1, 2026-09-30: it listened on every interface). The
     # Docker image sets MCP_BIND=0.0.0.0 inside the container, and docker-compose.yml publishes the port on 127.0.0.1.
     host = os.environ.get("MCP_BIND") or "127.0.0.1"

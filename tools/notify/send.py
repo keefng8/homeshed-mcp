@@ -13,7 +13,7 @@ from registry import tool
 
 _VALID_PRIORITIES = {"min", "low", "default", "high", "urgent", "max"}
 
-# Bundling (nexsift's idea, our own code): automated callers send more pushes, and only what matters should buzz the
+# Bundling (our own code): automated callers send more pushes, and only what matters should buzz the
 # owner's phone. Per topic: high/urgent/max always go at once; the same push again within DEDUPE_S is dropped; past
 # BURST sends in WINDOW_S the rest wait and go as one summary push when the window closes. In memory: a restart drops a
 # waiting summary (at most WINDOW_S of non-urgent pushes), the known ceiling of this minimal version.

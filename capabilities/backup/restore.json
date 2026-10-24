@@ -1,0 +1,40 @@
+{
+  "id": "backup.restore",
+  "name": "Restore a HomeShed Backup",
+  "version": "1.0.0",
+  "description": "Put a backup's state back: a dry run lists what changes and gives a confirm code; the restore makes a safety backup first. Owner only.",
+  "category": "backup",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "restore a backup",
+    "import my settings",
+    "undo with a backup"
+  ],
+  "inputs": {
+    "file": {
+      "type": "string",
+      "required": true
+    },
+    "confirm": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.backup.backup.restore"
+  },
+  "latency": {
+    "expected_ms": 2000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "backup.export"
+  ]
+}

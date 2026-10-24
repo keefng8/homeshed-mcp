@@ -34,7 +34,7 @@ _SECRETS = [
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)"),
     re.compile(r"\b[A-Za-z0-9+/_-]{40,}={0,2}(?=\s|$|[\"',;)])"),
 ]
-_ASSIGNED = re.compile(r"\b([A-Z][A-Z0-9_]*(?:TOKEN|KEY|SECRET|PASSWORD|BEARER))(\s*[=:]\s*)[\"']?[^\s\"']{6,}[\"']?")
+_ASSIGNED = re.compile(r"\b((?:[A-Z][A-Z0-9_]*)?(?:TOKEN|KEY|SECRET|PASSWORD|BEARER))(\s*[=:]\s*)[\"']?[^\s\"']{6,}[\"']?")
 
 
 class BugsError(ValueError):
@@ -139,6 +139,7 @@ def report(title: str, symptom: str = "", error_text: str = "", root_cause: str 
             raise BugsError(f"{id} isn't a known bug")
         known = bugs[id] if id else next((b for b in bugs.values() if fp and b.get("fingerprint") == fp), None)
         if known is not None:
+            before = (dict(known), list(known.get("tags") or []))
             for f, v in fields.items():
                 if v and f != "title":
                     known[f] = v
@@ -149,17 +150,48 @@ def report(title: str, symptom: str = "", error_text: str = "", root_cause: str 
             known["tags"] = sorted(set(known.get("tags") or []) | set(tag_list))
             if not id:  # a report matched by its error is the bug happening again; an edit by id isn't
                 known["occurrences"].append({"at": _now(), "by": _clean("component", source)})
+                if before[0].get("fix_status") == "fixed":
+                    regressed(known)
+            if any(known.get(f) != before[0].get(f) for f in (*fields, "fix_status")) or known["tags"] != before[1]:
+                known["rev"] = int(known.get("rev") or 1) + 1  # the shared contract's edit counter
             known["updated"] = _now()
             _save(bugs)
+            _shared()
             return _summary(known, matched=True)
         number = max([int(k.split("-")[1]) for k in bugs if k.startswith("KB-")] + [0]) + 1
         entry = {"id": f"KB-{number:04d}", **fields, "fix_status": fix_status or "open", "tags": tag_list,
                  "audience": audience or "private",
                  "fingerprint": fp, "occurrences": [{"at": _now(), "by": _clean("component", source)}],
+                 "origin": "homeshed", "origin_id": f"KB-{number:04d}", "rev": 1,
                  "created": _now(), "updated": _now()}
         bugs[entry["id"]] = entry
         _save(bugs)
+        _shared()
         return _summary(entry, matched=False)
+
+
+def regressed(bug: dict) -> None:
+    """A fixed bug happened again: counted per store (the shared contract), so a comeback isn't hidden by "fixed"."""
+    counts = bug.setdefault("regressed", {})
+    counts["homeshed"] = int(counts.get("homeshed") or 0) + 1
+
+
+def _shared_if_stale() -> None:
+    """A lookup brings the library's changes in when the last exchange is over an hour old (never on a timer)."""
+    try:
+        from tools.bugs import exchange
+        exchange.soon(only_if_stale=True)
+    except Exception:  # noqa: BLE001 - sharing must never cost a lookup
+        pass
+
+
+def _shared() -> None:
+    """A bug changed: share it with the HomeShed Library, if one is linked, in the background."""
+    try:
+        from tools.bugs import exchange
+        exchange.soon()
+    except Exception:  # noqa: BLE001 - sharing must never cost a report
+        pass
 
 
 @tool(name="find", category="bugs", doc="bugs/known.md")
@@ -185,7 +217,10 @@ def find(query: str, k: int = 5) -> dict:
         return {"matches": [{**{f: b.get(f, "") for f in ("id", "title", "fix_status", "fix", "workaround", "root_cause",
                                                           "guard")}, "score": 100,
                              "occurrences": len(b.get("occurrences") or [])}] if b else []}
+    _shared_if_stale()
     for b in bugs.values():
+        if b.get("deleted"):  # a tombstone from the library: gone everywhere
+            continue
         if fp and b.get("fingerprint") == fp:
             score = 100
         else:
@@ -193,7 +228,8 @@ def find(query: str, k: int = 5) -> dict:
             score = 10 * len(words & _words(text + " " + " ".join(b.get("tags") or [])))
         if score:
             matches.append({**{f: b.get(f, "") for f in ("id", "title", "fix_status", "fix", "workaround", "root_cause",
-                                                         "guard")}, "score": score, "occurrences": len(b.get("occurrences") or [])})
+                                                         "guard")}, "score": score, "occurrences": len(b.get("occurrences") or []),
+                            **({"regressed": sum((b.get("regressed") or {}).values())} if b.get("regressed") else {})})
     matches.sort(key=lambda m: (-m["score"], m["id"]))
     # Semantic fallback (optional, needs Shedkeeper): with no exact
     # error and only weak word overlap, a paraphrased report of a known bug would be missed. Shedkeeper picks which of the
@@ -279,8 +315,8 @@ def list_bugs(fix_status: str = "", component: str = "", limit: int = 50, detail
         raise BugsError(f"fix_status must be one of: {', '.join(STATUSES)}")
     if detail not in ("compact", "full"):
         raise BugsError('detail must be "compact" or "full"')
-    out = [_summary(b) for b in _load().values()
-           if (not fix_status or b.get("fix_status") == fix_status) and (not component or b.get("component") == component)]
+    out = [_summary(b) for b in _load().values() if not b.get("deleted")
+           and (not fix_status or b.get("fix_status") == fix_status) and (not component or b.get("component") == component)]
     out.sort(key=lambda b: b["id"], reverse=True)
     if detail == "compact":
         out = [{k: b[k] for k in COMPACT if k in b} for b in out]

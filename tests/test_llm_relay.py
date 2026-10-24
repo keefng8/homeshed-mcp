@@ -188,12 +188,12 @@ def test_another_model(fake):
     assert fake.body()["model"] == "grok-4.7"
 
 
-def test_long_answers_are_cut_and_flagged_under_5000_characters(fake):
+def test_long_answers_are_cut_and_flagged(fake):
     on()
-    fake.reply = lambda req: httpx.Response(200, json=answer(text="word " * 3000))
-    out = ask(max_tokens=2048)
-    assert out["truncated"] is True and len(out["text"]) == lc.MAX_TEXT_CHARS
-    assert len(blob(out)) < 5000
+    fake.reply = lambda req: httpx.Response(200, json=answer(text="word " * 14_000))
+    out = ask(max_tokens=16_000)
+    assert out["truncated"] is True and len(out["text"]) == lc.MAX_TEXT_CHARS == 64_000
+    assert fake.body()["max_output_tokens"] == 16_000
 
 
 def test_an_incomplete_answer_is_flagged(fake):
@@ -209,12 +209,12 @@ def test_an_incomplete_answer_is_flagged(fake):
     ({"messages": [{"role": "user", "content": "  "}]}, "empty content"),
     ({"messages": [{"role": "user"}]}, "role"),
     ({"messages": [{"role": "user", "content": "x"}] * 41}, "at most 40"),
-    ({"messages": [{"role": "user", "content": "x" * 48_001}]}, "limit is 48,000"),
-    ({"system": "s" * 8001}, "system is over"),
-    ({"max_tokens": 0}, "max_tokens"), ({"max_tokens": 2049}, "max_tokens"), ({"max_tokens": True}, "max_tokens"),
+    ({"messages": [{"role": "user", "content": "x" * 200_001}]}, "limit is 200,000"),
+    ({"system": "s" * 32_001}, "system is over"),
+    ({"max_tokens": 0}, "max_tokens"), ({"max_tokens": 16_001}, "max_tokens"), ({"max_tokens": True}, "max_tokens"),
     ({"temperature": 2.5}, "temperature"), ({"temperature": -1}, "temperature"),
     ({"model": "gpt-9"}, "no model 'gpt-9'"),
-    ({"provider": "openai"}, "unknown provider.*planned: openai"),
+    ({"provider": "mistral"}, "unknown provider"),
 ])
 def test_bad_arguments_are_refused_before_any_request(fake, kw, says):
     on()
@@ -325,7 +325,7 @@ def test_providers_list_when_off(fake):
     assert row["configured"] is True and row["key_name"] == "XAI_API_KEY" and "switched off" in row["why_not"]
     assert row["daily_cap"] == 0 and row["used_today"] == 0 and row["daily_token_cap"] is None
     assert row["default_model"] == "grok-4.3" and {"model": "grok-4.3"}.items() <= row["models"][0].items()
-    assert out["planned"] == ["openai"] and KEY not in blob(out) and len(blob(out)) < 5000
+    assert out["planned"] == [] and KEY not in blob(out) and len(blob(out)) < 8000
     assert fake.calls == []
 
 

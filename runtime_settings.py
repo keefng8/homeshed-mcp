@@ -45,11 +45,31 @@ SCHEMA = {
         "help": "The address of your ntfy server (for example https://ntfy.sh or your own). Leave empty to use the "
                 "tool server's settings file. The access token lives under Credentials.",
     },
+    "stray_command_stop": {
+        "type": "bool", "default": True, "group": "Notifications",
+        "label": "Stop runaway one-off commands",
+        "help": "A command run inside the tool server by hand or by a session (not the server itself) that uses a "
+                "whole CPU core for 10 minutes is stopped, and you get a phone alert saying what it was.",
+    },
     "bugs_search_public": {
         "type": "bool", "default": False, "group": "Known bugs",
         "label": "Look for similar public reports when nothing known matches",
         "help": "Searches GitHub issues for the same problem and shows links. Only a cleaned version of the error is "
                 "sent: no file paths, addresses, numbers or secrets. Off until you switch it on.",
+    },
+    "bug_capture": {
+        "type": "bool", "default": True, "group": "Known bugs",
+        "label": "Suggest bugs from failed tool calls",
+        "help": "When the same error comes back in two different sessions, it shows under Suggested bugs for you to "
+                "keep or dismiss, so nobody has to remember to report it. Your own blocks, refusals and wrongly used "
+                "tools are counted but never suggested. Everything stays on this machine.",
+    },
+    "library_url": {
+        "type": "url", "default": "", "group": "Known bugs",
+        "label": "HomeShed Library address (to share known bugs)",
+        "help": "If you also run the HomeShed Library, its address with the port, for example http://your-library-server:8770. "
+                "Both then hold the same known bugs. Also add the library's key under Credentials as LIBRARY_BUGS_KEY. "
+                "Leave empty if you don't use the library: nothing is sent.",
     },
 }
 # Which .env name each address setting stands in for (address() below).
@@ -103,8 +123,25 @@ try:  # the to-do list's app route (off) lives with the to-do tools
 except ImportError:
     pass
 
+try:  # the schedules' time zone lives with the schedule tools
+    from tools.schedule import SETTINGS as _SCHEDULE_SETTINGS
+    SCHEMA.update(_SCHEDULE_SETTINGS)
+except ImportError:
+    pass
+
+try:  # the owner's outgoing mail server lives with the email tools
+    from tools.email import SETTINGS as _EMAIL_SETTINGS
+    SCHEMA.update(_EMAIL_SETTINGS)
+except ImportError:
+    pass
+
 _lock = threading.Lock()
 _cache: tuple[object, dict] = (None, {})
+
+
+# A server name (email settings, 2026-10-24) and an email address: plain checks, no lookups.
+HOST_RE = re.compile(r"(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+")
+EMAIL_RE = re.compile(r"[^@\s<>,;\"]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,}")
 
 
 def validate(key: str, value):
@@ -118,6 +155,10 @@ def validate(key: str, value):
         raise ValueError(f"{spec['label']}: 1 to 64 letters, numbers, dashes or underscores.")
     if spec["type"] == "url" and not (isinstance(value, str) and (not value.strip() or URL_RE.fullmatch(value.strip()))):
         raise ValueError(f"{spec['label']}: an address starting with http:// or https://, or empty.")
+    if spec["type"] == "host" and not (isinstance(value, str) and (not value.strip() or HOST_RE.fullmatch(value.strip()))):
+        raise ValueError(f"{spec['label']}: a server name like smtp.example.com, or empty.")
+    if spec["type"] == "email" and not (isinstance(value, str) and (not value.strip() or EMAIL_RE.fullmatch(value.strip()))):
+        raise ValueError(f"{spec['label']}: an email address like you@example.com, or empty.")
     if spec["type"] == "select" and value not in spec["options"]:
         raise ValueError(f"{spec['label']}: choose one of the listed options.")
     if spec["type"] == "names":  # a list of names, e.g. apps: "a,b", or empty for none (2026-10-09)

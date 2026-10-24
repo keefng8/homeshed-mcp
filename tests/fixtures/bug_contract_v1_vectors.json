@@ -1,0 +1,67 @@
+{
+ "contract": "homeshed-bugs",
+ "fp_version": 1,
+ "algorithm": [
+  "lowercase the text, then trim it; empty -> fingerprint is the empty string (never matches anything)",
+  "replace each double-quoted or single-quoted run with <q>",
+  "replace each path (optional drive letter, then one or more / or \\ segments of [A-Za-z0-9_.@~-], optional trailing slash) with <path>",
+  "replace each run of 8+ hex digits, optional 0x, on word boundaries, with <hex>",
+  "replace each run of digits with <n>",
+  "collapse whitespace runs to one space, trim",
+  "SHA-1 of the UTF-8 text, first 12 hex characters"
+ ],
+ "cases": [
+  {
+   "error_text": "",
+   "fp": ""
+  },
+  {
+   "error_text": "   ",
+   "fp": ""
+  },
+  {
+   "error_text": "ConnectionRefusedError: [Errno 111] Connection refused",
+   "fp": "6f0c1f072ccf"
+  },
+  {
+   "error_text": "ConnectionRefusedError: [Errno 61] Connection refused",
+   "fp": "6f0c1f072ccf"
+  },
+  {
+   "error_text": "exit 1 at /opt/app/deploy.sh line 42",
+   "fp": "06967b0fbc64"
+  },
+  {
+   "error_text": "exit 2 at /opt/other/deploy.sh line 7",
+   "fp": "06967b0fbc64"
+  },
+  {
+   "error_text": "FileNotFoundError: C:\\Users\\someone\\project\\config.yaml",
+   "fp": "6377d93fe2d1"
+  },
+  {
+   "error_text": "KeyError: 'api_base'",
+   "fp": "740e9bd62acc"
+  },
+  {
+   "error_text": "KeyError: \"model_name\"",
+   "fp": "740e9bd62acc"
+  },
+  {
+   "error_text": "container 3f9a2b7c1d4e5f60 exited with code 137",
+   "fp": "c82efd04d02c"
+  },
+  {
+   "error_text": "  Mixed   CASE   and\n\nwhitespace\tERROR  ",
+   "fp": "d0e4f6b99f61"
+  },
+  {
+   "error_text": "timeout after 120s waiting for http://127.0.0.1:8080/health",
+   "fp": "f7a7f1134d1e"
+  },
+  {
+   "error_text": "rtk grep timed out after 300s",
+   "fp": "442352f5cf46"
+  }
+ ]
+}

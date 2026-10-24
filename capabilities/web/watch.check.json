@@ -1,0 +1,53 @@
+{
+  "id": "web.watch.check",
+  "name": "Check a Watched Page",
+  "description": "Read a page and compare it with the last look: alert due only when two checks in a row agree on a big-enough change, or the trigger text appears.",
+  "risk": "read",
+  "aliases": [
+    "has the page changed",
+    "check the watched page"
+  ],
+  "inputs": {
+    "url": {
+      "type": "string",
+      "required": true
+    },
+    "ignore": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "trigger": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "min_change_chars": {
+      "type": "integer",
+      "required": false,
+      "default": 20
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.web.watch.check"
+  },
+  "related": [
+    "web.watch",
+    "web.read"
+  ],
+  "version": "1.0.0",
+  "category": "web",
+  "requires": [
+    "web.read (Jina Reader)",
+    "schedule.*"
+  ],
+  "transport": "mcp",
+  "latency": {
+    "expected_ms": 4000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  }
+}

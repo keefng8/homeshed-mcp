@@ -23,7 +23,7 @@ that didn't arrive. A bundled push returns `{sent: false, held: true, summary_in
 `{sent: false, dropped: why, ...}`.
 
 ## Bundling (2026-10-07)
-Only what matters buzzes the phone (nexsift's idea, our own code). Per topic: `high`, `urgent` and `max`
+Only what matters buzzes the phone (our own code). Per topic: `high`, `urgent` and `max`
 always go at once, so use them for anything time-critical. Otherwise the same push (topic, title,
 message) again within 30 minutes is dropped, and after 3 pushes in 10 minutes the rest wait and go as
 one summary push ("N more updates", up to 10 lines) when the 10 minutes are up. A failed send isn't

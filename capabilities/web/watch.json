@@ -1,0 +1,67 @@
+{
+  "id": "web.watch",
+  "name": "Watch a Web Page",
+  "description": "Get a phone alert when a web page changes (a price, back in stock, a new post): a schedule that checks it and alerts only when two checks agree.",
+  "risk": "write",
+  "aliases": [
+    "watch this page",
+    "tell me when it changes",
+    "price alert",
+    "back in stock alert",
+    "monitor a website"
+  ],
+  "inputs": {
+    "url": {
+      "type": "string",
+      "required": true
+    },
+    "ignore": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "trigger": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "min_change_chars": {
+      "type": "integer",
+      "required": false,
+      "default": 20
+    },
+    "every": {
+      "type": "string",
+      "required": false,
+      "default": "every 2 hours"
+    },
+    "name": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.web.watch.watch"
+  },
+  "related": [
+    "web.watch.check",
+    "schedule.list",
+    "schedule.remove"
+  ],
+  "version": "1.0.0",
+  "category": "web",
+  "requires": [
+    "web.read (Jina Reader)",
+    "schedule.*"
+  ],
+  "transport": "mcp",
+  "latency": {
+    "expected_ms": 4000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  }
+}

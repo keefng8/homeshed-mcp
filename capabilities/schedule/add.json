@@ -1,0 +1,65 @@
+{
+  "id": "schedule.add",
+  "name": "Add a Schedule",
+  "version": "1.0.0",
+  "description": "Run a read-only tool on a timetable (daily, weekly, every N hours or cron), as its maker, with a phone alert on change, always, on error or never. Write tools are refused.",
+  "category": "schedule",
+  "risk": "write",
+  "requires": [
+    "apscheduler"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "schedule a check",
+    "run every morning",
+    "every day at",
+    "remind me daily",
+    "run on a timetable",
+    "cron"
+  ],
+  "inputs": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "capability": {
+      "type": "string",
+      "required": true
+    },
+    "when": {
+      "type": "string",
+      "required": true
+    },
+    "arguments": {
+      "type": "object",
+      "required": false
+    },
+    "notify": {
+      "type": "string",
+      "required": false,
+      "default": "on_change",
+      "enum": [
+        "on_change",
+        "always",
+        "on_error",
+        "never"
+      ]
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.schedule.tools.add"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "schedule.list",
+    "schedule.remove",
+    "schedule.pause"
+  ]
+}

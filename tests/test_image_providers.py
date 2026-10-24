@@ -155,6 +155,28 @@ def test_jpeg_bytes_labelled_png_are_saved_as_jpg(api, monkeypatch, tmp_path):
     assert (tmp_path / "images" / job["saved_as"]).read_bytes() == jpeg
 
 
+def test_a_paid_image_in_a_folder_is_saved_there_and_kept_out_of_history(api, monkeypatch, tmp_path):
+    """2026-10-24: book covers from a paid provider went to the main images, where the shop reads; folder keeps them
+    apart, as it does for a local image."""
+    from tools.image import history
+    png = b"\x89PNG\r\n\x1a\n" + b"p" * 50
+    monkeypatch.setitem(prov.ADAPTERS, "xai", lambda *a: (png, "image/png"))
+    job = {"job_id": "abcdef012346", "provider": "xai", "model": "grok-imagine-image", "prompt": "p", "width": 512,
+           "height": 512, "seed": 1, "steps": 0, "started_at": 0.0, "folder": "book-covers"}
+    prov._run(job, "k")
+    assert job["status"] == "done" and job["saved_as"].startswith("book-covers/")
+    assert (tmp_path / "images" / job["saved_as"]).read_bytes() == png
+    assert (tmp_path / "images" / "abcdef012346.json").exists()  # the record stays where image.status looks
+    assert all(r["name"] != job["saved_as"] for r in history._paid(20))
+
+
+@pytest.mark.parametrize("folder", ["../shop", "a/b", "x" * 41])
+def test_a_bad_folder_is_refused_for_paid_providers_too(folder):
+    from tools.image.generate import ImageError, generate
+    with pytest.raises(ImageError, match="folder"):
+        generate("a cat", provider="xai", folder=folder)
+
+
 def test_list_commercial_only(api):
     out = pl.providers_list(commercial_only=True)
     models = [m for r in out["providers"] for m in r["models"]]

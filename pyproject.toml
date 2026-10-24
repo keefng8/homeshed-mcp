@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "homeshed-mcp"
-version = "0.6.1"
+version = "0.6.2"
 description = "Every tool your AI needs, in one install."
 readme = "README.md"
 license = "Apache-2.0"
@@ -21,6 +21,10 @@ dependencies = [
     "z3-solver>=4.13",
     "cryptography>=42",   # vault.py: Fernet encryption of stored credentials
     "pillow>=10.3",       # image.store: re-encodes uploads, so their EXIF/GPS metadata never leaves
+    "apscheduler>=3.11,<4",  # schedule.*: cron and interval triggers (MIT; 4.x is a rewrite, R&D 2026-10-24)
+    "pypdf>=5",           # docs.read: PDF text (BSD-3)
+    "openpyxl>=3.1",      # docs.read: Excel, read-only mode (MIT)
+    "defusedxml>=0.7",    # docs.read: Word's XML without entity tricks (PSF)
 ]
 
 [project.optional-dependencies]

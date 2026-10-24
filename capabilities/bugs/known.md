@@ -40,6 +40,21 @@ Off by default. Switch on the `bugs_search_public` setting to use it.
 - Any failure gives no links, never an error.
 - Other trackers are never scraped or copied.
 
+## Suggested bugs (automatic)
+`bugs.seen` (`tools/bugs/seen.py`), sent by the PostToolUseFailure hook (`known-bug-hint.py`) for every failed tool
+call, so a bug is caught without anyone having to report it:
+- Each failure is sorted into `noise` (guard blocks, denials, the user stopping a call, hook timeouts), `misuse` (an
+  Edit whose text isn't there, a Read of a missing file, bad arguments, tests failing mid-development, a bare exit
+  code) or `platform`. Every class is counted with one cleaned example, so the sorting can be checked.
+- A platform failure that `bugs.find` matched to a known bug adds one occurrence to it, once per session.
+- Any other platform failure is watched by fingerprint (tool + the error's last lines). Seen in 2 different sessions
+  it becomes a suggestion; one session alone never does. Unseen for 14 days, it's forgotten.
+- Suggestions wait in their own file (`BUG_CANDIDATES_FILE`, default `DATA_DIR/observations/bug_candidates.json`),
+  never in the known bugs, so `bugs.find` never returns unreviewed noise. The owner keeps one in the Control Panel
+  (it becomes a private, open known bug) or dismisses it (that error is never suggested again): owner-only routes
+  `GET /bugs/suggested` ({items, watching, kept, dismissed, classes}) and `POST /bugs/suggested/{key}/{keep|dismiss}`.
+- Nothing leaves the machine. Off with the `bug_capture` setting (on by default).
+
 ## Safety
 Every text field is redacted before it's stored: token prefixes, `NAME=value` secrets, private keys and long
 key-like runs become `[hidden]`. An unreadable store is refused, never overwritten.

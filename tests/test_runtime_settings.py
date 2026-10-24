@@ -43,8 +43,18 @@ try:  # the to-do list's app route (off) comes with the to-do tools
     PRIVATE = {**PRIVATE, **{key: spec["default"] for key, spec in _TODO_SETTINGS.items()}}
 except ImportError:
     pass
+try:  # the schedules' time zone comes with the schedule tools
+    from tools.schedule import SETTINGS as _SCHEDULE_SETTINGS
+    PRIVATE = {**PRIVATE, **{key: spec["default"] for key, spec in _SCHEDULE_SETTINGS.items()}}
+except ImportError:
+    pass
+try:  # the outgoing mail server comes with the email tools
+    from tools.email import SETTINGS as _EMAIL_SETTINGS
+    PRIVATE = {**PRIVATE, **{key: spec["default"] for key, spec in _EMAIL_SETTINGS.items()}}
+except ImportError:
+    pass
 PUBLIC = {"local_ai_allow_cloud": True, "ntfy_default_topic": "Alerts", "local_ai_base_url": "", "ntfy_base_url": "",
-          "bugs_search_public": False, "agents_messaging": True}
+          "stray_command_stop": True, "bugs_search_public": False, "bug_capture": True, "library_url": "", "agents_messaging": True}
 
 
 @pytest.fixture(autouse=True)

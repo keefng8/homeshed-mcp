@@ -19,5 +19,6 @@ def providers_list() -> dict:
          "planned", "how"}
     """
     return {"providers": prov.catalogue(), "planned": list(prov.PLANNED),
-            "how": "llm.chat(messages=[{role, content}], system=..., model=..., max_tokens<=2048) - paid per token. "
+            "how": "llm.chat(messages=[{role, content}], system=..., model=..., provider=..., max_tokens<=16000) - "
+                   "paid per token. "
                    "Switches and daily caps: owner only, Control Panel > Settings > AI and tools > Language models."}

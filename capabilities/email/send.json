@@ -1,0 +1,57 @@
+{
+  "id": "email.send",
+  "name": "Send an Email",
+  "version": "1.0.0",
+  "description": "Send an email from the owner's own address (SMTP) after he approves it in the Control Panel's Messages; nothing goes out without him. Plain text, up to 10 recipients.",
+  "category": "email",
+  "risk": "write",
+  "requires": [
+    "an SMTP mail account (Settings > Email, SMTP_PASSWORD)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "send an email",
+    "email someone",
+    "mail this to",
+    "send by email"
+  ],
+  "inputs": {
+    "to": {
+      "type": "array",
+      "required": true
+    },
+    "subject": {
+      "type": "string",
+      "required": true
+    },
+    "body": {
+      "type": "string",
+      "required": true
+    },
+    "reply_to": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "sender_name": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.email.send.send"
+  },
+  "latency": {
+    "expected_ms": 100
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "email.status",
+    "inbox.send"
+  ]
+}

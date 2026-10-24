@@ -18,7 +18,7 @@ is for the times quality matters, and it is off until the owner switches it on.
 images), temperature not sent (its models refuse it). Every provider also has a monthly spend limit (Settings >
 Language models, "most spend a month", default no monthly stop): requests stop once the calendar month's estimated
 spend reaches it. `llm.providers.list` shows `monthly_credit_usd`, `cost_month_usd` and `credit_left_usd`.
-Planned, same switches and caps: `openai`. Prices per 1M tokens are in `llm.providers.list`
+`openai` (2026-10-23): the Responses API, key `OPENAI_API_KEY`, default `gpt-5.4-mini`, temperature not sent. `gemini` (2026-10-23): Google's OpenAI-compatible Chat Completions (`generativelanguage.googleapis.com/v1beta/openai/chat/completions`), key `GEMINI_API_KEY` (the same key the Nano Banana image provider uses), default `gemini-3.8-flash`. Google lists price rises (gemini-4-argon from 1 Dec 2026, the Flash models from 1 Jan 2027): update the table then. Both are off with a cap of 0 until the owner switches them on. Prices per 1M tokens are in `llm.providers.list`
 (docs.x.ai/docs/models, 2026-10-04; grok-4.3 $1.25 in / $0.20 cached / $2.50 out). xAI reports each request's exact
 cost (`cost_in_usd_ticks`), used when present (`cost_source: "xai"`); otherwise it's estimated from the table.
 
@@ -37,12 +37,14 @@ when they finish. Days are the server's local date.
 
 ## llm.chat
 Arguments: `messages` (1-40 `{role: user|assistant|system, content}`, oldest first), `system` (≤ 8,000 chars),
-together ≤ 48,000 characters; `model` (empty: the default); `max_tokens` 1-2048 (default 1024; reasoning tokens are
-billed on top); `temperature` 0-2 (optional); `provider` (default `xai`).
+together ≤ 200,000 characters (system ≤ 32,000); `model` (empty: the default); `max_tokens` 1-16000 (default 1024;
+reasoning tokens are billed on top, and thinking models spend them from this budget); `temperature` 0-2 (optional);
+`provider` (`xai` default, `anthropic`, `openai`, `gemini`). Limits widened 2026-10-23 (the owner) for book chapter
+batches; the wait grows with max_tokens (90 s, plus 1 s per 25 tokens past 2,048, at most 10 minutes).
 
 Returns `{"text", "provider", "model", "truncated", "finish", "usage": {"input_tokens", "output_tokens",
-"reasoning_tokens", "cached_tokens", "cost_usd", "cost_source"}, "used_today", "daily_cap"}`, under 5,000
-characters: `text` is cut at 4,200 characters, and `truncated` is true when it was cut or the model stopped at
+"reasoning_tokens", "cached_tokens", "cost_usd", "cost_source"}, "used_today", "daily_cap"}`:
+`text` is cut at 64,000 characters, and `truncated` is true when it was cut or the model stopped at
 `max_tokens` (`finish: "incomplete"`).
 
 ## Safety

@@ -1,0 +1,32 @@
+{
+  "id": "agents.roster",
+  "name": "Agent Roster",
+  "version": "1.0.0",
+  "description": "Who's who among the agents: each one's name, role and how to reach it (SendMessage, cloud or mailbox), owner-confirmed rows first.",
+  "category": "agents",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "which agent is which",
+    "who is the library builder",
+    "agent roles",
+    "agent roster"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "python",
+    "handler": "tools.agents.roster.roster"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "agents.roster_set",
+    "agents.list"
+  ]
+}

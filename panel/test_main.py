@@ -1292,6 +1292,29 @@ def test_approvals_gather_everything_waiting_for_the_owner(monkeypatch):
     assert "/api/approvals" not in main.VIEWER_ROUTES
 
 
+def test_suggested_bugs_wait_with_the_rest_and_keep_or_dismiss_goes_to_the_tool_server(monkeypatch):
+    """2026-10-24: a failed tool call seen in 2 sessions waits for the owner; an older tool server without it is skipped."""
+    c, main = _approval_sources(monkeypatch, todo=[], memory=[], proxmox=[])
+    sent = []
+
+    async def fake_admin(method, path, body=None):
+        sent.append((method, path))
+        if path == "/bugs/suggested":
+            return main.JSONResponse({"items": [{"key": "0123456789ab", "tool": "Bash:docker", "example": "port in use",
+                                                 "count": 4, "sessions": 2, "days": 1,
+                                                 "last": "2026-10-24T01:00:00+00:00"}]})
+        return main.JSONResponse({"items": []} if path.endswith("pending") else {"status": "kept"})
+    monkeypatch.setattr(main, "_mcp_admin", fake_admin)
+    [item] = c.get("/api/approvals").json()["items"]
+    assert (item["kind"], item["id"], item["from"]) == ("bug", "0123456789ab", "Bash:docker")
+    assert item["title"] == "port in use (seen 4 times in 2 sessions over 1 day(s))" and item["at"] > 0
+    assert c.post("/api/bugs/suggested/0123456789ab/keep").status_code == 200
+    assert ("POST", "/bugs/suggested/0123456789ab/keep") in sent
+    assert c.post("/api/bugs/suggested/not-a-key/keep").status_code == 400
+    assert c.post("/api/bugs/suggested/0123456789ab/delete").status_code == 400
+    assert "/api/bugs/suggested/{key}/{action}" not in main.VIEWER_ROUTES
+
+
 def test_a_source_that_cant_be_read_is_named_and_the_rest_still_show(monkeypatch):
     c, _ = _approval_sources(monkeypatch, todo=None, memory=[], proxmox=None)
     d = c.get("/api/approvals").json()
@@ -1580,6 +1603,27 @@ def test_each_change_goes_to_its_owner(settings_env):
     assert client.put("/api/settings", json={"source": "tool-server", "key": "local_ai_allow_cloud", "value": False}).json()["value"] is False
     assert client.put("/api/settings", json={"source": "panel", "key": "refresh_seconds", "value": 10}).json()["value"] == 10
     assert json.loads(main.PANEL_SETTINGS_FILE.read_text())["refresh_seconds"] == 10
+
+
+def test_the_library_address_is_one_field_saved_to_the_pc_and_the_tool_server(settings_env):
+    """2026-10-24: the PC's hooks and the tool server's known-bugs sharing use the same library address."""
+    client, main, seen, _ = settings_env
+    r = client.put("/api/settings", json={"source": "main-pc", "key": "library_url", "value": "http://lib.test:8770"})
+    assert r.json()["value"] == "http://lib.test:8770"
+    assert ("PUT", "gpu", "/settings", "t") in seen and ("PUT", "mcp", "/settings", None) in seen
+
+
+def test_the_tool_servers_copy_of_the_library_address_is_hidden_when_the_pc_has_it(settings_env, monkeypatch):
+    client, main, _, _ = settings_env
+    real = main._remote_settings
+
+    async def both(client_, source):
+        data, error = await real(client_, source)
+        data.setdefault("schema", {})["library_url"] = {"type": "url", "group": "Known bugs", "label": "Library"}
+        return data, error
+    monkeypatch.setattr(main, "_remote_settings", both)
+    items = [(i["source"], i["key"]) for i in client.get("/api/settings").json()["items"] if i["key"] == "library_url"]
+    assert items == [("main-pc", "library_url")]
 
 
 @pytest.mark.parametrize("body, status, says", [

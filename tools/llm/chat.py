@@ -12,10 +12,12 @@ from tools.llm import providers as prov
 
 ROLES = ("user", "assistant", "system")
 MAX_MESSAGES = 40
-MAX_INPUT_CHARS = 48_000  # every message plus system: about 12k tokens, a bounded input cost
-MAX_SYSTEM_CHARS = 8_000
-MAX_TOKENS = 2048
-MAX_TEXT_CHARS = 4_200  # the whole result stays under 5,000 characters
+# The owner, 2026-10-23 ("widen it"): room for a book's chapter batch. A series bible plus the last chapters in, three
+# chapters (about 10,000 words) out. The daily, token and monthly caps still bound what it can cost.
+MAX_INPUT_CHARS = 200_000  # every message plus system: about 50k tokens
+MAX_SYSTEM_CHARS = 32_000
+MAX_TOKENS = 16_000
+MAX_TEXT_CHARS = 64_000
 
 
 class Message(TypedDict):
@@ -84,32 +86,61 @@ def _with_images(msgs: list[dict], images) -> list[dict]:
     return [*msgs[:last], {"role": "user", "content": parts}, *msgs[last + 1:]]
 
 
+CONTINUE_ASK = "You were cut off. Carry on exactly where you stopped, without repeating anything or adding a preamble."
+
+
+def _turn(provider: str, client: str, model: str, msgs: list[dict], system: str, max_tokens: int,
+          temperature: float | None) -> dict:
+    prov.reserve(provider, client)  # switch, key, caps; counts the request
+    try:
+        out = prov.call(provider, model, msgs, system, max_tokens, temperature)
+    except prov.LLMError as exc:
+        prov.record(provider, client, model, None, ok=False, error=str(exc))
+        raise
+    prov.record(provider, client, model, out["usage"], ok=True)
+    return out
+
+
+def _add(a, b):
+    if isinstance(a, str) or isinstance(b, str):  # cost_source
+        return a or b
+    if a is None and b is None:
+        return None
+    return round((a or 0) + (b or 0), 6) if isinstance(a, float) or isinstance(b, float) else (a or 0) + (b or 0)
+
+
 @tool(name="chat", category="llm", doc="llm/relay.md")
 def chat(messages: list[Message], system: str = "", model: str = "", max_tokens: int = 1024,
-         temperature: float | None = None, provider: str = "xai", images: list[str] | None = None) -> dict:
-    """One chat turn with a PAID language model (xAI Grok first), relayed through HomeShed: the key stays in the
+         temperature: float | None = None, provider: str = "xai", images: list[str] | None = None,
+         continue_if_cut: bool = False) -> dict:
+    """One chat turn with a PAID language model (Grok, Claude, OpenAI or Gemini), relayed through HomeShed: the key stays in the
     owner's vault and never reaches the caller. Off until the owner switches the provider on and gives it a daily cap
     (Control Panel > Settings > AI and tools > Language models); refused with the reason when off, keyless or capped.
     Nothing is stored at the provider (store=false); HomeShed logs who, model, tokens and cost, never the text.
 
     Args:
         messages: the conversation, oldest first: [{"role": "user"|"assistant"|"system", "content": "..."}], 1-40
-            messages, together with system at most 48,000 characters.
-        system: optional instructions (system prompt), at most 8,000 characters.
+            messages, together with system at most 200,000 characters.
+        system: optional instructions (system prompt), at most 32,000 characters.
         model: one of the provider's models in llm.providers.list; empty means its default (xai: grok-4.3).
-        max_tokens: most answer tokens, 1-2048 (default 1024). Reasoning tokens are billed on top.
+        max_tokens: most answer tokens, 1-16000 (default 1024). Reasoning tokens are billed on top, and on thinking
+            models they come out of this budget too: allow room. A long answer waits up to 10 minutes.
         temperature: 0-2, optional (the model's default when left out).
-        provider: "xai" or "anthropic" (Claude; default model claude-haiku-5-5, temperature ignored: its models
-            don't take it). Either stops at the owner's monthly spend limit when one is set. openai planned.
+        provider: "xai", "anthropic" (Claude; default claude-haiku-5-5), "openai" (default gpt-5.4-mini) or
+            "gemini" (Google; default gemini-3.8-flash). anthropic and openai ignore temperature: their models
+            refuse it. Each stops at the owner's monthly spend limit when one is set.
         images: optional, up to 4 image names for the model to look at with the last user message: a generated or
             paid image's name, "folder/name.png" from the image store, or a Printify mockup address. Image tokens are
             billed as input.
+        continue_if_cut: when the answer stops at max_tokens, make one more call asking the model to carry on, and
+            join the two (usage is the sum, "continued": true). Both calls count against the caps. On Claude, thinking
+            counts toward max_tokens, so a long piece can stop well short of the word count you'd expect.
 
     Returns:
         {"text", "provider", "model", "truncated", "finish", "usage": {"input_tokens", "output_tokens",
          "reasoning_tokens", "cached_tokens", "cost_usd", "cost_source": "xai"|"estimate"}, "used_today", "daily_cap"}
         (with a monthly spend limit set, also "credit_left_usd": the limit minus this month's spend so far).
-        truncated is true when the model stopped at max_tokens or the text was cut to fit 4,200 characters.
+        truncated is true when the model stopped at max_tokens or the text was cut to fit 64,000 characters.
     """
     provider = str(provider or "xai").strip().lower()
     if provider not in prov.PROVIDERS:
@@ -121,13 +152,15 @@ def chat(messages: list[Message], system: str = "", model: str = "", max_tokens:
     msgs, system, max_tokens, temperature = _check(messages, system, max_tokens, temperature)
     msgs = _with_images(msgs, images)  # loaded before reserve(): a bad name costs nothing
     client = clients.current_client.get() or "owner"
-    prov.reserve(provider, client)  # switch, key, caps; counts the request
-    try:
-        out = prov.call(provider, model, msgs, system, max_tokens, temperature)
-    except prov.LLMError as exc:
-        prov.record(provider, client, model, None, ok=False, error=str(exc))
-        raise
-    prov.record(provider, client, model, out["usage"], ok=True)
+    out = _turn(provider, client, model, msgs, system, max_tokens, temperature)
+    if continue_if_cut and out["incomplete"] and out["text"].strip() and len(msgs) + 2 <= MAX_MESSAGES:
+        # One more call: the cut answer goes back as the assistant's turn and the model is asked to go on from there.
+        # A plain follow-up rather than a prefill, which the newer Claude models refuse.
+        more = _turn(provider, client, model, [*msgs, {"role": "assistant", "content": out["text"]},
+                                               {"role": "user", "content": CONTINUE_ASK}],
+                     system, max_tokens, temperature)
+        out = {**more, "text": out["text"] + more["text"], "continued": True,
+               "usage": {k: _add(out["usage"].get(k), more["usage"].get(k)) for k in out["usage"]}}
     text = out["text"]
     cut = len(text) > MAX_TEXT_CHARS
     if cut:
@@ -135,6 +168,7 @@ def chat(messages: list[Message], system: str = "", model: str = "", max_tokens:
     used = prov.today(provider)
     return {"text": text, "provider": provider, "model": out["model"], "truncated": bool(cut or out["incomplete"]),
             "finish": out["finish"], "usage": out["usage"], "used_today": used["requests"],
+            **({"continued": True} if out.get("continued") else {}),
             "daily_cap": prov.daily_cap(provider),
             **({"credit_left_usd": round(max(0.0, cap - prov.month_cost(provider)), 4)}
                if (cap := prov.monthly_cap(provider)) else {})}

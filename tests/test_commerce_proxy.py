@@ -412,6 +412,7 @@ def test_printify_shapes(fake):
     prods = pr.products_list(limit=3)
     assert prods["total"] == 120 and len(prods["products"]) == 3
     assert prods["products"][0]["variants_enabled"] == 50 and prods["products"][0]["min_price"] == 15.0
+    assert prods["products"][0].get("max_price", 15.0) >= 15.0  # present only when an enabled variant costs more
     assert prods["products"][0]["external_id"] is None  # a draft: not on Etsy yet
     bp = pr.blueprints_list(query="mug", limit=10, offset=5)
     assert bp["matches"] == 500 and len(bp["blueprints"]) == 10 and bp["next_offset"] == 15

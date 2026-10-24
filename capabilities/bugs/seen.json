@@ -1,0 +1,57 @@
+{
+  "id": "bugs.seen",
+  "name": "Known Bugs Seen",
+  "description": "A tool call failed: count it, and suggest it as a bug for the owner once it comes back in another session. Sent by the failure hook.",
+  "risk": "write",
+  "requires": [],
+  "aliases": [
+    "a tool call failed",
+    "count this failure",
+    "suggest a bug"
+  ],
+  "inputs": {
+    "error_text": {
+      "type": "string",
+      "required": true
+    },
+    "tool_name": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "session": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "known_id": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "interrupted": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.bugs.seen.seen"
+  },
+  "version": "1.0.0",
+  "category": "bugs",
+  "transport": "mcp",
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "related": [
+    "bugs.report",
+    "bugs.find",
+    "bugs.list"
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "id": "email.status",
+  "name": "Email Status",
+  "version": "1.0.0",
+  "description": "Your emails and where each is: waiting for the owner, sent, cancelled, expired or failed.",
+  "category": "email",
+  "risk": "read",
+  "requires": [
+    "an SMTP mail account (Settings > Email, SMTP_PASSWORD)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "was my email sent",
+    "email status"
+  ],
+  "inputs": {
+    "email_id": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.email.send.status"
+  },
+  "latency": {
+    "expected_ms": 100
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "email.send",
+    "inbox.send"
+  ]
+}

@@ -633,8 +633,10 @@ def _run(job: dict, key: str) -> None:
         mime = sniff_mime(data) or mime
         ext = {"image/jpeg": "jpg", "image/webp": "webp"}.get(mime, "png")
         name = f"{time.strftime('%Y%m%d-%H%M%S')}-{job['provider']}-{job['job_id']}.{ext}"
+        if job.get("folder"):
+            name = f"{job['folder']}/{name}"
         d = output_dir()
-        d.mkdir(parents=True, exist_ok=True)
+        (d / name).parent.mkdir(parents=True, exist_ok=True)
         (d / name).write_bytes(data)
         job.update(status="done", progress="done", saved_as=name, bytes=len(data), mime=mime)
     except ProviderError as exc:
@@ -660,9 +662,10 @@ def _run(job: dict, key: str) -> None:
 
 def start_remote(provider: str, model: str, prompt: str, width: int, height: int, seed: int, steps: int,
                  background: bool = True, inputs: list[tuple[bytes, str]] | None = None,
-                 input_names: list[str] | None = None) -> dict:
+                 input_names: list[str] | None = None, folder: str = "") -> dict:
     """inputs: (bytes, mime) of images to edit or take a look from (EDIT_PROVIDERS only); input_names: theirs, for
-    the record."""
+    the record. folder (checked by image.generate): saved in that subfolder as "folder/name", and left out of
+    image.history, as a local folder image is kept out of the main gallery (book covers away from the shop)."""
     p = PROVIDERS[provider]
     if inputs and provider not in EDIT_PROVIDERS:
         raise ProviderError(f"input_images work only with {', '.join(EDIT_PROVIDERS)}")
@@ -705,6 +708,7 @@ def start_remote(provider: str, model: str, prompt: str, width: int, height: int
                "model": model, "prompt": prompt, "width": width, "height": height, "steps": steps, "seed": seed,
                "saved_as": None, "error": None, "paid": True, "cost_estimate_usd": cost,
                **({"input_images": list(input_names or []), "_inputs": inputs} if inputs else {}),
+               **({"folder": folder} if folder else {}),
                "cost_note": p["cost_note"], "pricing_url": p["pricing_url"],
                "license": m["license"]["name"], "license_info": dict(m["license"]),
                "commercial_use": m["license"]["commercial_use"], "timeout_s": JOB_TIMEOUT_S,

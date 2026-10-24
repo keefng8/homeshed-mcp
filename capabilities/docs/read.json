@@ -1,0 +1,48 @@
+{
+  "id": "docs.read",
+  "name": "Read a Document",
+  "version": "1.0.0",
+  "description": "The text of a PDF, Word (.docx), Excel (.xlsx) or CSV file on this server, locally and free; long documents read on with offset; scanned PDFs say they have no text layer.",
+  "category": "docs",
+  "risk": "read",
+  "requires": [
+    "pypdf",
+    "openpyxl",
+    "defusedxml"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "read this pdf",
+    "open the word document",
+    "what does this spreadsheet say",
+    "summarise this file",
+    "extract text",
+    "read a csv"
+  ],
+  "inputs": {
+    "path": {
+      "type": "string",
+      "required": true
+    },
+    "offset": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.docs.read.read"
+  },
+  "latency": {
+    "expected_ms": 800
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "files.list",
+    "schedule.add"
+  ]
+}

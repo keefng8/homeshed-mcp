@@ -41,8 +41,8 @@ def _paid(limit: int) -> list[dict]:
             job = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if not isinstance(job, dict) or job.get("status") != "done" or not job.get("saved_as"):
-            continue
+        if not isinstance(job, dict) or job.get("status") != "done" or not job.get("saved_as") or job.get("folder"):
+            continue  # a folder's image stays out, as a local one stays out of the main gallery (book covers)
         rows.append({"name": job["saved_as"], "source": "paid", "at": job.get("finished_at"),
                      **{k: job[k] for k in PAID_KEYS if job.get(k) is not None}})
     return rows

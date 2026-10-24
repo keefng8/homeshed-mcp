@@ -58,7 +58,9 @@ from sd.cpp: "reading prompt", "step 7/20", "decoding image"), `elapsed_s` and `
 The job: `{job_id, status, progress, prompt, width, height, steps, seed, saved_as, license,
 timeout_s, elapsed_s, error}`, plus `provider`, `model`, `paid`, `cost_estimate_usd`, `license_info`,
 `commercial_use`, `auto_selected` from `image.generate`. Paid providers' images are saved under `IMAGE_OUTPUT_DIR`
-(providers.md). Local images are saved in the local image service's own `outputs/` folder.
+(providers.md). Local images are saved in the local image service's own `outputs/` folder. `folder` works for both:
+the image goes in that subfolder (a paid one's `saved_as` is then `"folder/name"`) and stays out of the main gallery
+and `image.history`, so work for one purpose (book covers) never mixes with what the shop reads.
 
 `paid_fallback=true` (2026-10-07): when the local GPU can't take the image now (too hot, short of RAM or GPU memory,
 or lent out), the local job is cancelled and the image runs on xAI `grok-imagine-image` (paid, about $0.02,

@@ -2,12 +2,12 @@
   "id": "llm.chat",
   "name": "Language Model Chat (relay)",
   "version": "1.0.0",
-  "description": "One chat turn with a PAID language model (xAI Grok first), relayed so the caller never holds the key: the key stays in the owner's vault. Off until the owner switches the provider on and sets a daily cap (Settings > Language models); refused with the reason when off, keyless or capped. Returns text, model, usage (tokens, cost) and a truncated flag, under 5,000 characters.",
+  "description": "One chat turn with a PAID language model (xAI Grok, Anthropic Claude, OpenAI or Google Gemini; xai by default), relayed so the caller never holds the key: the key stays in the owner's vault. Off until the owner switches the provider on and sets a daily cap (Settings > Language models); refused with the reason when off, keyless or capped. max_tokens up to 16,000; continue_if_cut asks once more when an answer stops at max_tokens and joins the two. Returns text (up to 64,000 characters), model, usage (tokens, cost) and a truncated flag.",
   "category": "llm",
   "risk": "write",
   "requires": [
-    "the owner's llm_provider_xai_enabled switch and an llm_daily_cap_xai above 0",
-    "XAI_API_KEY in the vault"
+    "the owner's llm_provider_<name>_enabled switch and an llm_daily_cap_<name> above 0, for the provider used",
+    "that provider's key in the vault: XAI_API_KEY, CLAUDE_WORKSPACE_API, OPENAI_API_KEY or GEMINI_API_KEY"
   ],
   "transport": "mcp",
   "aliases": [
@@ -51,6 +51,11 @@
       "type": "array",
       "required": false,
       "default": null
+    },
+    "continue_if_cut": {
+      "type": "boolean",
+      "required": false,
+      "default": false
     }
   },
   "execution": {

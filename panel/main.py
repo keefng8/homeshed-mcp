@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import datetime
 import hashlib
 import hmac
 import json
@@ -1947,11 +1948,14 @@ async def settings_all():
         fetched = await asyncio.gather(*(_remote_settings(client, s) for s in wanted))
     sources = dict(zip(wanted, fetched))
     sources["panel"] = ({"values": panel_values(), "schema": PANEL_SCHEMA}, None)
+    pc_keys = set(((sources.get("main-pc") or ({}, None))[0] or {}).get("schema") or {})
     for source, (data, error) in sources.items():
         if error:
             errors[source] = error
             continue
         for key, spec in (data.get("schema") or {}).items():
+            if source == "tool-server" and key in MIRRORED and key in pc_keys:
+                continue  # one field for the library's address: the PC's, copied to the tool server on save
             items.append({**spec, "key": key, "source": source, "value": (data.get("values") or {}).get(key)})
         info.extend(data.get("info") or [])
     return {"items": items, "info": info, "errors": errors, "saved_on": SETTING_SOURCES}
@@ -1981,7 +1985,19 @@ async def settings_put(request: Request):
     data = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
     if r.status_code != 200:
         return JSONResponse({"error": data.get("detail") or data.get("error") or f"HTTP {r.status_code}"}, status_code=r.status_code)
-    return {"source": source, "key": key, "value": (data.get("values") or {}).get(key, value)}
+    saved = (data.get("values") or {}).get(key, value)
+    if source == "main-pc" and key in MIRRORED:  # the tool server shares known bugs with the library at this address
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                await client.put(f"{MCP_BASE_URL}/settings", json={key: saved}, headers=_MCP_HEADERS)
+        except httpx.RequestError:
+            pass  # the PC has it; the tool server gets it on the next save
+    return {"source": source, "key": key, "value": saved}
+
+
+# Settings both the PC and the tool server need: shown once (the PC's), saved to both (2026-10-24: the library's
+# address, so the PC's hooks and the tool server's known-bugs sharing use the same one).
+MIRRORED = ("library_url",)
 
 
 def _address(url: str) -> str:
@@ -3080,8 +3096,66 @@ async def approvals():
                       # the shop's new texts in full (etsy.shop.update): the owner reads them before approving
                       **({"detail": pay["detail"][:20000]} if isinstance(pay.get("detail"), str) else {}),
                       **({"error": str(i["last_error"])[:300]} if i.get("last_error") else {})})
+    # Failed tool calls seen in 2+ sessions (tools/bugs/seen.py, the owner 2026-10-24: bugs were only reported when
+    # someone asked). Keep makes a known bug; dismiss stops that error being suggested. A tool server without it is skipped.
+    for i in await _admin_items("/bugs/suggested") or []:
+        try:
+            at = datetime.datetime.fromisoformat(str(i.get("last"))).timestamp()
+        except ValueError:
+            at = 0
+        seen_in = f"seen {i.get('count')} times in {i.get('sessions')} sessions over {i.get('days')} day(s)"
+        items.append({"kind": "bug", "id": str(i.get("key")), "from": str(i.get("tool") or "")[:60], "at": at,
+                      "title": f"{str(i.get('example') or '')[-300:]} ({seen_in})"})
+    # The agent roster (agents_roster.py, the owner 2026-10-24: "a confirm list"): rows agents added or changed wait here.
+    for r in await _admin_items("/agents/roster") or []:
+        change = r.get("proposed") or r
+        now = f" (now: {r.get('role')})" if r.get("proposed") else ""
+        items.append({"kind": "roster", "id": str(r.get("name") or ""), "from": str(change.get("by") or "")[:60],
+                      "at": r.get("updated") or 0,
+                      "title": f"{r.get('name')}: {change.get('role')} [{change.get('reach')}]{now}"[:300]})
+    # Library scripts an agent asked HomeShed to sign (library_signing.py, Homeshed-addon #58): Yes signs the code shown.
+    for s in await _admin_items("/publisher/sign") or []:
+        items.append({"kind": "sign", "id": str(s.get("id") or ""), "from": str(s.get("by") or "")[:60],
+                      "at": s.get("at") or 0, "detail": str(s.get("body") or ""),
+                      "title": (f"Sign {s.get('id')} v{s.get('version')} as read-only: {s.get('title') or ''} "
+                                f"({s.get('language')}, runs on {s.get('runs_on') or '?'}). Read the code first.")[:300]})
     items.sort(key=lambda x: -float(x.get("at") or 0))
     return {"items": items, "count": len(items), "unavailable": unavailable}
+
+
+@app.post("/api/agents/roster/{name}/{action}")
+async def agents_roster_decide(name: str, action: str, request: Request):
+    """Confirm a roster row (optional body {"role"}: the owner's own wording) or remove it. Owner only (not in
+    VIEWER_ROUTES)."""
+    if not 0 < len(name) <= 60 or action not in ("confirm", "decline", "remove"):
+        return JSONResponse({"error": "bad request"}, status_code=400)
+    try:
+        body = await request.json()
+    except ValueError:
+        body = {}
+    role = str(body.get("role") or "")[:200] if isinstance(body, dict) else ""
+    from urllib.parse import quote
+    return await _mcp_admin("POST", f"/agents/roster/{quote(name, safe='')}/{action}",
+                            {"role": role} if role else None)
+
+
+@app.post("/api/publisher/sign/{asset_id}/{action}")
+async def publisher_sign_decide(asset_id: str, action: str):
+    """Sign a library script the owner has read, or decline the request. Owner only (not in VIEWER_ROUTES)."""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,119}", asset_id) or action not in ("approve", "decline"):
+        return JSONResponse({"error": "bad request"}, status_code=400)
+    return await _mcp_admin("POST", f"/publisher/sign/{asset_id}/{action}")
+
+
+_SUGGESTION_KEY = re.compile(r"[0-9a-f]{12}")
+
+
+@app.post("/api/bugs/suggested/{key}/{action}")
+async def bugs_suggested_decide(key: str, action: str):
+    """Keep a suggested bug (it becomes a known bug) or dismiss it. Owner only (not in VIEWER_ROUTES)."""
+    if not _SUGGESTION_KEY.fullmatch(key) or action not in ("keep", "dismiss"):
+        return JSONResponse({"error": "bad request"}, status_code=400)
+    return await _mcp_admin("POST", f"/bugs/suggested/{key}/{action}")
 
 
 @app.post("/api/clients/{name}/tools/{tool_id}/{action}")

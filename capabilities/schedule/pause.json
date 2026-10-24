@@ -1,0 +1,43 @@
+{
+  "id": "schedule.pause",
+  "name": "Pause a Schedule",
+  "version": "1.0.0",
+  "description": "Pause a schedule or resume it (also clears a pause after repeated failures).",
+  "category": "schedule",
+  "risk": "write",
+  "requires": [
+    "apscheduler"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "pause schedule",
+    "resume schedule"
+  ],
+  "inputs": {
+    "schedule_id": {
+      "type": "string",
+      "required": true
+    },
+    "paused": {
+      "type": "boolean",
+      "required": false,
+      "default": true
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.schedule.tools.pause"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "schedule.add",
+    "schedule.list",
+    "schedule.remove"
+  ]
+}

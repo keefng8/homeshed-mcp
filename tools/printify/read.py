@@ -40,7 +40,8 @@ def shops_list() -> dict:
 @tool(name="products.list", category="printify", doc="printify/read.md")
 def products_list(page: int = 1, limit: int = 20) -> dict:
     """The configured shop's products (PRINTIFY_SHOP_ID), compact: id, title, visible, blueprint and print
-    provider, enabled variants, lowest price, updated, and external_id (the Etsy listing id once it's published, else
+    provider, enabled variants, lowest price of the enabled variants, and max_price only when some enabled variant
+    costs more (a mixed-price product shows at once, 2026-10-24), updated, and external_id (the Etsy listing id once it's published, else
     null), so a watch over drafts reads list pages instead of one product.get each (2026-10-14).
 
     Args:
@@ -56,10 +57,12 @@ def products_list(page: int = 1, limit: int = 20) -> dict:
         on = [v for v in (p.get("variants") or []) if isinstance(v, dict) and v.get("is_enabled")]
         prices = [v.get("price") for v in on if isinstance(v.get("price"), (int, float))]
         ext = p.get("external") if isinstance(p.get("external"), dict) else {}
-        rows.append({"id": p.get("id"), "title": h.trim(p.get("title"), 60), "visible": p.get("visible"),
+        rows.append({"id": p.get("id"), "title": h.trim(p.get("title"), 45),  # 45, not 60: room for max_price "visible": p.get("visible"),
                      "blueprint_id": p.get("blueprint_id"), "print_provider_id": p.get("print_provider_id"),
                      "variants_enabled": len(on), "min_price": _cents(min(prices)) if prices else None,
-                     "updated": p.get("updated_at"), "external_id": ext.get("id")})
+                     "updated": p.get("updated_at"), "external_id": ext.get("id"),
+                     # only when it differs, so a 20-product page stays under 5,000 characters
+                     **({"max_price": _cents(max(prices))} if prices and max(prices) != min(prices) else {})})
     return {**_page(d), "products": rows}
 
 

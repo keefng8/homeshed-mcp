@@ -1,0 +1,37 @@
+{
+  "id": "backup.export",
+  "name": "Back Up HomeShed",
+  "version": "1.0.0",
+  "description": "Save HomeShed's settings and state (schedules, watches, app access, to-do list, approvals, observations) to one zip; vault key values never included, only their names. Owner only.",
+  "category": "backup",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "back up homeshed",
+    "make a backup",
+    "export my settings",
+    "move to a new machine"
+  ],
+  "inputs": {
+    "include_logs": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.backup.backup.export"
+  },
+  "latency": {
+    "expected_ms": 2000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "backup.restore"
+  ]
+}

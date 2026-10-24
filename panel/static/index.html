@@ -7395,6 +7395,15 @@ const APPROVAL_KINDS = {
     act: (id, ok) => apiCall('POST', `/api/proxmox/waiting/${encodeURIComponent(id)}/${ok ? 'approve' : 'decline'}`) },
   printify: { label: 'Publish to Etsy', no: 'Decline',  // to-do #59: approving puts it live on the shop
     act: (id, ok) => apiCall('POST', `/api/printify/waiting/${encodeURIComponent(id)}/${ok ? 'approve' : 'decline'}`) },
+  // the same failed tool call in 2+ sessions (2026-10-24): keep makes it a known bug, so every session gets its fix
+  bug: { label: 'Suggested bug', yes: 'Keep as a bug', no: 'Not a bug',
+    act: (id, ok) => apiCall('POST', `/api/bugs/suggested/${encodeURIComponent(id)}/${ok ? 'keep' : 'dismiss'}`) },
+  // who's who among the agents (2026-10-24): an agent added or changed a row; the owner's wording wins once confirmed
+  roster: { label: 'Agent roster', yes: 'Confirm', no: 'Decline',
+    act: (id, ok) => apiCall('POST', `/api/agents/roster/${encodeURIComponent(id)}/${ok ? 'confirm' : 'decline'}`) },
+  // HomeShed signs a read-only library script (Homeshed-addon #58): runners that trust the key then run it unasked
+  sign: { label: 'Sign a library script', yes: 'Sign it', no: 'Decline', detailLabel: 'Read the code',
+    act: (id, ok) => apiCall('POST', `/api/publisher/sign/${encodeURIComponent(id)}/${ok ? 'approve' : 'decline'}`) },
 };
 let _appr = { items: [], unavailable: [], open: false };
 async function loadApprovals() {
@@ -7538,18 +7547,20 @@ function renderApprovals() {
     return `<div class="appr-item">
       <p class="hint"><b>${({ update: 'Update on Etsy', etsy: 'Etsy listing details', etsy_shop: 'Etsy shop texts', pinterest_pin: 'Pinterest pin', pinterest_board: 'Pinterest board' })[i.action] || k.label}</b>${i.from ? ` from ${escapeHtml(i.from)}` : ''}${when}</p>
       <div class="appr-text">${escapeHtml(i.title || '')}</div>
-      ${i.detail ? `<details class="appr-detail"><summary>Read the full new text</summary><div class="appr-text" style="white-space:pre-wrap;max-height:40vh;overflow:auto">${escapeHtml(i.detail)}</div></details>` : ''}
+      ${i.detail ? `<details class="appr-detail"><summary>${k.detailLabel || 'Read the full new text'}</summary><div class="appr-text" style="white-space:pre-wrap;max-height:40vh;overflow:auto">${escapeHtml(i.detail)}</div></details>` : ''}
       ${(i.images || []).length ? `<div class="appr-imgs">${i.images.map(m => m.thumb
         ? `<a href="${escAttr(m.thumb)}" target="_blank" rel="noopener"><img src="${escAttr(m.thumb)}" alt="${escAttr(m.label)}" title="${escAttr(m.label)}" loading="lazy"></a>`
         : `<span class="hint">${escapeHtml(m.label)}</span>`).join('')}</div>` : ''}
-      <div class="appr-act"><button type="button" onclick="decideApproval(this, '${escAttr(i.kind)}', '${escAttr(i.id)}', true)">Approve</button>
-        <button type="button" class="ghost" onclick="decideApproval(this, '${escAttr(i.kind)}', '${escAttr(i.id)}', false)">${k.no}</button></div>
+      <div class="appr-act" data-kind="${escAttr(i.kind)}" data-id="${escAttr(i.id)}"><button type="button" onclick="decideApproval(this, true)">${k.yes || 'Approve'}</button>
+        <button type="button" class="ghost" onclick="decideApproval(this, false)">${k.no}</button></div>
     </div>`;
   }).join('') + (_appr.unavailable.length ? `<div class="appr-note">Couldn't check: ${escapeHtml(_appr.unavailable.join(', '))}.</div>` : '');
 }
 function toggleApprovals() { onlyPopup('appr'); }
-async function decideApproval(btn, kind, id, ok) {
-  const buttons = btn.closest('.appr-act').querySelectorAll('button');
+async function decideApproval(btn, ok) {
+  // kind and id ride in data- attributes: inside a JS string in onclick, a backslash in an id (a session named after a
+  // Windows folder) was dropped, and the server got no such row (2026-10-24)
+  const row = btn.closest('.appr-act'), { kind, id } = row.dataset, buttons = row.querySelectorAll('button');
   buttons.forEach(b => { b.disabled = true; });
   try { await APPROVAL_KINDS[kind].act(id, ok); }
   catch (e) {  // it stays waiting: say why, and leave the buttons for another go

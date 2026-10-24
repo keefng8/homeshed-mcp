@@ -36,9 +36,11 @@ def switch_off():
 
 def test_discovered_by_registry_with_manifests():
     from manifest import load_manifests
-    assert {c.name for c in registry.discover() if c.category == "agents"} == {"list", "send", "inbox"}
+    names = {"list", "send", "inbox", "roster", "roster_set"}
+    assert {c.name for c in registry.discover() if c.category == "agents"} == names
     ids = {m["id"]: m for m in load_manifests() if m["category"] == "agents"}
-    assert set(ids) == {"agents.list", "agents.send", "agents.inbox"} and ids["agents.list"]["risk"] == "read"
+    assert set(ids) == {f"agents.{n}" for n in names} and ids["agents.list"]["risk"] == "read"
+    assert ids["agents.roster"]["risk"] == "read" and ids["agents.roster_set"]["risk"] == "write"
 
 
 def test_send_and_receive_between_two_clients(box):

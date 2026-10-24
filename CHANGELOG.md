@@ -6,6 +6,37 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-10-24
+
+### Added
+- `docs.read` reads PDF, Word, Excel and CSV files.
+- `web.watch` and `web.watch.check` watch a page and report when it changes.
+- `schedule.add`, `schedule.list`, `schedule.pause` and `schedule.remove` run read-only tools on a timetable.
+- `email.send` and `email.status`: each email waits for the owner's approval before it goes.
+- `backup.export` and `backup.restore` (Pro, owner only).
+- `image.describe` describes a picture in words. `image.generate` can save paid providers' images into folders.
+- `agents.roster` and `agents.roster_set`: a who's-who of the agents (name, role, how to reach them), with each row
+  confirmed by the owner in the Control Panel.
+- `bugs.seen` notes failures automatically, and suggests to the owner any bug that repeats across sessions. Known
+  bugs can be shared with a HomeShed Library server.
+- `publisher.sign` signs read-only library scripts with a key in the vault. The owner approves each one in the
+  Control Panel. It's off until that key is stored.
+- `printify.products.list` takes `max_price`.
+
+### Changed
+- `llm.chat` adds OpenAI and Gemini, answers up to 16,000 tokens, and can carry on when an answer is cut off
+  (`continue_if_cut`).
+- One-off commands that hog the CPU for 10 minutes are stopped, and the owner is told. Setting:
+  `stray_command_stop`, on by default.
+- Settings: the Library's address, and context-monitor levels down to 10%.
+- `printify.products.list` returns shorter titles.
+- The CodeQL and PyPI-publish actions are updated (SHA-pinned).
+- The plugin runs 0.6.2.
+
+### Fixed
+- Approval buttons work for items whose id contains a backslash.
+- A bare `TOKEN=value` is now redacted.
+
 ## [0.6.1] - 2026-10-23
 
 ### Security

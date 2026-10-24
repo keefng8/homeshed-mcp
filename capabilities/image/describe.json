@@ -1,0 +1,50 @@
+{
+  "id": "image.describe",
+  "name": "Describe a Design",
+  "version": "1.0.0",
+  "description": "Short, plainly visible details of a design's artwork (e.g. \"long gold ears\"), never a breed, name, fact or guess: for writing posts and listings about a design without seeing it. Claude Haiku through the llm relay.",
+  "category": "image",
+  "risk": "read",
+  "requires": [
+    "llm relay: anthropic switched on (CLAUDE_WORKSPACE_API)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "describe this design",
+    "what does the design show",
+    "visible details",
+    "design facts"
+  ],
+  "inputs": {
+    "image_name": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "image_b64": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "count": {
+      "type": "integer",
+      "required": false,
+      "default": 3
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.image.describe.describe"
+  },
+  "latency": {
+    "expected_ms": 6000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "image.ip_check",
+    "llm.chat"
+  ]
+}

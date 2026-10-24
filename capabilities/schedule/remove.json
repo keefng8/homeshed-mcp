@@ -1,0 +1,38 @@
+{
+  "id": "schedule.remove",
+  "name": "Remove a Schedule",
+  "version": "1.0.0",
+  "description": "Delete one of your schedules; it stops at once.",
+  "category": "schedule",
+  "risk": "write",
+  "requires": [
+    "apscheduler"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "delete schedule",
+    "stop the daily check"
+  ],
+  "inputs": {
+    "schedule_id": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.schedule.tools.remove"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "schedule.add",
+    "schedule.list",
+    "schedule.pause"
+  ]
+}

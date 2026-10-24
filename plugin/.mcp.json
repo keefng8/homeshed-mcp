@@ -2,7 +2,7 @@
   "mcpServers": {
     "homeshed": {
       "command": "uvx",
-      "args": ["homeshed-mcp==0.6.1"]
+      "args": ["homeshed-mcp==0.6.2"]
     }
   }
 }

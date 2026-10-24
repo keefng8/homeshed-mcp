@@ -1,0 +1,34 @@
+{
+  "id": "schedule.list",
+  "name": "List Schedules",
+  "version": "1.0.0",
+  "description": "Your schedules with next run, last run, whether it worked and the last 5 run summaries.",
+  "category": "schedule",
+  "risk": "read",
+  "requires": [
+    "apscheduler"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "my schedules",
+    "what runs automatically",
+    "scheduled jobs"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "python",
+    "handler": "tools.schedule.tools.list_schedules"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "schedule.add",
+    "schedule.remove",
+    "schedule.pause"
+  ]
+}

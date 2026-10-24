@@ -15,8 +15,9 @@ Errors carry the HTTP status and a short reason with URLs and the key scrubbed o
 start (so failed ones count too); tokens and cost when they finish. The usage log keeps who (client), provider, model,
 tokens and cost, never a prompt or an answer.
 
-Adding a provider (openai, anthropic): a PROVIDERS entry (key name, host, models with prices) and an adapter in
-ADAPTERS that takes (key, model, messages, system, max_tokens, temperature) and returns the common result.
+Adding a provider: a PROVIDERS entry (key name, host, models with prices) and an adapter in ADAPTERS that takes
+(key, model, messages, system, max_tokens, temperature) and returns the common result. xai and openai share the
+Responses API adapter; gemini uses the OpenAI-compatible Chat Completions one (the owner, 2026-10-23: "widen it").
 """
 from __future__ import annotations
 
@@ -63,8 +64,34 @@ PROVIDERS: dict[str, dict] = {
             "claude-opus-5-5": {"in": 4.00, "cached": 0.20, "out": 20.00, "note": "most capable here"},
         },
     },
+    # Prices from developers.openai.com/api/docs/pricing (checked 2026-10-23; Standard tier, <= 272k input tokens).
+    # Temperature isn't sent: OpenAI's reasoning models refuse it, the same as Claude's.
+    "openai": {
+        "label": "OpenAI", "key": "OPENAI_API_KEY", "host": "api.openai.com", "path": "/v1/responses",
+        "pricing_url": "https://developers.openai.com/api/docs/pricing", "default_model": "gpt-5.4-mini",
+        "no_temperature": True,
+        "models": {
+            "gpt-5.4-mini": {"in": 0.75, "cached": 0.075, "out": 4.50, "note": "good value all-rounder"},
+            "gpt-5.4-nano": {"in": 0.20, "cached": 0.02, "out": 1.25, "note": "cheapest; short checks"},
+            "gpt-6-luna": {"in": 0.10, "cached": 0.01, "out": 0.50},
+            "gpt-6-astra": {"in": 10.00, "cached": 1.00, "out": 50.00, "note": "OpenAI's most capable; costly"},
+        },
+    },
+    # Prices from ai.google.dev/gemini-api/docs/pricing (updated 2026-10-22; paid tier, prompts under 200k). Google lists
+    # rises: gemini-4-argon to $4/$20 from 1 Dec 2026, the Flash models to $1.50/$7.50 from 1 Jan 2027. Update then.
+    "gemini": {
+        "label": "Google Gemini", "key": "GEMINI_API_KEY", "host": "generativelanguage.googleapis.com",
+        "path": "/v1beta/openai/chat/completions", "pricing_url": "https://ai.google.dev/gemini-api/docs/pricing",
+        "default_model": "gemini-3.8-flash",
+        "models": {
+            "gemini-3.8-flash": {"in": 0.75, "cached": 0.075, "out": 3.75, "note": "fast all-rounder; sees images"},
+            "gemini-3.5-flash-lite": {"in": 0.30, "cached": 0.03, "out": 2.50, "note": "cheapest"},
+            "gemini-4-argon": {"in": 2.00, "cached": 0.10, "out": 10.00, "note": "Google's most capable"},
+            "gemini-2.5-pro": {"in": 1.25, "cached": 0.125, "out": 10.00},
+        },
+    },
 }
-PLANNED = ["openai"]  # same switches and caps when added; not callable yet
+PLANNED: list[str] = []  # names here show in errors as coming; not callable yet
 
 SETTINGS_GROUP = "Language models"
 CAP_OPTIONS = ["0", "10", "25", "50", "100", "250", "500", "1000"]
@@ -76,8 +103,13 @@ LOG_FILE_DEFAULT = "usage/llm_usage.jsonl"
 LOG_MAX_BYTES = 2 * 1024 * 1024  # then rotated once to .1
 
 TIMEOUT_S = 90.0
-TIMEOUT = httpx.Timeout(TIMEOUT_S, connect=5.0)
-MAX_BYTES = 2 * 1024 * 1024
+MAX_TIMEOUT_S = 600.0  # a long answer (16k tokens, a chapter batch) is minutes of generation: the wait grows with it
+MAX_BYTES = 4 * 1024 * 1024
+
+
+def timeout_for(max_tokens: int) -> float:
+    """90 s, plus a second for every 25 answer tokens past 2,048 (a slow model's pace), at most 10 minutes."""
+    return min(MAX_TIMEOUT_S, TIMEOUT_S + max(0, max_tokens - 2048) / 25)
 OWNER_HINT = "only the owner can change this: Control Panel > Settings > AI and tools > Language models"
 _URL = re.compile(r"\b(?:https?|data):\S+", re.IGNORECASE)
 
@@ -375,12 +407,12 @@ HINTS = {400: " (the request was refused: check the model and messages)", 401: "
          404: " (unknown model or endpoint)", 429: " (rate limited or out of quota: try again later)"}
 
 
-def post_json(provider: str, key: str, body: dict, auth: dict | None = None) -> dict:
+def post_json(provider: str, key: str, body: dict, auth: dict | None = None, wait_s: float = TIMEOUT_S) -> dict:
     """One POST to the provider's own host and path. The key goes in one header only (Authorization unless the
     provider's adapter passes its own auth headers)."""
     p = PROVIDERS[provider]
     host, name = p["host"], p["label"]
-    kwargs: dict = {"timeout": TIMEOUT, "follow_redirects": False}
+    kwargs: dict = {"timeout": httpx.Timeout(wait_s, connect=5.0), "follow_redirects": False}
     if _TRANSPORT is not None:
         kwargs["transport"] = _TRANSPORT
     headers = {**(auth or {"Authorization": f"Bearer {key}"}), "Content-Type": "application/json",
@@ -389,7 +421,7 @@ def post_json(provider: str, key: str, body: dict, auth: dict | None = None) -> 
         with httpx.Client(**kwargs) as http:
             resp = http.post(f"https://{host}{p['path']}", json=body, headers=headers)
     except httpx.TimeoutException:
-        raise LLMError(f"{name} didn't answer within {TIMEOUT_S:.0f} seconds") from None
+        raise LLMError(f"{name} didn't answer within {wait_s:.0f} seconds") from None
     except httpx.HTTPError as exc:
         raise LLMError(f"couldn't reach {name} ({type(exc).__name__})") from None
     if resp.url.host != host:  # belt and braces: the client never follows redirects
@@ -421,18 +453,20 @@ def estimate_cost(provider: str, model: str, input_tokens: int, cached: int, out
     return round((fresh * price["in"] + cached * price["cached"] + output_tokens * price["out"]) / 1_000_000, 6)
 
 
-def _xai(key: str, model: str, messages: list[dict], system: str, max_tokens: int,
-         temperature: float | None) -> dict:
-    """xAI's Responses API (POST /v1/responses, docs.x.ai/docs/api-reference, 2026-10-04). store=false: xAI keeps
-    nothing for later retrieval. max_output_tokens bounds the visible answer; reasoning tokens are billed on top."""
+def _responses(provider: str, key: str, model: str, messages: list[dict], system: str, max_tokens: int,
+               temperature: float | None) -> dict:
+    """The Responses API (POST /v1/responses): xAI's (docs.x.ai/docs/api-reference, 2026-10-04) and OpenAI's, the same
+    shape. store=false: the provider keeps nothing for later retrieval. max_output_tokens bounds the visible answer;
+    reasoning tokens are billed on top."""
+    p = PROVIDERS[provider]
     body: dict = {"model": model, "input": messages, "max_output_tokens": max_tokens, "store": False}
     if system:
         body["instructions"] = system
-    if temperature is not None:
+    if temperature is not None and not p.get("no_temperature"):
         body["temperature"] = temperature
-    d = post_json("xai", key, body)
+    d = post_json(provider, key, body, wait_s=timeout_for(max_tokens))
     if isinstance(d.get("error"), dict) and d["error"].get("message"):
-        raise LLMError(f"xAI Grok reported an error: {clean(d['error']['message'], (key,))}")
+        raise LLMError(f"{p['label']} reported an error: {clean(d['error']['message'], (key,))}")
     parts = []
     for item in d.get("output") or []:
         if isinstance(item, dict) and item.get("type") == "message":
@@ -447,10 +481,10 @@ def _xai(key: str, model: str, messages: list[dict], system: str, max_tokens: in
     cached = int(details_in.get("cached_tokens") or 0) if isinstance(details_in, dict) else 0
     reasoning = int(details_out.get("reasoning_tokens") or 0) if isinstance(details_out, dict) else 0
     ticks = u.get("cost_in_usd_ticks")
-    if isinstance(ticks, (int, float)) and ticks >= 0:  # 10,000,000,000 ticks to the dollar (xAI's docs)
+    if provider == "xai" and isinstance(ticks, (int, float)) and ticks >= 0:  # 1e10 ticks to the dollar (xAI's docs)
         cost, source = round(ticks / 1e10, 6), "xai"
     else:
-        cost, source = estimate_cost("xai", model, in_t, cached, out_t + reasoning), "estimate"
+        cost, source = estimate_cost(provider, model, in_t, cached, out_t + reasoning), "estimate"
     status = d.get("status") or "completed"
     return {"text": "".join(parts), "model": str(d.get("model") or model)[:60], "finish": str(status)[:20],
             "incomplete": status == "incomplete",
@@ -497,7 +531,8 @@ def _anthropic(key: str, model: str, messages: list[dict], system: str, max_toke
                            "cache_control": {"type": "ephemeral"}}]
     if schema:  # structured output: the answer is JSON in this shape (output_config.format, GA)
         body["output_config"] = {"format": {"type": "json_schema", "schema": schema}}
-    d = post_json("anthropic", key, body, auth={"x-api-key": key, "anthropic-version": "2023-06-01"})
+    d = post_json("anthropic", key, body, auth={"x-api-key": key, "anthropic-version": "2023-06-01"},
+                  wait_s=timeout_for(max_tokens))
     if d.get("type") == "error" and isinstance(d.get("error"), dict):
         raise LLMError(f"Anthropic Claude reported an error: {clean(d['error'].get('message'), (key,))}")
     text = "".join(c["text"] for c in d.get("content") or []
@@ -516,7 +551,51 @@ def _anthropic(key: str, model: str, messages: list[dict], system: str, max_toke
                       "cost_usd": cost, "cost_source": "estimate" if cost is not None else None}}
 
 
-ADAPTERS = {"xai": _xai, "anthropic": _anthropic}
+def _chat_content(content) -> str | list[dict]:
+    """llm.chat's content (text, or the Responses-style parts _with_images builds) as Chat Completions content."""
+    if isinstance(content, str):
+        return content
+    return [{"type": "text", "text": c["text"]} if c.get("type") == "input_text"
+            else {"type": "image_url", "image_url": {"url": c["image_url"]}} for c in content]
+
+
+def _chat_completions(provider: str, key: str, model: str, messages: list[dict], system: str, max_tokens: int,
+                      temperature: float | None) -> dict:
+    """An OpenAI-compatible Chat Completions API (Gemini's: ai.google.dev/gemini-api/docs/openai, 2026-10-23). The
+    system prompt goes first as a system message; usage is read in OpenAI's shape, with Gemini's thinking tokens in
+    completion_tokens_details.reasoning_tokens when it reports them."""
+    p = PROVIDERS[provider]
+    msgs = ([{"role": "system", "content": system}] if system else []) + [
+        {"role": m["role"], "content": _chat_content(m["content"])} for m in messages]
+    body: dict = {"model": model, "messages": msgs, "max_tokens": max_tokens}
+    if temperature is not None and not p.get("no_temperature"):
+        body["temperature"] = temperature
+    d = post_json(provider, key, body, wait_s=timeout_for(max_tokens))
+    if isinstance(d.get("error"), dict) and d["error"].get("message"):
+        raise LLMError(f"{p['label']} reported an error: {clean(d['error']['message'], (key,))}")
+    choice = (d.get("choices") or [{}])[0]
+    choice = choice if isinstance(choice, dict) else {}
+    msg = choice.get("message") if isinstance(choice.get("message"), dict) else {}
+    text = msg.get("content") if isinstance(msg.get("content"), str) else ""
+    u = d.get("usage") if isinstance(d.get("usage"), dict) else {}
+    in_t, out_t = int(u.get("prompt_tokens") or 0), int(u.get("completion_tokens") or 0)
+    din = u.get("prompt_tokens_details") if isinstance(u.get("prompt_tokens_details"), dict) else {}
+    dout = u.get("completion_tokens_details") if isinstance(u.get("completion_tokens_details"), dict) else {}
+    cached, reasoning = int(din.get("cached_tokens") or 0), int(dout.get("reasoning_tokens") or 0)
+    cost = estimate_cost(provider, model, in_t, cached, out_t + reasoning)
+    stop = str(choice.get("finish_reason") or "stop")
+    return {"text": text, "model": str(d.get("model") or model)[:60], "finish": stop[:20],
+            "incomplete": stop == "length",
+            "usage": {"input_tokens": in_t, "output_tokens": out_t, "reasoning_tokens": reasoning,
+                      "cached_tokens": cached, "cost_usd": cost, "cost_source": "estimate" if cost is not None else None}}
+
+
+def _xai(*a):
+    return _responses("xai", *a)
+
+
+ADAPTERS = {"xai": _xai, "openai": lambda *a: _responses("openai", *a), "anthropic": _anthropic,
+            "gemini": lambda *a: _chat_completions("gemini", *a)}
 
 
 def call(provider: str, model: str, messages: list[dict], system: str, max_tokens: int,

@@ -11,6 +11,7 @@ model: a job_id at once, the image via image.status.
 from __future__ import annotations
 
 import os
+import re
 import threading
 
 import httpx
@@ -32,6 +33,9 @@ ENHANCE_INSTRUCTION = (
 # than 256" for schnell); about 1,000 characters of English. Longer prompts lose their end, so the rewrite is kept
 # shorter for it, and a long prompt of the owner's gets a warning (the owner, 2026-10-07, #65: "info on char limits").
 FLUX_MAX_CHARS = 1000
+# The image service's own rule for a folder name, here too since paid images take one (2026-10-24: book covers out of
+# the store's gallery)
+FOLDER = re.compile(r"[A-Za-z0-9 _-]{1,40}")
 WORDS = {"flux.1-schnell": "40-90"}
 # The rewrite may take no longer than this: a slow or busy model must never make image.generate fail (the owner,
 # 2026-10-07, #65: queuing failed with an HTML error while the local model was off for training).
@@ -161,8 +165,9 @@ def generate(prompt: str, width: int = 768, height: int = 768, steps: int = 0, s
         require_commercial: refuse models whose outputs can't be sold (non-commercial, or "check" terms). With no
             provider named: the free local FLUX.1-schnell if installed and on, else the first usable (switched
             on, key stored, under its daily cap) of together, fal, replicate, openai (PAID; "auto_selected" is true).
-        folder: local only: save into this folder of the images (made if new; letters, numbers, spaces, - and _,
-            up to 40). Empty saves to the main images folder.
+        folder: save into this folder of the images (made if new; letters, numbers, spaces, - and _, up to 40),
+            kept out of the main gallery and image.history; a paid image's name is then "folder/name". Empty saves
+            to the main images folder.
         paid_fallback: local only: if the GPU can't take the image now (too hot, short of RAM or GPU memory, or
             lent out), run it on xAI grok-imagine-image instead (PAID, about $0.02, commercial use allowed) when xAI
             is switched on, has its key and is under its owner-set daily cap; "fell_back" says so. Otherwise it waits
@@ -188,12 +193,14 @@ def generate(prompt: str, width: int = 768, height: int = 768, steps: int = 0, s
     neg = (negative_prompt or "").strip()
     if len(neg) > 1000:
         raise ImageError("negative_prompt must be at most 1000 characters")
+    if folder.strip() and not FOLDER.fullmatch(folder.strip()):
+        raise ImageError("folder: letters, numbers, spaces, - and _, up to 40")
     name, model, auto = choose(provider, model, require_commercial)
     info = prov.model_info(name, model)
     if name == prov.LOCAL:
         base = base_url()
-    elif upscale or folder.strip() or neg:
-        raise ImageError("upscale, folder and negative_prompt are only available on the local provider")
+    elif upscale or neg:
+        raise ImageError("upscale and negative_prompt are only available on the local provider")
     refs = [str(r).strip() for r in input_images or [] if str(r).strip()]
     inputs = []
     if refs:
@@ -225,7 +232,7 @@ def generate(prompt: str, width: int = 768, height: int = 768, steps: int = 0, s
     if name != prov.LOCAL:
         try:
             return {**prov.start_remote(name, model, prompt, width, height, seed, steps, inputs=inputs or None,
-                                        input_names=refs or None), **extra}
+                                        input_names=refs or None, folder=folder.strip()), **extra}
         except prov.ProviderError as exc:
             raise ImageError(str(exc)) from None
     try:

@@ -1,0 +1,40 @@
+{
+  "id": "publisher.sign",
+  "name": "Sign a Library Script",
+  "version": "1.0.0",
+  "description": "Ask for a read-only library script's current version to be signed with HomeShed's publisher key; the owner reads the code and says Yes in the Control Panel.",
+  "category": "publisher",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "sign a library script",
+    "publisher sign",
+    "trust this script version"
+  ],
+  "inputs": {
+    "id": {
+      "type": "string",
+      "required": true
+    },
+    "as_session": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.publisher.sign.sign"
+  },
+  "latency": {
+    "expected_ms": 1000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "agents.roster"
+  ]
+}

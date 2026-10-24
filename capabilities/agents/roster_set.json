@@ -1,0 +1,50 @@
+{
+  "id": "agents.roster_set",
+  "name": "Add to the Agent Roster",
+  "version": "1.0.0",
+  "description": "Add yourself or another agent (a cloud session, a mailbox-only app) to the roster with its role; the owner confirms it in the Control Panel.",
+  "category": "agents",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "add me to the roster",
+    "set my role",
+    "say what this agent does"
+  ],
+  "inputs": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "role": {
+      "type": "string",
+      "required": true
+    },
+    "reach": {
+      "type": "string",
+      "required": false,
+      "default": "session"
+    },
+    "as_session": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.agents.roster.roster_set"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "agents.roster",
+    "agents.list"
+  ]
+}

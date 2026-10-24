@@ -70,11 +70,13 @@ def test_prompts_backend_refusal_passes_its_reason(monkeypatch):
         prompts_mod.prompts(action="add", prompt="x", size="9x9")
 
 
-def test_generate_folder_is_local_only(monkeypatch):
+def test_generate_folder_goes_to_a_paid_provider_negative_prompt_doesnt(monkeypatch):
     from tools.image import generate as gen
     monkeypatch.setattr(gen, "choose", lambda p, m, r: ("openai", "gpt-image-1", False))
     monkeypatch.setattr(gen.prov, "model_info", lambda n, m: {"license": {"commercial_use": True}})
-    with pytest.raises(ImageError, match="only available on the local provider"):
-        gen.generate("a shed", enhance_prompt=False, provider="openai", folder="Sheds")
+    seen = {}
+    monkeypatch.setattr(gen.prov, "start_remote", lambda *a, **kw: seen.update(kw) or {"job_id": "x"})
+    gen.generate("a shed", enhance_prompt=False, provider="openai", folder="Sheds")
+    assert seen["folder"] == "Sheds"  # 2026-10-24: paid book covers kept out of the shop's gallery
     with pytest.raises(ImageError, match="only available on the local provider"):
         gen.generate("a shed", enhance_prompt=False, provider="openai", negative_prompt="blurry")
