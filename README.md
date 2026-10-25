@@ -23,7 +23,13 @@
   <a href="LICENSE"><img alt="Licence: Apache-2.0" src="https://img.shields.io/badge/licence-Apache--2.0-blue"></a>
   <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white">
   <a href="https://modelcontextprotocol.io"><img alt="Model Context Protocol" src="https://img.shields.io/badge/MCP-server-black"></a>
-  <a href="https://mcprush.com/to/homeshed-mcp?ref=badge"><img alt="mcprush" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fmcprush.com%2Fbadge%2Fhomeshed-mcp%2Fshields.json"></a>
+  
+  <p align="center">
+  <a href="https://mcprush.com/to/homeshed-mcp?ref=badge">
+    <img width="380" height="200" src="https://mcprush.com/badge/homeshed-mcp/card.svg" alt="HomeShed MCP server" />
+  </a>
+</p>
+
 </p>
 
 <p align="center">
