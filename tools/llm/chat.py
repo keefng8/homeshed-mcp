@@ -18,6 +18,9 @@ MAX_INPUT_CHARS = 200_000  # every message plus system: about 50k tokens
 MAX_SYSTEM_CHARS = 32_000
 MAX_TOKENS = 16_000
 MAX_TEXT_CHARS = 64_000
+# Claude's output_config.effort. The station's book writer, 2026-10-24: Sonnet 5.5 spent all 16,000 tokens thinking and
+# answered nothing (finish max_tokens); a lower effort leaves room for the answer.
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
 
 
 class Message(TypedDict):
@@ -90,10 +93,10 @@ CONTINUE_ASK = "You were cut off. Carry on exactly where you stopped, without re
 
 
 def _turn(provider: str, client: str, model: str, msgs: list[dict], system: str, max_tokens: int,
-          temperature: float | None) -> dict:
+          temperature: float | None, effort: str = "") -> dict:
     prov.reserve(provider, client)  # switch, key, caps; counts the request
     try:
-        out = prov.call(provider, model, msgs, system, max_tokens, temperature)
+        out = prov.call(provider, model, msgs, system, max_tokens, temperature, effort=effort)
     except prov.LLMError as exc:
         prov.record(provider, client, model, None, ok=False, error=str(exc))
         raise
@@ -112,7 +115,7 @@ def _add(a, b):
 @tool(name="chat", category="llm", doc="llm/relay.md")
 def chat(messages: list[Message], system: str = "", model: str = "", max_tokens: int = 1024,
          temperature: float | None = None, provider: str = "xai", images: list[str] | None = None,
-         continue_if_cut: bool = False) -> dict:
+         continue_if_cut: bool = False, effort: str = "") -> dict:
     """One chat turn with a PAID language model (Grok, Claude, OpenAI or Gemini), relayed through HomeShed: the key stays in the
     owner's vault and never reaches the caller. Off until the owner switches the provider on and gives it a daily cap
     (Control Panel > Settings > AI and tools > Language models); refused with the reason when off, keyless or capped.
@@ -135,6 +138,9 @@ def chat(messages: list[Message], system: str = "", model: str = "", max_tokens:
         continue_if_cut: when the answer stops at max_tokens, make one more call asking the model to carry on, and
             join the two (usage is the sum, "continued": true). Both calls count against the caps. On Claude, thinking
             counts toward max_tokens, so a long piece can stop well short of the word count you'd expect.
+        effort: anthropic only: "low", "medium", "high", "xhigh" or "max", how hard Claude thinks before answering
+            (empty = the model's default: high on Sonnet, medium on Haiku and Opus). Lower leaves more of max_tokens
+            for the answer and costs less; the Claude 5.5 models take no fixed thinking budget.
 
     Returns:
         {"text", "provider", "model", "truncated", "finish", "usage": {"input_tokens", "output_tokens",
@@ -150,15 +156,20 @@ def chat(messages: list[Message], system: str = "", model: str = "", max_tokens:
     if model not in p["models"]:
         raise prov.LLMError(f"{provider} has no model {model!r} here; models: {', '.join(p['models'])}")
     msgs, system, max_tokens, temperature = _check(messages, system, max_tokens, temperature)
+    effort = str(effort or "").strip().lower()
+    if effort and effort not in EFFORTS:
+        raise prov.LLMError(f"effort must be one of {', '.join(EFFORTS)}, or empty for the model's default")
+    if effort and provider != "anthropic":
+        raise prov.LLMError("effort works with provider anthropic only")
     msgs = _with_images(msgs, images)  # loaded before reserve(): a bad name costs nothing
     client = clients.current_client.get() or "owner"
-    out = _turn(provider, client, model, msgs, system, max_tokens, temperature)
+    out = _turn(provider, client, model, msgs, system, max_tokens, temperature, effort)
     if continue_if_cut and out["incomplete"] and out["text"].strip() and len(msgs) + 2 <= MAX_MESSAGES:
         # One more call: the cut answer goes back as the assistant's turn and the model is asked to go on from there.
         # A plain follow-up rather than a prefill, which the newer Claude models refuse.
         more = _turn(provider, client, model, [*msgs, {"role": "assistant", "content": out["text"]},
                                                {"role": "user", "content": CONTINUE_ASK}],
-                     system, max_tokens, temperature)
+                     system, max_tokens, temperature, effort)
         out = {**more, "text": out["text"] + more["text"], "continued": True,
                "usage": {k: _add(out["usage"].get(k), more["usage"].get(k)) for k in out["usage"]}}
     text = out["text"]

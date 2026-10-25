@@ -2,7 +2,7 @@
   "id": "llm.chat",
   "name": "Language Model Chat (relay)",
   "version": "1.0.0",
-  "description": "One chat turn with a PAID language model (xAI Grok, Anthropic Claude, OpenAI or Google Gemini; xai by default), relayed so the caller never holds the key: the key stays in the owner's vault. Off until the owner switches the provider on and sets a daily cap (Settings > Language models); refused with the reason when off, keyless or capped. max_tokens up to 16,000; continue_if_cut asks once more when an answer stops at max_tokens and joins the two. Returns text (up to 64,000 characters), model, usage (tokens, cost) and a truncated flag.",
+  "description": "One chat turn with a PAID language model (xAI Grok, Anthropic Claude, OpenAI or Google Gemini; xai by default), relayed so the caller never holds the key: the key stays in the owner's vault. Off until the owner switches the provider on and sets a daily cap (Settings > Language models); refused with the reason when off, keyless or capped. max_tokens up to 16,000; continue_if_cut asks once more when an answer stops at max_tokens and joins the two. effort (anthropic only: low, medium, high, xhigh, max) sets how hard Claude thinks, so thinking can't eat the whole max_tokens. Returns text (up to 64,000 characters), model, usage (tokens, cost) and a truncated flag.",
   "category": "llm",
   "risk": "write",
   "requires": [
@@ -56,6 +56,11 @@
       "type": "boolean",
       "required": false,
       "default": false
+    },
+    "effort": {
+      "type": "string",
+      "required": false,
+      "default": ""
     }
   },
   "execution": {

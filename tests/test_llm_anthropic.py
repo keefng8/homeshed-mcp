@@ -115,6 +115,23 @@ def test_temperature_is_not_sent(fake):
     assert "temperature" not in fake.body()
 
 
+def test_effort_goes_in_output_config_and_only_when_asked(fake):
+    """The station's book writer, 2026-10-24: Sonnet 5.5 thought through all of max_tokens and answered nothing."""
+    ask(model="claude-sonnet-5-5", effort="Low")
+    b = fake.body()
+    assert b["output_config"] == {"effort": "low"} and "thinking" not in b  # budget_tokens is a 400 on the 5.5 models
+    ask()
+    assert "output_config" not in fake.body()
+
+
+def test_a_bad_effort_or_another_provider_costs_nothing(fake):
+    with pytest.raises(prov.LLMError, match="effort must be one of"):
+        ask(effort="huge")
+    with pytest.raises(prov.LLMError, match="anthropic only"):
+        lc.chat(messages=[{"role": "user", "content": "hi"}], provider="xai", effort="low")
+    assert fake.calls == []
+
+
 def test_the_monthly_credit_is_a_hard_stop(fake):
     prov._add_month_cost("anthropic", 100.0)
     with pytest.raises(prov.LLMError, match="this month's \\$100 spend limit"):

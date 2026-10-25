@@ -508,10 +508,11 @@ def _anthropic_content(content) -> str | list[dict]:
 
 
 def _anthropic(key: str, model: str, messages: list[dict], system: str, max_tokens: int,
-               temperature: float | None, schema: dict | None = None) -> dict:
+               temperature: float | None, schema: dict | None = None, effort: str = "") -> dict:
     """Anthropic's Messages API (POST /v1/messages, anthropic-version 2023-06-01). A "system" message joins the
     system prompt (the API takes it only there). Temperature isn't sent: the Claude 5.5 models refuse it (HTTP 400
-    "temperature is deprecated for this model", seen live 2026-10-22)."""
+    "temperature is deprecated for this model", seen live 2026-10-22). effort goes in output_config.effort: on the
+    5.5 models it is the only thinking control (a thinking budget_tokens is refused with a 400)."""
     sys_parts = [system] if system else []
     msgs = []
     for m in messages:
@@ -531,6 +532,8 @@ def _anthropic(key: str, model: str, messages: list[dict], system: str, max_toke
                            "cache_control": {"type": "ephemeral"}}]
     if schema:  # structured output: the answer is JSON in this shape (output_config.format, GA)
         body["output_config"] = {"format": {"type": "json_schema", "schema": schema}}
+    if effort:
+        body.setdefault("output_config", {})["effort"] = effort
     d = post_json("anthropic", key, body, auth={"x-api-key": key, "anthropic-version": "2023-06-01"},
                   wait_s=timeout_for(max_tokens))
     if d.get("type") == "error" and isinstance(d.get("error"), dict):
@@ -599,15 +602,16 @@ ADAPTERS = {"xai": _xai, "openai": lambda *a: _responses("openai", *a), "anthrop
 
 
 def call(provider: str, model: str, messages: list[dict], system: str, max_tokens: int,
-         temperature: float | None, schema: dict | None = None) -> dict:
-    """schema: a JSON schema the answer must follow (anthropic only; the tools that need one call this directly)."""
+         temperature: float | None, schema: dict | None = None, effort: str = "") -> dict:
+    """schema: a JSON schema the answer must follow (anthropic only; the tools that need one call this directly).
+    effort: how hard a Claude model thinks (anthropic only; empty = the model's default)."""
     p = PROVIDERS[provider]
     key = _secret(p["key"])
     if not key:
         raise LLMError(f"{provider} isn't configured: add {p['key']} under the Control Panel's Keys and passwords")
     try:
         return ADAPTERS[provider](key, model, messages, system, max_tokens, temperature,
-                                  **({"schema": schema} if schema else {}))
+                                  **({"schema": schema} if schema else {}), **({"effort": effort} if effort else {}))
     except LLMError as exc:  # every message is scrubbed already; this is belt and braces
         raise LLMError(str(exc).replace(key, "<secret>")) from None
 

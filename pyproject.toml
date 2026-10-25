@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "homeshed-mcp"
-version = "0.6.2"
+version = "0.6.3"
 description = "Every tool your AI needs, in one install."
 readme = "README.md"
 license = "Apache-2.0"

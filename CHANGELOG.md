@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-10-25
+
+### Added
+- `llm.chat` takes an `effort` option (low, medium, high, xhigh or max) for Anthropic models, so a long answer isn't spent on thinking. A bad value, or `effort` with another provider, is refused before any call.
+
+### Changed
+- GitHub Actions updates: setup-python 7.1.0, setup-uv 10.3.1, CodeQL action 4.39.1.
+- The plugin runs 0.6.3.
+
 ## [0.6.2] - 2026-10-24
 
 ### Added
