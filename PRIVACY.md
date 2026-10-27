@@ -27,6 +27,8 @@ Only when you set something up, or ask a tool to:
   up a package's latest version on PyPI, npm or GitHub. They contact the address or service the tool is asked about.
 - **Public GitHub issue search** in `bugs.find`: off by default. When you switch it on (`bugs_search_public`), only
   the error's general words are sent, with paths, numbers, quoted values and secrets removed.
+- **Chat-app sign-in** (off unless `MCP_PUBLIC_URL` is set): to check a chat app that names itself by a web address,
+  HomeShed fetches that address once (public addresses only).
 - **HomeShed Pro** (optional, paid): nothing is sent to the Pro website until you connect a Pro key. After that,
   HomeShed checks the membership and downloads the Pro tools, rule packs and known-bugs feed from it. HomeShed never asks for your
   Pro password.

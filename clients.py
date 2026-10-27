@@ -159,7 +159,7 @@ def create(name: str, note: str = "", preset: str = "none", expires_days: int | 
             "token_sha256": _hash(token), "note": (note or "")[:200], "created": now, "token_created": now,
             "expires": now + int(expires_days) * 86400 if expires_days else None, "suspended": False,
             "allow": list(PRESETS[preset]), "deny": [], "rate_per_min": int(rate_per_min) if rate_per_min else None,
-            "last_used": None,
+            "last_used": None, "tool_view": "front_door", "images": "content",  # new apps start on the front door
         }
         _save(data)
     _audit("created", name, preset=preset, expires_days=expires_days, rate_per_min=rate_per_min)
@@ -179,6 +179,7 @@ def rotate(name: str, by_manager: bool = False) -> str:
         token = _new_token()
         c["token_sha256"], c["token_created"] = _hash(token), time.time()
         _save(data)
+    _end_oauth(name)  # a new key ends its OAuth sign-ins too: rotating is how the owner cuts an app off
     _audit("token rotated", name)
     return token
 
@@ -190,7 +191,16 @@ def delete(name: str) -> None:
         del data["clients"][name]
         _save(data)
     _windows.pop(name, None)
+    _end_oauth(name)
     _audit("deleted", name)
+
+
+def _end_oauth(name: str) -> None:
+    try:
+        import oauth_server
+        oauth_server.end_app(name)
+    except Exception:  # noqa: BLE001 - logged by oauth_server; the key change itself stands
+        _logger.exception("couldn't end %s's OAuth sign-ins", name)
 
 
 def set_managed_by(name: str, manager: str | None) -> None:
@@ -345,6 +355,59 @@ def shared_read_for(name: str | None) -> bool:
     return (_load()["clients"].get(name) or {}).get("memory_shared_read") is not False
 
 
+def set_view(name: str, tool_view: str | None = None, images: str | None = None) -> None:
+    """How this app sees the tools (frontdoor.py): "full" list or the "front_door", and pictures "inline" (base64 in
+    the JSON) or as "content" (MCP image blocks). A value left as None stays as it is."""
+    import frontdoor
+    if tool_view is not None and tool_view not in frontdoor.VIEWS:
+        raise ClientError(f"tool_view must be one of {list(frontdoor.VIEWS)}")
+    if images is not None and images not in frontdoor.IMAGE_MODES:
+        raise ClientError(f"images must be one of {list(frontdoor.IMAGE_MODES)}")
+    with _lock:
+        data = _editable()
+        c = _get(data, name)
+        for key, value in (("tool_view", tool_view), ("images", images)):
+            if value is not None:
+                c[key] = value
+        _save(data)
+    _audit("tool view", name, tool_view=tool_view, images=images)
+
+
+TOOLSET_MAX = 200
+
+
+def set_toolset(name: str, patterns: list[str] | None) -> None:
+    """The tools the front door shows this app, as grant patterns ("etsy.*", "read:image", an exact id), or None for
+    its whole grant. It only narrows: what runs is still the grant. HomeShed Pro applies it (pro_frontdoor.py); the
+    free HomeShed keeps it, so a set saved while Pro lapsed works again when Pro comes back."""
+    if patterns is not None:
+        if not isinstance(patterns, list) or len(patterns) > TOOLSET_MAX or not all(
+                isinstance(p, str) and re.fullmatch(r"[A-Za-z0-9_.:*-]{1,80}", p) for p in patterns):
+            raise ClientError(f"a tool set is a list of up to {TOOLSET_MAX} tool ids or patterns such as etsy.* or "
+                              "read:image")
+        patterns = sorted(set(patterns))
+    with _lock:
+        data = _editable()
+        c = _get(data, name)
+        if patterns is None:
+            c.pop("toolset", None)
+        else:
+            c["toolset"] = patterns
+        _save(data)
+    _audit("tool set", name, patterns=patterns)
+
+
+def toolset(name: str | None) -> list[str] | None:
+    if name is None:
+        return None
+    ts = (_load()["clients"].get(name) or {}).get("toolset")
+    return ts if isinstance(ts, list) else None
+
+
+def in_toolset(patterns: list[str], tool_id: str, risk: str, category: str) -> bool:
+    return any(_match(p, tool_id, risk, category) for p in patterns)
+
+
 def set_preset(name: str, preset: str) -> None:
     if preset not in PRESETS:
         raise ClientError(f"preset must be one of {sorted(PRESETS)}")
@@ -399,7 +462,8 @@ def list_clients() -> dict:
             "memory_agent": c.get("memory_agent"), "memory_shared_read": c.get("memory_shared_read") is not False,
             "daily_spend_usd": c.get("daily_spend_usd"), "spend_today": _spent(name),
             "cap_delegated": bool(c.get("cap_delegated")), "control_keys": c.get("control_keys"),
-            "managed_by": c.get("managed_by"),
+            "managed_by": c.get("managed_by"), "tool_view": c.get("tool_view") or "full",
+            "images": c.get("images") or "inline", "toolset": c.get("toolset"),
         })
     return {"clients": out, "unreadable": bool(data.get("unreadable"))}
 
@@ -427,6 +491,17 @@ def resolve(authorization: str | None) -> tuple[str | None, str]:
         return None, "unreadable"
     if not authorization or not authorization.startswith("Bearer "):
         return None, "unknown"
+    if authorization.startswith("Bearer hso_"):  # an OAuth sign-in's access token (oauth_server.py): same app checks
+        import oauth_server
+        name = oauth_server.resolve(authorization[7:])
+        c = data["clients"].get(name) if name else None
+        if not c:
+            return None, "unknown"
+        if c.get("suspended"):
+            return name, "suspended"
+        if c.get("expires") and c["expires"] < time.time():
+            return name, "expired"
+        return name, "ok"
     h = _hash(authorization[7:])
     for name, c in data["clients"].items():
         if hmac.compare_digest(h, c.get("token_sha256", "")):
@@ -449,7 +524,16 @@ def _match(pattern: str, tool_id: str, risk: str, category: str) -> bool:
     return pattern == tool_id
 
 
+FRONT_DOOR = frozenset({"tools.find", "tools.describe", "tools.call", "tools.groups", "tools.result"})
+# Every app may use these without a grant (an explicit deny still wins): the front door only shows and runs what the
+# rest of the grant allows, and the approvals tools only touch the app's own requests (approvals.decide also needs
+# the owner to have named the app in "Apps whose own approval counts").
+ALWAYS = FRONT_DOOR | {"approvals.status", "approvals.card", "approvals.decide"}
+
+
 def _allowed(c: dict, tool_id: str, risk: str, category: str) -> bool:
+    if tool_id in ALWAYS:
+        return tool_id not in c.get("deny", [])
     return (any(_match(p, tool_id, risk, category) for p in c.get("allow", []))
             and not any(_match(p, tool_id, risk, category) for p in c.get("deny", [])))
 

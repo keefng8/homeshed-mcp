@@ -262,6 +262,7 @@ def _ctx(auth, host=None):
 
 def test_client_sees_only_granted_tools(server):
     token = clients.create("app1", preset="read")
+    clients.set_view("app1", tool_view="full")  # new apps start on the front door (test_frontdoor.py)
     clients.grant("app1", "docker.container.stop", "write", "docker")
     owner = asyncio.run(server.mcp._handle_list_tools(_ctx("Bearer owner-secret"), None)).tools
     mine = asyncio.run(server.mcp._handle_list_tools(_ctx(bearer(token)), None)).tools

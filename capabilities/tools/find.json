@@ -1,0 +1,44 @@
+{
+  "id": "tools.find",
+  "name": "Find Tools For A Job",
+  "version": "1.0.0",
+  "description": "Find the tools for a job, best first, among the ones this app may use: each with one line on what it does and whether it reads or changes things. Start here, then tools.describe one and tools.call it.",
+  "category": "tools",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "which tool",
+    "find a tool",
+    "what can you do",
+    "search tools"
+  ],
+  "inputs": {
+    "task": {
+      "type": "string",
+      "required": true
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 8
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.frontdoor.front.find"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "tools.groups",
+    "tools.describe",
+    "tools.call",
+    "tools.result"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "id": "tools.groups",
+  "name": "Tool Groups",
+  "version": "1.0.0",
+  "description": "What's here by group (shops, images, memory...), with counts, or the tools in one group with one line each. Only tools this app may use.",
+  "category": "tools",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "list tools",
+    "tool groups",
+    "what tools are there"
+  ],
+  "inputs": {
+    "group": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.frontdoor.front.groups"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "tools.find",
+    "tools.describe",
+    "tools.call",
+    "tools.result"
+  ]
+}

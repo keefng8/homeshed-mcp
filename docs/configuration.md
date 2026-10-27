@@ -38,6 +38,7 @@ talks to your AI app directly and needs none of these.
 |---|---|---|
 | `MCP_AUTH_TOKEN` | none | The password every client sends. Over HTTP the server won't start without it. `homeshed-mcp init` creates one. |
 | `MCP_ALLOWED_HOSTS` | none | The addresses clients may use to reach the server, comma separated. Over HTTP the server won't start without it. `homeshed-mcp init` writes `localhost:8765,127.0.0.1:8765`. |
+| `MCP_PUBLIC_URL` | none | The https address chat apps use to [sign in](../README.md#connect-a-chat-app-with-sign-in-oauth). Sign-in is off until it's set. Add its host name to `MCP_ALLOWED_HOSTS` too. |
 | `MCP_ALLOWED_ORIGINS` | empty | Only for browser-based clients. Leave empty for Claude Code, Claude Desktop and other apps. |
 | `MCP_PORT` | `8765` | The port the server listens on. |
 | `MCP_BIND` | `127.0.0.1` | The address it listens on over HTTP. The default answers this machine only. The Docker image sets `0.0.0.0` inside the container, and `docker-compose.yml` still publishes the port on `127.0.0.1` only. Leave it out of `.env` (don't even leave `MCP_BIND=` empty): the container would then listen nowhere reachable. |
@@ -268,6 +269,10 @@ NTFY_DEFAULT_TOPIC=my-homeshed-alerts
 ```
 
 ## Docker
+
+To use the Control Panel's Settings > Claude Code ("When Claude Code compacts a chat") with Docker, uncomment the
+`~/.claude` mount and the two `CLAUDE_CONFIG_DIR` lines in `docker-compose.yml`; without them, saving is refused and
+nothing changes.
 
 The Docker tools (list, inspect, logs, and start, stop and restart once switched on) need access to Docker.
 

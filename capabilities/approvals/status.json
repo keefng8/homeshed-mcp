@@ -1,0 +1,34 @@
+{
+  "id": "approvals.status",
+  "name": "Approval Status",
+  "version": "1.0.0",
+  "description": "What happened to one request that waited for the owner (a shared-memory write, a Proxmox change, a shop request or a message to the owner): waiting, approved, declined, expired, withdrawn or parked, and who decided. An app sees only its own.",
+  "category": "approvals",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "was my request approved",
+    "approval status",
+    "is it still waiting",
+    "who approved it"
+  ],
+  "inputs": {
+    "request_id": {"type": "string", "required": true}
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.approvals.status.status"
+  },
+  "latency": {
+    "expected_ms": 50
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "commerce.requests.list",
+    "inbox.replies"
+  ]
+}

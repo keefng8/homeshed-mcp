@@ -53,7 +53,8 @@ DONE_FILE = Path(os.environ.get("PRINTIFY_PUBLISHED_FILE") or data_path("usage/p
 HISTORY_FILE = Path(os.environ.get("PRINTIFY_DECISIONS_FILE") or data_path("usage/printify_decisions.json"))
 MAX_TOTAL = 30
 TTL_S = 24 * 3600
-HISTORY_S = 7 * 86400
+HISTORY_S = 30 * 86400  # 7 days until 2026-10-27 (R&D's approvals baseline needed a month)
+HISTORY_MAX = 5000  # rows kept; 7 days held about 760
 ID_RE = re.compile(r"^[0-9a-f]{8}$")
 APPROVALS_FILE = Path(os.environ.get("PRINTIFY_APP_APPROVALS_FILE") or data_path("usage/app_approvals.json"))
 TRUST_SETTING = "approvals_trusted_clients"
@@ -115,12 +116,12 @@ def _load() -> list[dict]:
 
 
 def history(days: int = 7) -> list[dict]:
-    """The owner's decisions of the last `days` (at most 7), newest first."""
+    """The owner's decisions of the last `days` (at most HISTORY_S), newest first."""
     try:
         rows = json.loads(HISTORY_FILE.read_text(encoding="utf-8")).get("decisions") or []
     except (OSError, ValueError, AttributeError):
         rows = []
-    since = time.time() - min(days, 7) * 86400
+    since = time.time() - min(days * 86400, HISTORY_S)
     return sorted((r for r in rows if isinstance(r, dict) and float(r.get("decided_at") or 0) >= since),
                   key=lambda r: -float(r.get("decided_at") or 0))
 
@@ -130,13 +131,13 @@ def _log(item: dict, outcome: str, note: str = "", at: float | None = None) -> N
     row = {"id": item.get("id"), "kind": item.get("action") or "publish", "client": item.get("client"),
            "product_id": item.get("product_id"), "summary": item.get("summary"), "asked_at": item.get("at"),
            "decided_at": at or time.time(), "outcome": outcome, **({"note": str(note)[:300]} if note else {})}
-    rows = history(7)
+    rows = history(HISTORY_S // 86400)
     if any(r.get("id") == row["id"] for r in rows):
         return
     try:
         HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
         tmp = HISTORY_FILE.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"decisions": ([row] + rows)[:1000]}, indent=1), encoding="utf-8")
+        tmp.write_text(json.dumps({"decisions": ([row] + rows)[:HISTORY_MAX]}, indent=1), encoding="utf-8")
         os.replace(tmp, HISTORY_FILE)
     except OSError:
         pass  # the decision itself stands; only its record is missing

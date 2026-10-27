@@ -2,7 +2,7 @@
   "id": "commerce.requests.list",
   "name": "My Shop Requests And Decisions",
   "version": "1.0.0",
-  "description": "An app's own shop requests (Printify publishes, live-product updates, Etsy listing edits): what still waits for the owner, and the owner's decisions of the last 7 days (approved, declined, expired), with notes. Check this instead of assuming something still waits.",
+  "description": "An app's own shop requests (Printify publishes, live-product updates, Etsy listing edits): what still waits for the owner, and the owner's decisions of the last 7 days by default, up to 30 (approved, declined, expired), with notes. Check this instead of assuming something still waits.",
   "category": "commerce",
   "risk": "read",
   "requires": [],

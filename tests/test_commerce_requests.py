@@ -97,3 +97,15 @@ def test_history_keeps_a_week_and_etsy_requests_name_their_listing(queue, monkey
     later = pp.time.time() + 8 * 86400
     monkeypatch.setattr(pp.time, "time", lambda: later)
     assert pp.history() == []
+
+
+def test_decisions_are_kept_30_days_and_days_picks_how_far_back(queue, monkeypatch):
+    rid = ask("shopbot", "aa11")
+    pp.decide(rid, True)
+    later = pp.time.time() + 20 * 86400
+    monkeypatch.setattr(pp.time, "time", lambda: later)
+    ask("shopbot", "bb22")  # a new request rewrites the file; the 20-day-old row stays
+    assert [r["id"] for r in pp.history(30)] == [rid] and pp.history(7) == []
+    assert requests_list(days=30)["days"] == 30 and len(requests_list(days=30)["decided"]) == 1
+    with pytest.raises(Exception):
+        requests_list(days=31)

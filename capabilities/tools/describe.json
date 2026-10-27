@@ -1,0 +1,38 @@
+{
+  "id": "tools.describe",
+  "name": "Describe A Tool",
+  "version": "1.0.0",
+  "description": "One tool in full: what it does and its inputs, exactly as the full tool list shows it. Use before tools.call.",
+  "category": "tools",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "tool inputs",
+    "tool schema",
+    "how do i call"
+  ],
+  "inputs": {
+    "name": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.frontdoor.front.describe"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "tools.find",
+    "tools.groups",
+    "tools.call",
+    "tools.result"
+  ]
+}

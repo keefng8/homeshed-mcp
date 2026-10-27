@@ -1850,12 +1850,13 @@ SESSION_ID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 
 
 @app.get("/api/claude/sessions")
-async def claude_sessions():
+async def claude_sessions(hidden: int = 0, limit: int = 30):
     if (off := _no_helper("Past sessions")) is not None:
         return off
+    params = {"limit": max(1, min(limit, 40))} | ({"hidden": 1} if hidden else {})
     try:
         async with httpx.AsyncClient(timeout=8) as client:
-            r = await client.get(f"{GPU_SERVICE_URL}/sessions", headers=_GPU_AUTH)
+            r = await client.get(f"{GPU_SERVICE_URL}/sessions", headers=_GPU_AUTH, params=params)
         if r.status_code == 200:
             return r.json()
         return JSONResponse({"error": f"GPU service returned HTTP {r.status_code}"}, status_code=502)
@@ -1877,6 +1878,35 @@ async def claude_session_resume(sid: str):
         return body
     detail = body.get("detail") if isinstance(body, dict) and isinstance(body.get("detail"), str) else f"HTTP {r.status_code}"
     return JSONResponse({"error": detail}, status_code=r.status_code if r.status_code in (400, 403, 404, 409, 429, 503) else 502)
+
+
+async def _session_hide(sid: str, action: str):
+    if not SESSION_ID_RE.match(sid):
+        return JSONResponse({"error": "That isn't a session id."}, status_code=400)
+    if (off := _no_helper("Past sessions")) is not None:
+        return off
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(f"{GPU_SERVICE_URL}/sessions/{sid}/{action}", headers=_GPU_AUTH)
+        body = r.json()
+    except (httpx.RequestError, ValueError):
+        return JSONResponse({"error": "Can't reach the helper on your PC."}, status_code=502)
+    if r.status_code == 200:
+        return body
+    detail = body.get("detail") if isinstance(body, dict) and isinstance(body.get("detail"), str) else f"HTTP {r.status_code}"
+    return JSONResponse({"error": detail}, status_code=r.status_code if r.status_code in (400, 404) else 502)
+
+
+# Taking a chat off the Overview's list, and bringing it back (the owner, 2026-10-27: "Can we remove chats?"). The PC
+# helper keeps only the id in a small list; the session's own file is never touched. Owner only (not in VIEWER_ROUTES).
+@app.post("/api/claude/sessions/{sid}/hide")
+async def claude_session_hide(sid: str):
+    return await _session_hide(sid, "hide")
+
+
+@app.post("/api/claude/sessions/{sid}/unhide")
+async def claude_session_unhide(sid: str):
+    return await _session_hide(sid, "unhide")
 
 
 @app.post("/api/claude/sessions/{sid}/compact")
@@ -2360,7 +2390,9 @@ async def tools_switch(tool_id: str, action: str):
 _CLIENT_NAME = re.compile(r"[a-z][a-z0-9-]{1,31}")
 _CLIENT_ACTIONS = {"rotate", "suspend", "resume", "limits", "preset-none", "preset-read", "preset-all",
                    "shared-read-on", "shared-read-off",  # reading the shared memory, per app (2026-10-01)
-                   "spend-cap"}  # a daily dollar cap on paid images and models, per app (2026-10-10)
+                   "spend-cap",  # a daily dollar cap on paid images and models, per app (2026-10-10)
+                   "view",  # tool_view (full | front_door) and images (inline | content), per app: the front door
+                   "toolset"}  # which tools the front door shows an app (HomeShed Pro applies it; saved either way)
 
 
 MCP_UNREACHABLE = "mcp-server unreachable"
@@ -2726,7 +2758,28 @@ async def clients_action(name: str, action: str, request: Request):
     elif action == "spend-cap":
         raw = await request.json()
         body = {"usd": raw.get("usd")}
+    elif action == "view":  # only the keys sent, so changing one setting leaves the other as it is
+        raw = await request.json()
+        body = {k: raw[k] for k in ("tool_view", "images") if k in raw}
+    elif action == "toolset":  # a list of patterns such as etsy.*, or null for the whole grant
+        raw = await request.json()
+        body = {"patterns": raw.get("patterns")}
     return await _mcp_admin("POST", f"/clients/{name}/{action}", body)
+
+
+FRONT_DOOR_SAVINGS_PRO = "HomeShed Pro shows what the front door saved each app."
+
+
+@app.get("/api/front-door/savings")
+async def front_door_savings():
+    """What the front door saved each app (tools.savings, HomeShed Pro). Without Pro the tool isn't there, so this answers
+    {pro: false, note} and the API page says what Pro would show instead of an error. Owner only (not in VIEWER_ROUTES)."""
+    try:
+        return await _mcp_call_tool("tools.savings", {}, quiet=True)
+    except RuntimeError as exc:
+        if re.search(r"(?i)unknown tool|homeshed pro", str(exc)):
+            return {"pro": False, "note": FRONT_DOOR_SAVINGS_PRO}
+        return _public_error(exc, 502)
 
 
 # Apps' writes to the shared memory, waiting for the owner (the owner's decision, 2026-10-01: each app has its own memory;
@@ -2788,6 +2841,39 @@ async def proxmox_decide(item_id: str, action: str):
     if not _WAITING_ID.fullmatch(item_id) or action not in ("approve", "decline"):
         return JSONResponse({"error": "bad request"}, status_code=400)
     return await _mcp_admin("POST", f"/proxmox/pending/{item_id}/{action}")
+
+
+# Sign in with OAuth (mcp-server/oauth_server.py, the owner 2026-10-27: "real auth for easy setup on this connector"): a
+# chat app's sign-in waits here, with a 6-digit code the owner matches against the sign-in page, for 10 minutes. Owner
+# only (not in VIEWER_ROUTES). Only the app name and the access preset are passed on; nothing else in the body.
+_OAUTH_ID = re.compile(r"[A-Za-z0-9_-]{16,64}")
+_OAUTH_PRESETS = ("none", "read", "all")
+
+
+@app.get("/api/oauth/pending")
+async def oauth_pending():
+    return await _mcp_admin("GET", "/oauth/pending")
+
+
+@app.post("/api/oauth/pending/{item_id}/{action}")
+async def oauth_decide(item_id: str, action: str, request: Request):
+    """Approve a sign-in (body {"app": a new or existing app name, "preset": none|read|all}) or decline it."""
+    if not _OAUTH_ID.fullmatch(item_id) or action not in ("approve", "decline"):
+        return JSONResponse({"error": "bad request"}, status_code=400)
+    if action == "decline":
+        return await _mcp_admin("POST", f"/oauth/pending/{item_id}/decline")
+    try:
+        body = await request.json()
+    except ValueError:
+        body = {}
+    body = body if isinstance(body, dict) else {}
+    app_name, preset = str(body.get("app") or "").strip().lower(), str(body.get("preset") or "read")
+    if app_name and not re.fullmatch(r"[a-z][a-z0-9-]{1,31}", app_name):
+        return JSONResponse({"error": "an app name is 2 to 32 small letters, digits or dashes, starting with a letter"},
+                            status_code=400)
+    if preset not in _OAUTH_PRESETS:
+        return JSONResponse({"error": "access must be none, read or all"}, status_code=400)
+    return await _mcp_admin("POST", f"/oauth/pending/{item_id}/approve", {"app": app_name, "preset": preset})
 
 
 async def _admin_items(path: str) -> list[dict] | None:
@@ -3119,7 +3205,28 @@ async def approvals():
                       "at": s.get("at") or 0, "detail": str(s.get("body") or ""),
                       "title": (f"Sign {s.get('id')} v{s.get('version')} as read-only: {s.get('title') or ''} "
                                 f"({s.get('language')}, runs on {s.get('runs_on') or '?'}). Read the code first.")[:300]})
+    # Chat apps signing in with OAuth (oauth_server.py): each lasts 10 minutes, so it shows first, whatever its age. A
+    # tool server without sign-in (or with it off) has none, and is skipped.
+    signins = []
+    resp = await _mcp_admin("GET", "/oauth/pending")
+    try:
+        rows = json.loads(resp.body).get("pending") if resp.status_code == 200 else None
+    except (ValueError, AttributeError):
+        rows = None
+    for s in rows if isinstance(rows, list) else []:
+        if not isinstance(s, dict):
+            continue
+        signins.append({"kind": "signin", "id": str(s.get("id") or ""), "from": "", "at": s.get("at") or 0,
+                        "title": f"{str(s.get('app_name') or 'An app')[:80]} wants to connect",
+                        "signin": {"app_name": str(s.get("app_name") or "")[:80],
+                                   "client_id": str(s.get("client_id") or "")[:200],
+                                   "client_host": str(s.get("client_host") or "")[:200],
+                                   "verified": s.get("verified") is True,
+                                   "match": str(s.get("match") or ""), "redirect_host": str(s.get("redirect_host") or ""),
+                                   "expires_in_s": int(s.get("expires_in_s") or 0),
+                                   "suggested_name": str(s.get("suggested_name") or "")[:32]}})
     items.sort(key=lambda x: -float(x.get("at") or 0))
+    items = signins + items
     return {"items": items, "count": len(items), "unavailable": unavailable}
 
 

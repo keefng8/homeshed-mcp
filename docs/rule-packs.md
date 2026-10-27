@@ -131,7 +131,8 @@ uvx homeshed-mcp packs compact-at 80
 ```
 
 It shows the one line it adds to Claude Code's settings and asks first; `packs compact-at off` goes back to Claude
-Code's own point. Tested on Windows and Linux; macOS should work.
+Code's own point. Tested on Windows and Linux; macOS should work. Prefer a fixed size in tokens? The Control Panel's
+Settings > Claude Code > **When Claude Code compacts a chat** sets that instead.
 
 ## Where a pack came from
 

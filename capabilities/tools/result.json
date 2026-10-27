@@ -1,0 +1,57 @@
+{
+  "id": "tools.result",
+  "name": "Read A Stored Result",
+  "version": "1.0.0",
+  "description": "Read back a reply tools.call kept with to_file, a page at a time, filtered by text or trimmed to fields. Kept 24 hours, only for the app that made it.",
+  "category": "tools",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "stored result",
+    "read result",
+    "next page"
+  ],
+  "inputs": {
+    "result_id": {
+      "type": "string",
+      "required": true
+    },
+    "fields": {
+      "type": "array",
+      "required": false
+    },
+    "query": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "offset": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
+    "limit": {
+      "type": "integer",
+      "required": false,
+      "default": 50
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.frontdoor.front.result"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "tools.find",
+    "tools.groups",
+    "tools.describe",
+    "tools.call"
+  ]
+}

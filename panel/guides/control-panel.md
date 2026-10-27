@@ -2,7 +2,7 @@
 title: The Control Panel, page by page
 slug: control-panel
 audience: everyone
-updated: 2026-10-01
+updated: 2026-10-27
 ---
 
 # The Control Panel, page by page
@@ -45,20 +45,24 @@ The panel always asks for a password, and there's no way to turn that off.
 ## Finding your way
 
 The pages are listed down the left side. Related pages share one entry, which opens the one you used last and lists
-the others under it: **AI** holds Models and Reasoning, **Servers** holds Containers, Uptime and Tools, **Rules** holds
-Rules and Observations, and **Settings** holds Settings and this Guide. On a phone, the bar at the bottom shows Overview,
+the others under it: **AI** holds Models and Reasoning, **Servers** holds Proxmox, Terminal, Containers, Uptime, Tools
+and Run, **Rules** holds Rules and Observations, and **Settings** holds Settings and this Guide. On a phone, the bar at the bottom shows Overview,
 To-do, AI and Settings, and **More** lists everything else.
 
 | Page | What it's for |
 |---|---|
 | Overview | What works right now, and what HomeShed is doing |
+| Projects | Every folder your agents work in |
 | To-do | Tasks for your AI agents (HomeShed Pro; otherwise an example) |
 | Savings | What your setup has kept out of your AI's paid context |
 | Models | Which AI answers first, and why |
 | Reasoning | Try the reasoning tools by hand |
+| Proxmox | Your Proxmox cluster, live (needs Proxmox) |
+| Terminal | SSH in the browser |
 | Containers | Your Docker containers (needs Docker) |
 | Uptime | Your Uptime Kuma checks (needs Uptime Kuma) |
 | Tools | Every tool, with an on/off switch |
+| Run | Run any tool by hand |
 | Rules | Rule packs for your AI's working rules (needs the guard hooks) |
 | Observations | Corrections and broken rules your AI has logged |
 | API access | Keys for other apps and projects |
@@ -74,18 +78,26 @@ what.
 
 ## Overview
 
-The home page: is everything working, and what is it doing right now?
+The home page: is everything working, and what is it doing right now? From the top:
 
-- **The status line** says in one sentence whether everything is working, for example "Everything is running, but no AI
-  model is set up yet." The chips under it show each part: green works, grey isn't set up.
-- **The numbers** show how many tools are available, how many memory facts are saved, how many AI models are online,
-  and whether HomeShed and its memory are running. Memory says **Built in** when HomeShed's own memory is in use.
-- **Tokens kept out of your AI's context** estimate what your setup saved: work done by your own model, and, if you use
-  RTK, command output trimmed before your AI read it.
-- **Reads and Writes** count every tool call; **Recent calls** lists the latest ones.
-- **Clients live** shows who is using HomeShed right now: you, and each app with its own key.
-- **Release progress** shows how far a project's release has got, when an AI agent reports it with
-  `repo.progress_update`.
+- **Pick up where you left off:** your recent Claude Code chats. Search them, press **Resume** to reopen one in its own
+  folder, or **×** to hide it (**Undo** brings it back; nothing is deleted).
+- **Tokens saved** (switch between **All**, **30 d** and **7 d**) and **GitHub** (stars, downloads, views, releases).
+- **The status line** says in one sentence whether everything is working. Under it: tools available, memory facts, AI
+  models online, and whether HomeShed and its memory are running.
+- Then the details, in groups: **Claude sessions** (how full each chat is, and your alarm), **Savings** (tokens kept
+  out of your AI, work done by your own model), **Projects** (release progress), **Live activity** (reads, writes,
+  recent calls, who's connected) and **Tools and memory**.
+- **Summary screen** shows a simple one-screen view; **Refresh** updates everything now.
+
+## Waiting for you
+
+When something needs your OK, a **Waiting for you** button appears at the top of every page.
+
+A chat app signing in shows as a **Sign-in waiting** card with a 6-digit code, how long is left, and whether the app
+is *checked* or *unverified*. Approve only a sign-in you just started, with the same code on both screens. Give it an
+app name and an access level (**No tools**, **Read-only (recommended)** or **Everything**), then press **Approve**, or
+**Decline**.
 
 ## To-do
 
@@ -167,6 +179,13 @@ Give each other app, coding agent or person its own **client**:
 - only the tools you grant: none to start with, all read-only tools, or everything;
 - a limit on **calls per minute**, and an optional **expiry** (1, 7, 30 or 90 days, or never).
 
+- **Tool view:** **Full list**, or **Front door**: five tools that find and run the rest, so the app uses fewer
+  tokens. New apps start on the front door.
+- **Images:** **Inline**, or **As pictures** (shown as real images in the chat).
+
+**Connect a chat app (Claude, ChatGPT…)** shows how a chat app signs in without a token: you approve it under
+**Waiting for you**. **Front door savings** (Pro) shows what the front door saved.
+
 You can suspend a client, give it a new token, or delete it. **Suspend every client** is the emergency stop.
 **Recent changes** lists who changed what; tokens are never recorded. You (your own AI app and this panel) always have
 full access, so you don't appear in the list.
@@ -191,6 +210,9 @@ Everything you can change, one section at a time. Each change saves straight awa
 - **Alerts:** where phone notifications go, if you use [ntfy](https://ntfy.sh).
 - **Account and sharing:** your password, and **view-only logins** (add a person, give them a new password, or remove
   them, which signs them out at once).
+- **Claude Code:** *When Claude Code compacts a chat* (its default, or 100k to 1M tokens). It changes Claude
+  Code's own settings file and keeps a backup. Restart open chats to pick it up. In Docker it needs the `~/.claude`
+  mount in docker-compose.yml.
 - **System:** how the panel itself behaves (its name, how often it updates, animations, how long a sign-in lasts), and
   **Connections**: the services it talks to, and whether each one is answering.
 

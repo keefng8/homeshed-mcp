@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-27
+
+### Added
+- **One-click sign-in for chat apps (OAuth)**: Claude's custom connectors, ChatGPT and other chat apps connect by signing in, with no pasted token. Set `MCP_PUBLIC_URL` to your server's https address; add its host to `MCP_ALLOWED_HOSTS`; you approve each sign-in on the Control Panel (Waiting for you > Sign-in waiting) with a matching 6-digit code. Tokens are stored only as hashes, and a reused refresh token ends that sign-in. Off unless `MCP_PUBLIC_URL` is set.
+- **The front door**: five tools in place of the full list, so an app doesn't pay for every tool definition (160+) on every turn, and a small model picks the right tool more often. `tools.find` (best tools for a job, instant, no model call), `tools.groups`, `tools.describe`, `tools.call` (runs any tool with the same access, approvals and spend checks as a direct call) and `tools.result`. Every tool an app is granted still runs when called by name.
+- Each app has a **Tool view** setting (full list or front door). Apps added from now on start on the front door; existing apps keep the full list until you switch them.
+- Shorter replies: `tools.call` takes `fields` to keep only the parts you need, and `to_file` to keep a big reply on the server and read it a page at a time with `tools.result` (24 hours, only the app that made it, key-shaped secrets hidden).
+- Pictures as MCP image content: a per-app **Images** setting sends images as image blocks rather than base64 text, which a model reads for much less.
+- Control Panel: a new Overview (pick up where you left off, tokens saved, GitHub), and a Waiting for you button for sign-ins.
+- `approvals.status` and `GET /approvals/{id}`: what happened to one request that waited for the owner, and who decided.
+- HomeShed Pro: per-app tool sets, ranking learned from use, approve-in-chat cards and a front-door savings report.
+
+### Changed
+- The approvals history is kept 30 days (was 7).
+- The plugin runs 0.7.0.
+
 ## [0.6.4] - 2026-10-27
 
 ### Added

@@ -86,6 +86,29 @@ def ledger_id(capability_id: str, args: dict | None) -> str:
     return capability_id
 
 
+def record_front_door(client: str | None, hidden_chars: int = 0, trimmed_chars: int = 0) -> None:
+    """What the front door saved one app (frontdoor.py): tool definitions it didn't load, and reply characters fields or
+    to_file cut. Kept per app under "front_door"; HomeShed Pro reports it. Never raises."""
+    try:
+        with _lock:
+            data = _load()
+            fd = data.setdefault("front_door", {}).setdefault(client or "owner", {
+                "listings": 0, "hidden_chars": 0, "calls": 0, "trimmed_chars": 0})
+            if hidden_chars:
+                fd["listings"] += 1
+                fd["hidden_chars"] += int(hidden_chars)
+            if trimmed_chars:
+                fd["calls"] += 1
+                fd["trimmed_chars"] += int(trimmed_chars)
+            fd["last"] = time.time()
+            USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            tmp = USAGE_FILE.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data), encoding="utf-8")
+            tmp.replace(USAGE_FILE)
+    except Exception:
+        pass
+
+
 def record(capability_id: str, args: dict, result, ok: bool, client: str | None = None) -> None:
     """Never raises: accounting must not break a real capability call."""
     try:

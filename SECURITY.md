@@ -21,6 +21,7 @@ Security fixes go into the latest release. Please update before reporting, and c
 ## What's in scope
 
 - Bypassing authentication, per-client grants or rate limits
+- Getting a sign-in (OAuth) token without the owner approving it, or reusing a code or a rotated refresh token
 - A write tool running while it's switched off, including through `workflow.run`
 - Reaching private or metadata addresses through `web.read` or `network.*` (SSRF)
 - Leaking tokens, vault contents or request text into logs or responses
@@ -29,12 +30,23 @@ Security fixes go into the latest release. Please update before reporting, and c
 Out of scope: problems that need an attacker to already hold the owner token, and anything in third-party
 backends you run yourself (report those to their projects; see [THIRD_PARTY.md](THIRD_PARTY.md)).
 
+## Official sources
+
+HomeShed is published only as `homeshed-mcp` on PyPI, `ghcr.io/keefng8/homeshed-mcp`, the MCP Registry entry
+`io.github.keefng8/homeshed-mcp` and [github.com/keefng8/homeshed-mcp](https://github.com/keefng8/homeshed-mcp)
+(also its Claude Code plugin). Packages, images, extensions or sites that copy the name or look like it aren't ours
+and may carry malware. Check releases against their `SHA256SUMS` file. We never ask anyone for tokens, keys or
+passwords. To report a fake copy or someone pretending to be this project, use the private report link above, or open
+an issue if it's already public.
+
 ## Running it safely
 
 The defaults are built to be safe: every request needs a token (except `/healthz`, which only says the server is up), the server listens on `127.0.0.1`, and tools
 that act on your machines start switched off. If you change them:
 
-- **Never expose it to the internet** without an access proxy (for example Cloudflare Access) in front of it.
+- **Never expose it to the internet** without an access proxy (for example Cloudflare Access) in front of it, unless
+  you use [sign-in for chat apps](README.md#connect-a-chat-app-with-sign-in-oauth): then `/mcp` still needs a token,
+  and you approve only sign-ins you started yourself, with the same code on both screens.
 - **Mounting the Docker socket gives root on the host.** Only uncomment the socket (and its `group_add`) lines in
   `docker-compose.yml` on a machine where that's acceptable.
 - Give each app its own client token with only the tools it needs, and rotate tokens you no longer use.

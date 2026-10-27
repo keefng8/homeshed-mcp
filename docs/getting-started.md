@@ -11,6 +11,9 @@ This guide takes you from nothing to a working setup, one step at a time. You do
 
 ## Steps
 
+Install only from the official sources: PyPI `homeshed-mcp`, `ghcr.io/keefng8/homeshed-mcp`,
+github.com/keefng8/homeshed-mcp and the MCP Registry `io.github.keefng8/homeshed-mcp`. Look-alikes may carry malware ([more](../README.md#get-homeshed-only-from-official-sources)).
+
 1. **Open a terminal.**
    - Windows: press **Start**, type `PowerShell`, press **Enter**.
    - macOS: press **Cmd + Space**, type `Terminal`, press **Enter**.
@@ -26,7 +29,8 @@ This guide takes you from nothing to a working setup, one step at a time. You do
    Then **close the terminal and open a new one**, so it notices uv. In the new one, type `uv --version` and press
    **Enter**: a version number means it worked.
 
-3. **Add HomeShed to your AI app.** It works with apps installed on your computer (the Claude website can't use it).
+3. **Add HomeShed to your AI app.** It works with apps installed on your computer. The Claude website and ChatGPT can connect too, but
+   only to a HomeShed server with sign-in switched on ([how](../README.md#connect-a-chat-app-with-sign-in-oauth)).
    - **Claude Code** (if you have it installed): paste `uvx homeshed-mcp setup` and press **Enter**. It checks for a local AI model, then shows
      a short list of optional tool groups (Docker, phone notifications and so on), with the ones it found already
      ticked. Press **Enter** to keep them; your AI only sees the groups you keep, which saves it time and money. Then

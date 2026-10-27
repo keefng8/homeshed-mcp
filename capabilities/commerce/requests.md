@@ -12,7 +12,7 @@ the owner's decisions, so it checks instead of assuming.
 ## Parameters
 | Name | Required | Notes |
 |---|---|---|
-| `days` | no | How far back the decisions go, 1-7 (default 7). |
+| `days` | no | How far back the decisions go, 1-30 (default 7). |
 
 ## Returns
 ```
@@ -37,7 +37,7 @@ the owner's decisions, so it checks instead of assuming.
 An app sees only its own requests. The owner (no app token) sees everyone's, each with its `client`.
 
 ## How decisions are kept
-`printify_pending.py` writes every outcome to `usage/printify_decisions.json` (7 days, once per request). An owner's
+`printify_pending.py` writes every outcome to `usage/printify_decisions.json` (30 days, up to 5,000 rows, once per request). An owner's
 private add-on, `private_decision_hooks.py` with `decided(row)`, may also pass each decision on as it happens. That
 includes `failed` approvals. It runs in the background and never holds up or fails a decision. The public copy has
 none.

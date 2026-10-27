@@ -13,7 +13,7 @@
 <h3 align="center">Every tool your AI needs, in one install: memory, reasoning, git, Docker and more.</h3>
 
 <p align="center">
-  A self-hosted MCP server for Claude Code, Claude Desktop, Cursor, VS Code, OpenCode and any MCP client.<br>
+  A self-hosted MCP server for Claude Code, Claude Desktop, Claude.ai, ChatGPT, Cursor, VS Code, OpenCode and any MCP client.<br>
   Your model first, the cloud when you choose.
 </p>
 
@@ -48,7 +48,13 @@
 
 **HomeShed** is a self-hosted [Model Context Protocol](https://modelcontextprotocol.io) tool server. Add it to your
 AI assistant and it can check your containers, work with git, remember what it learned across sessions, spot bugs
-it has seen before, and solve logic problems: <!--count:total-->161<!--/count--> tools behind one endpoint that you run and control.
+it has seen before, and solve logic problems: <!--count:total-->167<!--/count--> tools behind one endpoint that you run and control.
+
+> ### New in 0.7.0: one-click sign-in for Claude.ai and ChatGPT
+> Your own tool server, in the chat apps you already use, with no token to copy and paste. Add HomeShed as a
+> connector, click **Sign in**, and approve it on your Control Panel when the 6-digit codes match. That's it: the chat
+> app gets only the tools you choose, and you can switch it off any time. Your memory, your tools and your keys stay
+> on your own machine. [Set it up](#connect-a-chat-app-with-sign-in-oauth)
 
 <p align="center">
   <img src="docs/assets/hero.png" alt="The optional HomeShed Control Panel on a fresh install, beside the words: Your AI's tools, on one page. See what's running and what it saved you. A switch for every tool. A key for every app. On your own machine. Free and open source." width="820">
@@ -57,7 +63,23 @@ it has seen before, and solve logic problems: <!--count:total-->161<!--/count-->
 
 ## Why people use it
 
-**Free and open source (Apache-2.0).** One install, <!--count:total-->161<!--/count--> tools, no account, no GPU.
+**Free and open source (Apache-2.0).** One install, <!--count:total-->167<!--/count--> tools, no account, no GPU.
+
+**New in 0.7.0**
+
+- **One-click sign-in for Claude.ai, ChatGPT and other chat apps.** No token to copy: the chat app signs in, you check
+  a 6-digit code on the Control Panel and approve it with just the tools you choose. Your HomeShed, its memory and its
+  tools, now reach every chat app you use, not just the ones on your computer
+  ([how](#connect-a-chat-app-with-sign-in-oauth)).
+- **Cheaper on every turn: the front door.** Instead of loading 160+ tool descriptions, an app sees five tools that
+  find and run all the others. Replies can be cut to just the fields you need, or kept on the server and read a page
+  at a time, and pictures arrive as real images, not text. Fewer tokens, and small models pick the right tool more
+  often. Switch it per app on the Control Panel's API access page.
+- **Choose when Claude Code compacts.** One setting sets how full a chat gets before Claude Code summarises it.
+- **See what happened to a request.** `approvals.status` tells your AI whether something it asked for was approved,
+  declined or is still waiting, and who decided.
+
+**Everything else**
 
 - **Memory that carries across sessions.** Your AI remembers facts, decisions and fixes between conversations and
   across projects. It's built in, with nothing extra to run. Facts are kept by category and recalled by relevance
@@ -107,9 +129,14 @@ Once HomeShed is added, just ask your AI. A few favourites:
 | "How's the Proxmox cluster?" | `proxmox.health`: quorum, each node's CPU, RAM and disk, what's running, and any alarm active now |
 | "How many stars and downloads did my project get?" | `repo.stats`: stars, forks, release and PyPI downloads, plus views and referrers with a GitHub token |
 | "What did my apps spend on AI today?" | `spend.today`: each app's spend against the daily cap you set |
+| "Find me a tool to check SSL certificates" | `tools.find` lists the best matches in plain words, without loading every tool |
+| "Was my email to the team approved yet?" | `approvals.status`: waiting, approved or declined, and who decided |
 | "Which container keeps restarting?" | `docker.container.list` and `docker.container.logs`, once you switch Docker on |
 
 ## Install
+
+> Install only from the official sources: PyPI `homeshed-mcp`, `ghcr.io/keefng8/homeshed-mcp`,
+> github.com/keefng8/homeshed-mcp and the MCP Registry `io.github.keefng8/homeshed-mcp`. Look-alikes may carry malware ([more](#get-homeshed-only-from-official-sources)).
 
 A real run, from setup to the first answers:
 
@@ -312,8 +339,13 @@ docker compose up -d                 # listens on 127.0.0.1:8765
 
 Then, on the machine where your AI app runs (the same machine here):
 
-Put the token `init` printed in an environment variable named `HOMESHED_TOKEN` (in your shell profile), open a new
-terminal, and run:
+Put the token `init` printed in an environment variable named `HOMESHED_TOKEN`:
+
+- Windows: `setx HOMESHED_TOKEN "paste-token-here"`
+- macOS: `echo 'export HOMESHED_TOKEN=paste-token-here' >> ~/.zshrc`
+- Linux: `echo 'export HOMESHED_TOKEN=paste-token-here' >> ~/.bashrc`
+
+Then open a new terminal, and run:
 
 ```bash
 claude mcp add -s user --transport http homeshed-mcp 'http://127.0.0.1:8765/mcp' --header 'Authorization: Bearer ${HOMESHED_TOKEN}'
@@ -332,7 +364,7 @@ tool off, give each app its own key, and keep your keys encrypted in one place. 
 later, or not at all, and remove it without touching HomeShed.
 
 <p align="center">
-  <img src="docs/assets/panel.png" alt="The HomeShed Control Panel's Overview on a fresh install: everything running, 119 tools ready, 3 facts in built-in memory, and the latest tool calls" width="720">
+  <img src="docs/assets/panel.png" alt="The HomeShed Control Panel on a fresh install: Welcome to HomeShed, and a Get running checklist with the password set, the tool server answering, and the next step, connecting your first project" width="720">
 </p>
 
 | Page | What you get |
@@ -351,7 +383,8 @@ docker compose --profile panel up -d
 docker compose logs panel            # the first-run password, printed once
 ```
 
-Without Docker, in the folder where you ran `uvx homeshed-mcp init`:
+Without Docker: make a folder for it, open a terminal there and run `uvx homeshed-mcp init` once (skip this if you
+already did). Then, in that folder:
 
 ```bash
 uvx homeshed-mcp serve --http                         # HomeShed as a server; leave it running
@@ -361,6 +394,37 @@ uvx --from "homeshed-mcp[panel]" homeshed-mcp panel   # in a second terminal
 Then open http://127.0.0.1:9090 and sign in. The panel answers on this machine only and always asks for a password.
 Every page says **Not set up yet**, and what it needs, for anything you haven't added. More:
 [the panel's README](panel/README.md) and its [page-by-page guide](panel/guides/control-panel.md).
+
+### Connect a chat app with sign-in (OAuth)
+
+<p align="center">
+  <img src="docs/assets/signin-code.png" alt="The sign-in page a chat app opens: Connect Claude to HomeShed. Open your HomeShed Control Panel and approve this sign-in. Check it shows the same code, then a 6-digit code and Waiting for your approval" width="520">
+</p>
+<p align="center"><sub>What you see after clicking Sign in: approve it on your Control Panel when the code matches.</sub></p>
+
+Claude's custom connectors, ChatGPT and other chat apps can connect by signing in, so nobody copies a token. You need
+the server running (Docker, above), the Control Panel (to approve each sign-in), and an https address the chat app can
+reach it at: a service that gives your server a public web address, such as Cloudflare Tunnel, Tailscale Funnel or
+Caddy.
+
+1. In `.env`, set `MCP_PUBLIC_URL` to that address and add its name to `MCP_ALLOWED_HOSTS`, for example:
+   ```
+   MCP_PUBLIC_URL=https://mcp.example.com
+   MCP_ALLOWED_HOSTS=localhost:8765,127.0.0.1:8765,mcp.example.com
+   ```
+   Then run `docker compose up -d` again (a plain restart doesn't read `.env` changes). With `MCP_PUBLIC_URL`
+   unset, sign-in is off.
+2. In the chat app, add a custom connector with `https://mcp.example.com/mcp` and choose sign-in (in Claude: "Sign in
+   now", "Use Claude's published identity" or "Register automatically").
+3. A page opens with a 6-digit code. On the Control Panel, press **Waiting for you** at the top of the page. Check the
+   **Sign-in waiting** card shows the same code, give the app a name, choose **Read-only (recommended)**, and press
+   **Approve**.
+
+Each sign-in is then an app on the API page: its grants, tool view, limits, suspend and delete work as for any app, and
+deleting it (or rotating its key) ends its sign-in. Access tokens last an hour and refresh for 60 days; only their
+SHA-256 hashes are stored. A chat app left unused for 60 days signs in again. A sign-in waits 10 minutes for you, then
+expires. **Approve only a sign-in you just started yourself, with the same code on both screens:** anyone who can
+reach the address can start one and call themselves "Claude".
 
 ## What your AI can do
 
@@ -387,7 +451,7 @@ flowchart LR
 ## Tools
 
 <!-- TOOLS:START (generated by scripts/gen_tools_table.py; do not edit by hand) -->
-**161 tools** in 40 groups. `write` tools change something; 🔒 = off until you enable it (see [Security](#security)).
+**167 tools** in 42 groups. `write` tools change something; 🔒 = off until you enable it (see [Security](#security)).
 
 <details><summary><b>agents</b> (5)</summary>
 
@@ -407,6 +471,14 @@ flowchart LR
 |---|---|---|---|
 | `apis.find` | Find APIs in the shared catalog by need, e.g. 'text to speech' or 'free web search'. | read | nothing |
 | `apis.list` | List APIs in the shared catalog (what APIs exist, cost, local vs cloud, status, how to use), filtered by category/cost/local/status. Never contains secrets. | read | nothing |
+
+</details>
+
+<details><summary><b>approvals</b> (1)</summary>
+
+| Tool | What it does | Risk | Needs |
+|---|---|---|---|
+| `approvals.status` | What happened to one request that waited for the owner (a shared-memory write, a Proxmox change, a shop request or a message to the owner): waiting, approved, declined, expired, withdrawn or parked, and who decided. An app sees only its own. | read | nothing |
 
 </details>
 
@@ -445,7 +517,7 @@ flowchart LR
 
 | Tool | What it does | Risk | Needs |
 |---|---|---|---|
-| `commerce.requests.list` | An app's own shop requests (Printify publishes, live-product updates, Etsy listing edits): what still waits for the owner, and the owner's decisions of the last 7 days (approved, declined, expired), with notes. Check this instead of assuming something still waits. | read | nothing |
+| `commerce.requests.list` | An app's own shop requests (Printify publishes, live-product updates, Etsy listing edits): what still waits for the owner, and the owner's decisions of the last 7 days by default, up to 30 (approved, declined, expired), with notes. Check this instead of assuming something still waits. | read | nothing |
 
 </details>
 
@@ -803,6 +875,18 @@ flowchart LR
 
 </details>
 
+<details><summary><b>tools</b> (5)</summary>
+
+| Tool | What it does | Risk | Needs |
+|---|---|---|---|
+| `tools.call` | Run any tool by name with the same checks as a direct call (access, approvals, spend limits). Optional fields keep only the parts of the reply you need; to_file keeps a big reply on the server to read with tools.result. | read | nothing |
+| `tools.describe` | One tool in full: what it does and its inputs, exactly as the full tool list shows it. Use before tools.call. | read | nothing |
+| `tools.find` | Find the tools for a job, best first, among the ones this app may use: each with one line on what it does and whether it reads or changes things. Start here, then tools.describe one and tools.call it. | read | nothing |
+| `tools.groups` | What's here by group (shops, images, memory...), with counts, or the tools in one group with one line each. Only tools this app may use. | read | nothing |
+| `tools.result` | Read back a reply tools.call kept with to_file, a page at a time, filtered by text or trimmed to fields. Kept 24 hours, only for the app that made it. | read | nothing |
+
+</details>
+
 <details><summary><b>uptime</b> (1)</summary>
 
 | Tool | What it does | Risk | Needs |
@@ -843,8 +927,9 @@ HomeShed can act on your machines, so it's built to be dull and safe out of the 
 - **As a Docker server, a token on every request**, including from localhost, with `Host` and `Origin` checks
   against DNS rebinding. The one exception is `/healthz`, which says only `{"status": "ok"}` so an uptime
   monitor can check it. The server refuses to start without a token and a list of allowed hosts.
-- **Listens on `127.0.0.1` by default.** Putting it on the internet is opt-in, and only behind an access proxy
-  such as Cloudflare Access.
+- **Listens on `127.0.0.1` by default.** Putting it on the internet is opt-in: behind an access proxy such as
+  Cloudflare Access, or, for chat apps, with [sign-in](#connect-a-chat-app-with-sign-in-oauth) switched on, where
+  `/mcp` still needs a token and a chat app gets one only after you approve it on the Control Panel.
 - **Runs as an ordinary user in Docker**, not root, and can't rewrite its own code there.
 - **Tools that act on your machines start off.** Docker, git writes and code execution each need switching on.
   Tools that only keep notes for your AI (memory, observations, known bugs) are on.
@@ -858,6 +943,32 @@ HomeShed can act on your machines, so it's built to be dull and safe out of the 
 Mounting the Docker socket gives root on that machine, so the compose file leaves it out until you uncomment its
 line ([how](docs/configuration.md#docker)). To report a vulnerability, see
 [SECURITY.md](SECURITY.md).
+
+### Get HomeShed only from official sources
+
+Popular open-source tools attract look-alike packages and fake copies that carry malware. HomeShed is published
+only here:
+
+| Where | Official name |
+|---|---|
+| GitHub | [github.com/keefng8/homeshed-mcp](https://github.com/keefng8/homeshed-mcp) |
+| PyPI | [`homeshed-mcp`](https://pypi.org/project/homeshed-mcp/) |
+| Container image | `ghcr.io/keefng8/homeshed-mcp` |
+| MCP Registry | `io.github.keefng8/homeshed-mcp` |
+| Claude Code plugin | `claude plugin marketplace add keefng8/homeshed-mcp` |
+
+Anything else using the name, a similar name or this project's logo isn't us. Every GitHub release has a
+`SHA256SUMS` file, and PyPI packages are published from this repo's release workflow with provenance, so you can
+check what you install. To check a file you downloaded from a release, compare its hash with the line for it in
+`SHA256SUMS`:
+
+```bash
+certutil -hashfile homeshed-mcp.mcpb SHA256    # Windows
+shasum -a 256 homeshed-mcp.mcpb                # macOS and Linux
+```
+
+If they don't match, don't open the file. We never ask for your tokens, keys or passwords, by email, message or anywhere else; your
+keys stay in your own HomeShed. If you find a fake copy, please [tell us](SECURITY.md#official-sources).
 
 ## What it's not
 
@@ -873,7 +984,7 @@ line ([how](docs/configuration.md#docker)). To report a vulnerability, see
 | | Official reference servers | Gateways (Docker MCP Gateway, MetaMCP) | **HomeShed** |
 |---|---|---|---|
 | One endpoint for everything | ❌ one server per job | ✅ | ✅ |
-| Tools built in | ➖ each installed separately | ❌ bundles servers you add | ✅ <!--count:total-->161<!--/count-->: <!--count:ready-->63<!--/count--> ready at once, <!--count:off-->13<!--/count--> off until you enable them, <!--count:needs-->85<!--/count--> connect to what you run |
+| Tools built in | ➖ each installed separately | ❌ bundles servers you add | ✅ <!--count:total-->167<!--/count-->: <!--count:ready-->69<!--/count--> ready at once, <!--count:off-->13<!--/count--> off until you enable them, <!--count:needs-->85<!--/count--> connect to what you run |
 | Per-app keys, grants, rate limits and audit | ❌ | ➖ varies | ✅ |
 | Hands routine work to your own model | ❌ | ❌ | ✅ if you run one |
 | Write tools off until you enable them | ➖ | ➖ | ✅ |
@@ -911,7 +1022,9 @@ your membership and to fetch the packs and the known-bugs feed. Nothing phones h
 
 <details><summary><b>Is it safe to put on the internet?</b></summary>
 
-Only behind an access proxy (for example Cloudflare Access) as well as the token. See [Security](#security).
+Only behind an access proxy (for example Cloudflare Access) as well as the token, or with
+[sign-in for chat apps](#connect-a-chat-app-with-sign-in-oauth), where you approve each sign-in yourself. See
+[Security](#security).
 </details>
 
 <details><summary><b>Can I add my own tools?</b></summary>
@@ -926,7 +1039,9 @@ Yes: one Python file plus a JSON manifest, and every MCP client sees it within i
 
 | | What |
 |---|---|
-| ✅ | <!--count:total-->161<!--/count--> tools across reasoning, memory, git, Docker, network and more |
+| ✅ | <!--count:total-->167<!--/count--> tools across reasoning, memory, git, Docker, network and more |
+| ✅ | The front door: five tools that find and run the rest, with trimmed replies and real images (0.7.0) |
+| ✅ | Sign-in for chat apps (Claude.ai connectors, ChatGPT), approved by you with a matching code (0.7.0) |
 | ✅ | Per-app keys, tool grants and rate limits, with an audit log of every change to them |
 | ✅ | Persistent memory, built in, one per project (or connect memory-core) |
 | ✅ | Observations: log corrections, flag repeats |

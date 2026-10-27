@@ -1,0 +1,51 @@
+{
+  "id": "tools.call",
+  "name": "Call A Tool",
+  "version": "1.0.0",
+  "description": "Run any tool by name with the same checks as a direct call (access, approvals, spend limits). Optional fields keep only the parts of the reply you need; to_file keeps a big reply on the server to read with tools.result.",
+  "category": "tools",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "run tool",
+    "call tool",
+    "use tool"
+  ],
+  "inputs": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "arguments": {
+      "type": "object",
+      "required": false
+    },
+    "fields": {
+      "type": "array",
+      "required": false
+    },
+    "to_file": {
+      "type": "boolean",
+      "required": false,
+      "default": false
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.frontdoor.front.call"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "tools.find",
+    "tools.groups",
+    "tools.describe",
+    "tools.result"
+  ]
+}

@@ -723,6 +723,7 @@ body.ws-open { overflow: hidden; }
 .approvals { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 800; display: grid; justify-items: center;
   gap: 8px; width: min(560px, calc(100vw - 32px)); pointer-events: none; }
 .approvals > * { pointer-events: auto; }
+.approvals.has-signin { z-index: 950; }  /* above the welcome screen (900): a sign-in lasts 10 minutes */
 .appr-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; min-height: 0;
   font: 600 13px/1 var(--font); background: var(--surface); color: var(--text); border: 1px solid var(--warn);
   box-shadow: var(--shadow), 0 6px 24px -10px var(--warn); cursor: pointer; }
@@ -747,6 +748,12 @@ body.ws-open { overflow: hidden; }
 .appr-item .appr-imgs img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; background: var(--surface); }
 .appr-item .appr-act button { min-height: 0; padding: 6px 12px; }
 .appr-note { font-size: 12px; color: var(--text-2); padding: 4px 6px; }
+.appr-item.signin { border: 2px solid var(--accent); }
+.signin-code { font: 600 30px/1.1 var(--mono); letter-spacing: .18em; color: var(--accent); }
+.signin-warn { margin: 0; padding: 6px 10px; border-radius: 8px; background: var(--accent-soft); font-size: 13.5px; }
+.signin-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.signin-form label { display: grid; gap: 3px; font-size: 12px; color: var(--text-2); }
+.signin-form input, .signin-form select { min-width: 160px; }
 .appr-pills { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .appr-pill.repl { border-color: var(--accent); box-shadow: var(--shadow), 0 6px 24px -10px var(--accent); }
 .appr-pill.repl .appr-dot { background: var(--accent); }
@@ -810,6 +817,15 @@ details summary { cursor: pointer; color: var(--text-2); }
 .client-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .client-head .cname { font-weight: 600; font-size: 15px; }
 .client-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.client-view { display: flex; flex-wrap: wrap; gap: 10px 28px; margin-top: 12px; }
+.client-view > div { flex: 1 1 260px; } .client-view .vlabel { font-size: 12.5px; font-weight: 600; margin-bottom: 4px; }
+.client-view .hint { display: block; margin-top: 4px; }
+.client-toolset { margin-top: 12px; } .client-toolset .vlabel { font-size: 12.5px; font-weight: 600; margin-bottom: 4px; }
+.client-toolset .ts-groups { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-top: 6px; }
+.client-toolset .ts-groups label { display: inline-flex; gap: 5px; align-items: center; font-size: 13px; font-family: var(--mono); }
+.fd-savings { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+.fd-savings th, .fd-savings td { padding: 6px 10px; text-align: left; border-top: 1px solid var(--separator); }
+.fd-savings td:nth-child(n+2), .fd-savings th:nth-child(n+2) { text-align: right; }
 .shared-item { padding: 10px 0; }
 .shared-item + .shared-item { border-top: 1px solid var(--separator); }
 .shared-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; margin: 6px 0 0; }
@@ -958,20 +974,108 @@ body.viewer .announce-card, body.summary .announce-card { display: none; }
 @media (max-width: 700px) { .announce-form { flex-wrap: wrap; } .announce-label { width: 100%; } }
 @media (max-width: 860px) { .ctx-row { grid-template-columns: minmax(0,1fr) 48px; } .ctx-row .ctx-bar { grid-column: 1 / -1; grid-row: 2; } .ctx-row .ctx-when { display: none; }
   .ctx-row.with-act { grid-template-columns: minmax(0,1fr) 48px auto; } }
-/* Past sessions (GPU service sessions.py): pick one up again in its own folder */
-.ctx-past { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--separator); display: flex; flex-direction: column; gap: 4px; }
-.ctx-past[hidden] { display: none; }
-.ctx-past-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 2px; }
-.ctx-past-head b { font-size: 13.5px; font-weight: 600; }
-.ctx-past-list { display: flex; flex-direction: column; gap: 2px; }
-.ctx-past-row { display: grid; grid-template-columns: minmax(0, 1fr) 72px 92px; gap: 12px; align-items: center; padding: 6px 8px;
-  margin: 0 -8px; border-radius: 9px; font-size: 13px; }
-.ctx-past-row:hover { background: var(--fill); }
-.ctx-past-row .ctx-go { justify-self: end; }
-.ctx-past-row button { height: 28px; padding: 0 12px; }
-.ctx-open { justify-self: end; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--ok-soft); color: var(--ok); }
-.ctx-past-more { align-self: flex-start; margin-top: 4px; }
-@media (max-width: 860px) { .ctx-past-row { grid-template-columns: minmax(0, 1fr) auto; } .ctx-past-row .ctx-when { display: none; } }
+/* ---- Overview top (the owner, 2026-10-27: "I always use the resume session buttons ... I look at my GitHub stats ... my
+   saved tokens a lot"): his past chats with a Resume button each (GPU service sessions.py), then two tiles. ---- */
+.ov-top { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(260px, 1fr); gap: 16px; align-items: start; }
+.ov-top:has(> .ov-resume[hidden]) { grid-template-columns: minmax(0, 1fr); }
+.ov-top:has(> .ov-resume[hidden]) .ov-tiles { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.ov-resume { padding: 18px 20px 12px; border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ov-resume-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ov-resume-id { display: flex; align-items: baseline; gap: 10px; flex: 1 1 auto; min-width: 0; }
+.ov-resume-title { margin: 0; font: 600 19px/1.2 var(--head-font); letter-spacing: -0.015em; }
+.ov-resume .ov-search { flex: 0 1 250px; height: 34px; padding: 0 12px 0 32px !important; border-radius: 999px !important; background-color: var(--fill) !important;
+  border-color: transparent !important; background-repeat: no-repeat; background-position: 11px center; background-size: 14px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='7' cy='7' r='4.8' fill='none' stroke='%238e8e93' stroke-width='1.6'/%3E%3Cpath d='m10.6 10.6 3.4 3.4' stroke='%238e8e93' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E"); }
+.ov-resume .ov-search:focus { border-color: var(--accent) !important; outline: none; }
+.ov-resume-note:empty { display: none; }
+.ov-resume-note.bad { color: var(--bad); }
+.ov-list { display: flex; flex-direction: column; margin: 0 -10px; }
+.ov-row { display: grid; grid-template-columns: 36px minmax(0, 1fr) 70px auto 32px; gap: 12px; align-items: center; padding: 9px 10px;
+  border-radius: 12px; position: relative; }
+.ov-row + .ov-row::before { content: ''; position: absolute; top: 0; left: 58px; right: 10px; border-top: 1px solid var(--separator); }
+.ov-row:hover { background: var(--fill); } .ov-row:hover::before, .ov-row:hover + .ov-row::before { opacity: 0; }
+.ov-row.leaving { animation: ovLeave .28s ease forwards; }
+@keyframes ovLeave { to { opacity: 0; transform: translateX(14px); } }
+.ov-av { position: relative; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+  font: 600 15px var(--head-font); color: var(--accent-text); background: var(--accent-soft); }
+.ov-av.open::after { content: ''; position: absolute; right: -3px; bottom: -3px; width: 11px; height: 11px; border-radius: 50%;
+  background: var(--ok); box-shadow: 0 0 0 2.5px var(--surface); }
+.ov-name { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.ov-name b { font-size: 14.5px; font-weight: 600; letter-spacing: -0.005em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-name span { font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-name mark { background: var(--accent-soft); color: inherit; border-radius: 3px; }
+.ov-when { text-align: right; font-size: 12px; color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ov-when-m { display: none; font-style: normal; }
+.ov-go { justify-self: end; display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 16px 0 13px; border: 0;
+  border-radius: 999px; background: var(--accent-fill); color: var(--on-accent); font: 600 13px var(--font); cursor: pointer;
+  white-space: nowrap; box-shadow: var(--glow); transition: filter .15s, transform .15s; }
+.ov-go svg { width: 12px; height: 12px; fill: currentColor; }
+.ov-go:hover:not(:disabled) { filter: brightness(1.1); } .ov-go:active:not(:disabled) { transform: scale(.97); }
+.ov-go:disabled { opacity: .5; cursor: default; }
+.ov-go.ghosty { background: var(--fill); color: var(--accent-text); box-shadow: none; }
+.ctx-open { justify-self: end; font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px; background: var(--ok-soft); color: var(--ok); white-space: nowrap; }
+.ov-x { width: 30px; height: 30px; border: 0; border-radius: 50%; background: transparent; color: var(--text-3); cursor: pointer;
+  display: grid; place-items: center; }
+.ov-x svg { width: 12px; height: 12px; }
+.ov-x:hover, .ov-x:focus-visible { background: var(--bad-soft); color: var(--bad); }
+.ov-resume-foot { display: flex; gap: 18px; flex-wrap: wrap; padding: 2px 0; }
+.ov-resume-foot:not(:has(> :not([hidden]))) { display: none; }
+.ov-link { border: 0; background: none; padding: 4px 0; color: var(--accent-text); font: 500 13px var(--font); cursor: pointer; }
+.ov-link:hover { text-decoration: underline; text-underline-offset: 2px; }
+.ov-empty { padding: 18px 10px; color: var(--text-2); font-size: 13px; }
+/* the tiles: tokens saved, GitHub. Each opens its detail. */
+.ov-tiles { display: grid; gap: 16px; min-width: 0; }
+.ov-tokwrap { position: relative; min-width: 0; }
+.ov-tile { width: 100%; display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border: 0; border-radius: var(--radius-lg);
+  background: var(--surface); box-shadow: var(--shadow); color: var(--text); text-align: left; cursor: pointer; font: inherit;
+  transition: box-shadow .2s ease; }
+[data-theme="dark"] .ov-tile, [data-theme="mavis"] .ov-tile { border: 1px solid var(--separator); }
+.ov-tile:hover { box-shadow: var(--shadow), 0 0 0 2px var(--accent-soft); }
+.ov-tile-k { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--text-2); min-width: 0; }
+.ov-tile-k svg { width: 15px; height: 15px; flex: none; fill: currentColor; }
+.ov-tok .ov-tile-k svg { fill: none; color: var(--ok); }
+.ov-tile-repo { margin-left: auto; font-weight: 400; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-tile-num { font: 700 34px/1.1 var(--head-font); letter-spacing: -0.03em; color: var(--ok); font-variant-numeric: tabular-nums; margin-top: 4px; }
+.ov-tile-sub { font-size: 12.5px; color: var(--text-2); min-height: 1.45em; }
+.ov-range { position: absolute; top: 12px; right: 12px; display: grid; grid-template-columns: repeat(3, auto); padding: 2px;
+  border-radius: 8px; background: var(--fill); }
+.ov-range button { border: 0; background: transparent; border-radius: 6px; padding: 3px 8px; font: 500 11.5px var(--font); color: var(--text-2); cursor: pointer; }
+.ov-range button.on { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+/* thirty days of RTK's measured savings, one bar a day (a single series: the tile's name is its title) */
+.ov-spark { display: flex; align-items: flex-end; gap: 2px; height: 38px; margin-top: 8px; }
+.ov-spark:empty { display: none; }
+.ov-spark i { flex: 1 1 0; min-height: 2px; border-radius: 2px 2px 0 0; background: var(--ok); opacity: .32; }
+.ov-spark i.in { opacity: 1; }
+.ov-spark i:hover { opacity: 1; filter: brightness(1.15); }
+.ov-gh-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; margin-top: 8px; }
+.ov-gh-grid > span { display: flex; flex-direction: column; min-width: 0; }
+.ov-gh-grid b { font: 600 22px/1.15 var(--head-font); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.ov-gh-grid small { font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-gh-grid em { font-style: normal; font-size: 11.5px; color: var(--ok); font-weight: 600; margin-left: 4px; }
+/* group headings between the cards below */
+.ov-group { margin: 10px 2px -6px; font: 600 14px var(--head-font); letter-spacing: -0.005em; color: var(--text-2); }
+/* "Removed from the list. Undo" */
+.ov-toast { position: fixed; left: 50%; bottom: 24px; z-index: 60; transform: translateX(-50%); display: flex; align-items: center;
+  gap: 14px; max-width: min(520px, calc(100vw - 32px)); padding: 10px 10px 10px 16px; border-radius: 14px;
+  background: var(--text); color: var(--bg); font-size: 13px; box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  animation: ovToast .3s cubic-bezier(.32,.72,0,1); }
+.ov-toast span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ov-toast button { flex: none; height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: color-mix(in srgb, var(--bg) 16%, transparent);
+  color: inherit; font: 600 13px var(--font); cursor: pointer; }
+@keyframes ovToast { from { opacity: 0; transform: translate(-50%, 10px); } }
+body.summary :is(.ov-top, .ov-group, .ov-toast) { display: none !important; }
+@media (max-width: 1100px) { .ov-top { grid-template-columns: minmax(0, 1fr); } .ov-tiles { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); } }
+@media (max-width: 860px) {
+  .ov-resume { padding: 16px 14px 10px; }
+  .ov-resume .ov-search { flex: 1 1 100%; order: 3; }
+  .ov-list { margin: 0 -6px; }
+  .ov-row { grid-template-columns: 34px minmax(0, 1fr) auto 32px; gap: 10px; padding: 9px 6px; }
+  .ov-row + .ov-row::before { left: 50px; right: 6px; }
+  .ov-row > .ov-when { display: none; } .ov-when-m { display: inline; }
+  .ov-go { padding: 0 14px; } .ov-go svg { display: none; }
+  .ov-toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (pointer: coarse), (max-width: 860px) { .ov-x { width: 40px; height: 44px; min-height: 44px; border-radius: 12px; } .ov-range button { min-height: 32px; } }
 
 /* ---- View-only login (VIEWER_ROUTES in main.py): hide what the server won't serve a viewer ---- */
 body.viewer #tabModels, body.viewer #tabReasoning, body.viewer #tabTools,
@@ -1741,6 +1845,7 @@ body.summary .sum-bar { display: flex; align-items: center; gap: 14px; margin-bo
       <div class="appr-list" id="apprList" hidden role="region" aria-label="Waiting for your approval"></div>
       <div class="appr-list" id="msgList" hidden role="region" aria-label="Messages from your agents"></div>
       <div class="appr-list" id="replList" hidden role="region" aria-label="New replies on your to-do list"></div>
+      <datalist id="signinApps"></datalist>
     </div>
     <div class="sum-bar" id="sumBar" role="banner">
       <span class="sum-brand"><img src="/icons/icon-64.png" width="24" height="24" alt="">HomeShed</span>
@@ -1785,6 +1890,44 @@ body.summary .sum-bar { display: flex; align-items: center; gap: 14px; margin-bo
       <div class="announce-list" id="announceList"></div>
     </section>
     <div class="welcome-screen" id="welcomeCard" hidden role="dialog" aria-modal="true" aria-labelledby="wsTitle"></div>
+    <!-- The owner, 2026-10-27: "I always use the resume session buttons ... I look at my GitHub stats. I also look at my
+         saved tokens a lot. Can we organise it a little better". What he uses most comes first: his chats, then two tiles. -->
+    <div class="ov-top" id="ovTop">
+      <section class="card ov-resume" id="ovResume" data-card="resume" data-name="Pick up where you left off" hidden aria-labelledby="ovResumeTitle">
+        <div class="ov-resume-head card-head">
+          <div class="ov-resume-id"><h2 class="ov-resume-title" id="ovResumeTitle">Pick up where you left off</h2>
+            <span class="hint" id="ovResumeCount"></span></div>
+          <input type="search" class="ov-search" id="ovSearch" placeholder="Find a chat by name or folder" aria-label="Find a chat by name or folder"
+            autocomplete="off" oninput="_past.q = this.value; renderPastSessions()">
+        </div>
+        <div class="hint ov-resume-note" id="ctxPastNote" aria-live="polite"></div>
+        <div class="ov-list" id="ctxPastList" role="list"></div>
+        <div class="ov-resume-foot">
+          <button type="button" class="ov-link" id="ovMore" hidden onclick="_past.all = !_past.all; renderPastSessions()"></button>
+          <button type="button" class="ov-link" id="ovHiddenBtn" hidden onclick="togglePastHidden()"></button>
+        </div>
+      </section>
+      <div class="ov-tiles" id="ovTiles">
+        <div class="ov-tokwrap" id="ovTok" hidden>
+          <button type="button" class="ov-tile ov-tok" onclick="switchTab('savings')" title="Open Savings: every day's figures">
+            <span class="ov-tile-k"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5 2.5 4v4c0 3.2 2.3 5.7 5.5 6.5 3.2-.8 5.5-3.3 5.5-6.5V4L8 1.5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="m5.6 8 1.7 1.7 3.2-3.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Tokens saved</span>
+            <span class="ov-tile-num" id="ovTokNum">—</span>
+            <span class="ov-tile-sub" id="ovTokSub"></span>
+            <span class="ov-spark" id="ovTokSpark"></span>
+          </button>
+          <div class="ov-range" id="ovTokRange" hidden role="group" aria-label="Tokens saved over">
+            <button type="button" data-r="all" onclick="setTokRange('all')">All</button>
+            <button type="button" data-r="month" onclick="setTokRange('month')">30 d</button>
+            <button type="button" data-r="week" onclick="setTokRange('week')">7 d</button>
+          </div>
+        </div>
+        <button type="button" class="ov-tile ov-gh" id="ovGh" hidden onclick="openRepoStats()" title="Show the Released card: every figure, and the views and clones chart">
+          <span class="ov-tile-k"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .2a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.93-.89-1.17-.89-1.17-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.72 1.22 1.88.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.66 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 .2Z"/></svg>GitHub<span class="ov-tile-repo" id="ovGhRepo"></span></span>
+          <span class="ov-gh-grid" id="ovGhGrid"></span>
+        </button>
+      </div>
+    </div>
+    <div class="ov-toast" id="ovToast" role="status" aria-live="polite" hidden></div>
     <section class="status-hero" id="statusHero">
       <div class="hero-text">
         <span class="pulse"></span>
@@ -1806,6 +1949,29 @@ body.summary .sum-bar { display: flex; align-items: center; gap: 14px; margin-bo
       <div class="stat-box"><div class="stat-num" id="statMem">—</div><div class="stat-label">Memory service</div></div>
     </div>
 
+    <h2 class="ov-group" id="ovGrpCtx">Claude sessions</h2>
+    <section class="card live-card ctx-live" id="ctxCard" data-card="context" hidden title="How full each Claude Code session's context is, live from your PC. At the alarm, Claude is told to save its memory before it compacts, and your phone can get an alert. The marker on each bar is the alarm; change it on the Settings page.">
+      <div class="live-head">
+        <div class="live-id">
+          <span class="live-orb idle" id="ctxOrb"><span class="ring"></span><span class="dot"></span></span>
+          <div><div class="live-title">Claude context</div><div class="hint" id="ctxSub">How full each Claude session is</div></div>
+        </div>
+        <div class="live-stats">
+          <div><b id="ctxTop">—</b><span>fullest session</span></div>
+          <div><b id="ctxAlarm">—</b><span>alarm at</span></div>
+          <div><b id="ctxCompact">—</b><span>last compacted at</span></div>
+          <label class="ctx-auto" id="ctxAuto" hidden><span class="sw"><input type="checkbox" id="ctxAutoIn" onchange="setAutoCompact(this)"
+            aria-label="Compact automatically"><span></span></span><span id="ctxAutoTxt">auto-compact</span></label>
+          <label class="ctx-auto" id="ctxLimits" hidden><span class="sw"><input type="checkbox" id="ctxLimitsIn" onchange="setPlanLimits(this)"
+            aria-label="Plan limits: slow down and pause Claude near my limit"><span></span></span><span id="ctxLimitsTxt">plan limits</span></label>
+        </div>
+      </div>
+      <div class="ctx-plan hint" id="ctxPlan" hidden></div>
+      <div class="live-feed" id="ctxFeed"><div class="empty">Connecting…</div></div>
+      <div class="hint ctx-note" id="ctxNote" hidden aria-live="polite"></div>
+    </section>
+
+    <h2 class="ov-group">Savings</h2>
     <div class="tok-strip" data-card="tokens" data-name="Tokens kept out of Claude" title="Measured figures come from the tools themselves; the estimate is sizes-only (never content), about 4 characters per token, one rule per tool. Hover each figure for its method.">
       <div class="tok-head card-head"><span class="lbl">Tokens kept out of Claude</span><span class="big" id="tokTotal">—</span><span class="sub" id="tokSub">Loading…</span><span class="sub" id="tokMoney" hidden></span></div>
       <div class="tok-bar" id="tokBar"></div>
@@ -1827,6 +1993,29 @@ body.summary .sum-bar { display: flex; align-items: center; gap: 14px; margin-bo
       <div class="reasoning-stat" title="local_ai.ask: the delegator (local model first, NVIDIA fallback)"><span class="reasoning-stat-num" id="statAsk">0</span><span class="reasoning-stat-lbl">Ask</span></div>
       </div>
     </div>
+
+    <h2 class="ov-group" id="ovGrpProj">Projects</h2>
+    <section class="card live-card prog-live" id="progCard" data-card="progress" hidden title="How far each project's release has got, as the agent preparing it last reported: the gates it has passed, readiness from repo.readiness, and what's waiting on you and for how long.">
+      <div class="live-head">
+        <div class="live-id">
+          <span class="live-orb idle" id="progOrb"><span class="ring"></span><span class="dot"></span></span>
+          <div><div class="live-title">Release progress</div><div class="hint" id="progSub">What your agents report</div></div>
+        </div>
+      </div>
+      <div class="live-feed" id="progFeed"><div class="empty">Connecting…</div></div>
+    </section>
+
+    <section class="card live-card rel-live" id="relCard" data-card="released" hidden title="Your projects that are out: the live version, where it's published, and how it's doing (stars, downloads, views and clones, from GitHub and PyPI).">
+      <div class="live-head">
+        <div class="live-id">
+          <span class="live-orb shipped" id="relOrb"><span class="ring"></span><span class="dot"></span></span>
+          <div><div class="live-title">Released</div><div class="hint" id="relSub">What's out and how it's doing</div></div>
+        </div>
+      </div>
+      <div class="live-feed" id="relFeed"></div>
+    </section>
+
+    <h2 class="ov-group">Live activity</h2>
 
     <section class="card activity-card">
       <div class="rw-strip">
@@ -1869,52 +2058,7 @@ body.summary .sum-bar { display: flex; align-items: center; gap: 14px; margin-bo
       <div class="live-feed" id="clientsFeed"><div class="empty">Connecting…</div></div>
     </section>
 
-    <section class="card live-card prog-live" id="progCard" data-card="progress" hidden title="How far each project's release has got, as the agent preparing it last reported: the gates it has passed, readiness from repo.readiness, and what's waiting on you and for how long.">
-      <div class="live-head">
-        <div class="live-id">
-          <span class="live-orb idle" id="progOrb"><span class="ring"></span><span class="dot"></span></span>
-          <div><div class="live-title">Release progress</div><div class="hint" id="progSub">What your agents report</div></div>
-        </div>
-      </div>
-      <div class="live-feed" id="progFeed"><div class="empty">Connecting…</div></div>
-    </section>
-
-    <section class="card live-card rel-live" id="relCard" data-card="released" hidden title="Your projects that are out: the live version, where it's published, and how it's doing (stars, downloads, views and clones, from GitHub and PyPI).">
-      <div class="live-head">
-        <div class="live-id">
-          <span class="live-orb shipped" id="relOrb"><span class="ring"></span><span class="dot"></span></span>
-          <div><div class="live-title">Released</div><div class="hint" id="relSub">What's out and how it's doing</div></div>
-        </div>
-      </div>
-      <div class="live-feed" id="relFeed"></div>
-    </section>
-
-    <section class="card live-card ctx-live" id="ctxCard" data-card="context" hidden title="How full each Claude Code session's context is, live from your PC. At the alarm, Claude is told to save its memory before it compacts, and your phone can get an alert. The marker on each bar is the alarm; change it on the Settings page.">
-      <div class="live-head">
-        <div class="live-id">
-          <span class="live-orb idle" id="ctxOrb"><span class="ring"></span><span class="dot"></span></span>
-          <div><div class="live-title">Claude context</div><div class="hint" id="ctxSub">How full each Claude session is</div></div>
-        </div>
-        <div class="live-stats">
-          <div><b id="ctxTop">—</b><span>fullest session</span></div>
-          <div><b id="ctxAlarm">—</b><span>alarm at</span></div>
-          <div><b id="ctxCompact">—</b><span>last compacted at</span></div>
-          <label class="ctx-auto" id="ctxAuto" hidden><span class="sw"><input type="checkbox" id="ctxAutoIn" onchange="setAutoCompact(this)"
-            aria-label="Compact automatically"><span></span></span><span id="ctxAutoTxt">auto-compact</span></label>
-          <label class="ctx-auto" id="ctxLimits" hidden><span class="sw"><input type="checkbox" id="ctxLimitsIn" onchange="setPlanLimits(this)"
-            aria-label="Plan limits: slow down and pause Claude near my limit"><span></span></span><span id="ctxLimitsTxt">plan limits</span></label>
-        </div>
-      </div>
-      <div class="ctx-plan hint" id="ctxPlan" hidden></div>
-      <div class="live-feed" id="ctxFeed"><div class="empty">Connecting…</div></div>
-      <div class="hint ctx-note" id="ctxNote" hidden aria-live="polite"></div>
-      <div class="ctx-past" id="ctxPast" data-card="past-sessions" data-name="Past sessions" hidden>
-        <div class="ctx-past-head card-head"><b>Past sessions</b><span class="hint" id="ctxPastCount"></span></div>
-        <div class="hint" id="ctxPastNote"></div>
-        <div class="ctx-past-list" id="ctxPastList"></div>
-      </div>
-    </section>
-
+    <h2 class="ov-group">Tools and memory</h2>
     <div class="cols">
       <div class="col" data-card="tools" data-name="Tools">
         <div class="panel-title card-head">Tools <span class="count" id="capCount"></span></div>
@@ -2128,10 +2272,20 @@ body.summary .sum-bar { display: flex; align-items: center; gap: 14px; margin-bo
         <div style="margin-top:12px"><button class="ghost" style="color:var(--bad)" onclick="suspendAllClients()">Suspend every client (emergency)</button></div>
       </section>
     </div>
+    <section class="card sav-card" id="apSignin">
+      <div class="panel-title">Connect a chat app (Claude, ChatGPT…) <span class="count" id="apSigninState"></span></div>
+      <div class="hint">A chat app can use HomeShed's tools by signing in, with no token to copy. You approve each sign-in here, and it becomes an app in the list below, with only the tools you allow.</div>
+      <div id="apSigninBody"><div class="loading">Loading…</div></div>
+    </section>
     <section class="card sav-card" id="apShared" hidden>
       <div class="panel-title">Shared memory: waiting for you <span class="count" id="apSharedCount"></span></div>
       <div class="hint">Each app has its own memory. When an app asks to add something to the shared memory, which your other apps and projects can read, it waits here until you approve it.</div>
       <div id="apSharedList"></div>
+    </section>
+    <section class="card sav-card" id="apSavings">
+      <div class="panel-title">Front door savings <span class="count" id="apSavingsSince"></span></div>
+      <div class="hint">About how many tokens each app saved by using the front door: tool descriptions it didn't have to load, and long replies cut down to what it asked for. Fewer tokens means lower cost and more room for the app's own work.</div>
+      <div id="apSavingsBody"><div class="loading">Loading…</div></div>
     </section>
     <section class="card" style="padding:4px 0" id="apList"><div class="loading" style="padding:12px 16px">Loading…</div></section>
   </div>
@@ -2730,6 +2884,8 @@ async function loadWeekValue() {
   const since = new Date(); since.setDate(since.getDate() - 6);
   const from = since.toLocaleDateString('en-CA');
   _sys.week = ((d.daily && d.daily.daily) || []).filter(x => x.date >= from).reduce((a, x) => a + (x.saved_tokens || 0), 0);
+  _tok.daily = (d.daily && d.daily.daily) || null;
+  renderTokTile();
   renderHero();
 }
 function renderHero() {
@@ -3671,6 +3827,8 @@ async function loadTokens() {
     _sys.saved = total;
     renderHero();
     document.getElementById('tokTotal').textContent = '≈ ' + fmtTok(total);
+    _tok.all = total;
+    renderTokTile();
     // Never a zero that looks measured (the prepper's rule): without RTK's own numbers, say why instead
     const rtkOff = !!(d.rtk && d.rtk.not_set_up);
     document.getElementById('tokSub').textContent = rtkOk
@@ -4462,8 +4620,9 @@ async function apiCall(method, url, body) {
   return d;
 }
 async function loadApi() {
-  let d, t, se;
-  try { [d, t, se] = await Promise.all([apiCall('GET', '/api/clients'), apiCall('GET', '/api/tools'), apiCall('GET', '/api/connections').catch(() => ({ connections: [] }))]); }
+  let d, t, se, pro;
+  try { [d, t, se, pro] = await Promise.all([apiCall('GET', '/api/clients'), apiCall('GET', '/api/tools'), apiCall('GET', '/api/connections').catch(() => ({ connections: [] })),
+    apiCall('GET', '/api/pro').catch(() => ({}))]); }
   catch (e) { document.getElementById('apList').innerHTML = `<div class="empty" style="padding:12px 16px">${loadErr('clients', e)}</div>`; return; }
   _apiClients = d.clients || []; _apiTools = t.tools || [];
   const week = Date.now() / 1000 - 7 * 86400;
@@ -4513,6 +4672,13 @@ async function loadApi() {
         <button class="ghost" onclick="rotateClient('${escAttr(c.name)}')">New token</button>
         <button class="ghost" style="color:var(--bad)" onclick="deleteClient('${escAttr(c.name)}')">Delete</button>
       </div>
+      <div class="client-view">
+        <div><div class="vlabel">Tool view</div>${viewSeg(c, 'tool_view', [['full', 'Full list'], ['front_door', 'Front door']])}
+          <span class="hint">Front door: the app sees 5 tools that find and run all the others, instead of the whole list. Saves tokens, which helps small models most.</span></div>
+        <div><div class="vlabel">Images</div>${viewSeg(c, 'images', [['inline', 'Inline'], ['content', 'As pictures']])}
+          <span class="hint">Inline sends a picture as a long block of text. As pictures sends it as a real image, which costs models far less.</span></div>
+      </div>
+      ${c.tool_view === 'front_door' ? toolsetPicker(c, !!(pro.pro || pro.effective_pro)) : ''}
       <div class="client-tools${_openGrants.has(c.name) ? ' open' : ''}">${grants}</div>
     </div>`;
   }).join('') : '<div class="empty" style="padding:12px 16px">No clients yet. Add one above when another project or app needs to use HomeShed.</div>';
@@ -4522,6 +4688,42 @@ async function loadApi() {
       <span>${escapeHtml(a.client || 'all clients')}${a.tool ? ': ' + escapeHtml(a.tool) : ''}${a.preset ? ': ' + escapeHtml(a.preset) : ''}</span></div>`).join('')
     : '<div class="empty">No changes yet.</div>';
   loadSharedWaiting();
+  loadFrontDoorSavings();
+  loadSigninHelp();
+}
+// How to connect a chat app with OAuth sign-in (oauth_server.py). Open by default: it's where the owner looks. A tool
+// server without sign-in answers 404, which reads the same as "not set up".
+async function loadSigninHelp() {
+  const body = document.getElementById('apSigninBody'), state = document.getElementById('apSigninState');
+  if (!body) return;
+  let d;
+  try { d = await apiCall('GET', '/api/oauth/pending'); } catch (e) { d = { enabled: false, error: e.message }; }
+  const waiting = (d.pending || []).length;
+  state.textContent = d.enabled ? (waiting ? `${waiting} sign-in${waiting === 1 ? '' : 's'} waiting at the top of the page` : 'sign-in is on') : 'not set up yet';
+  body.innerHTML = d.enabled ? `<ol class="hint" style="margin:8px 0 0 18px;padding:0;display:grid;gap:6px">
+      <li>In the chat app, add a <b>custom connector</b> (in Claude: Settings, Connectors, Add custom connector). A connector is how a chat app reaches outside tools.</li>
+      <li>For its address, give this server's public web address (the one starting <b>https://</b> that HomeShed was set up with) followed by <b>/mcp</b>, for example <span style="font-family:var(--mono)">https://tools.example.com/mcp</span>.</li>
+      <li>When it asks how to sign in, choose <b>Sign in now</b> or <b>OAuth</b>. If it offers a choice of how the app is identified, either works: Claude's <b>published identity</b> (Claude names itself by a web address HomeShed checks) or <b>automatic registration</b> (the app registers itself here). Leave any "client ID" or "secret" boxes empty.</li>
+      <li>A page opens showing a 6-digit code. Come back here: the sign-in waits at the top of the Control Panel for 10 minutes. Check the code matches, choose the app's name and access, and press <b>Approve</b>. The page then takes you back to the chat app.</li>
+    </ol>
+    <div class="hint" style="margin-top:8px">To end a chat app's access later, suspend or delete its app in the list below: its sign-in stops working at once.</div>`
+    : `<div class="hint" style="margin-top:8px"><b>Not set up yet.</b> Sign-in needs this server's public https address: a web address starting <b>https://</b> that chat apps on the internet can reach (for example through a tunnel or a reverse proxy: a go-between that passes visitors from the internet safely on to HomeShed). Put that address in the tool server's settings as <span style="font-family:var(--mono)">MCP_PUBLIC_URL</span> and restart the tool server; this card then shows the steps.${d.error ? ` (Couldn't check just now: ${escapeHtml(d.error)}.)` : ''}</div>`;
+}
+// What the front door saved each app (tools.savings, HomeShed Pro). Without Pro the route answers {pro: false} and the
+// card says what Pro shows; it stays open either way (features show where the owner looks).
+async function loadFrontDoorSavings() {
+  const body = document.getElementById('apSavingsBody');
+  if (!body) return;
+  let d;
+  try { d = await apiCall('GET', '/api/front-door/savings'); } catch (e) { body.innerHTML = `<div class="empty">${loadErr('the savings', e)}</div>`; return; }
+  document.getElementById('apSavingsSince').textContent = d.since ? `since ${new Date(d.since * 1000).toLocaleDateString()}` : '';
+  if (d.pro === false) { body.innerHTML = `<div class="empty">${escapeHtml(d.note || 'HomeShed Pro shows what the front door saved each app.')}</div>`; return; }
+  const apps = d.apps || [];
+  body.innerHTML = apps.length ? `<table class="fd-savings"><thead><tr><th>App</th><th>Tokens saved (about)</th><th>Tool lists shortened</th><th>Replies cut down</th></tr></thead>
+    <tbody>${apps.map(a => `<tr><td>${escapeHtml(a.app)}</td><td><b>${(a.tokens_saved_about || 0).toLocaleString()}</b></td>
+      <td>${(a.listings || 0).toLocaleString()}</td><td>${(a.calls_trimmed || 0).toLocaleString()}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td><b>All apps</b></td><td><b>${(d.total_tokens_saved_about || 0).toLocaleString()}</b></td><td></td><td></td></tr></tfoot></table>`
+    : '<div class="empty">Nothing saved yet. Set an app\'s Tool view to Front door and the savings show here once it uses it.</div>';
 }
 // Apps' writes to the shared memory wait here for the owner (the owner's decision, 2026-10-01). The text is the app's, so
 // it's escaped; the card hides when nothing waits or the tool server can't say.
@@ -4573,6 +4775,39 @@ async function deleteClient(name) {
 }
 async function clientAction(name, action) {
   try { await apiCall('POST', `/api/clients/${encodeURIComponent(name)}/${action}`); loadApi(); } catch (e) { alert(e.message); }
+}
+// How the app sees the tools (the tool server's front door): tool_view full | front_door, images inline | content.
+// The tool server fills in the defaults, so an old app with neither set shows Full list and Inline.
+function viewSeg(c, key, options) {
+  return `<div class="seg" role="radiogroup" aria-label="${key === 'tool_view' ? 'Tool view' : 'Images'}: ${escAttr(c.name)}">${options.map(([v, label]) =>
+    `<button type="button" role="radio" aria-checked="${c[key] === v}" class="${c[key] === v ? 'on' : ''}"
+      onclick="clientView('${escAttr(c.name)}', '${key}', '${v}')">${label}</button>`).join('')}</div>`;
+}
+async function clientView(name, key, value) {
+  try { await apiCall('POST', `/api/clients/${encodeURIComponent(name)}/view`, { [key]: value }); loadApi(); } catch (e) { alert(e.message); }
+}
+// Tool set (HomeShed Pro): which tool groups the front door shows the app, saved as "<group>.*" patterns; null is its
+// whole grant. It only narrows what the app sees; what may run is still the grant. The free HomeShed keeps the set, so
+// it saves either way and starts working while Pro is on. Groups are the first part of the granted tools' ids.
+function toolsetPicker(c, proOn) {
+  const set = c.toolset || [];
+  const groups = new Set(_apiTools.filter(x => (x.clients || {})[c.name]).map(x => x.id.split('.')[0]));
+  set.filter(p => p.endsWith('.*')).forEach(p => groups.add(p.slice(0, -2)));
+  groups.delete('tools');  // the front door's own tools are always shown
+  const boxes = [...groups].sort().map(g => `<label><input type="checkbox" data-ts="${escAttr(c.name)}" value="${escAttr(g)}.*"
+    ${set.includes(g + '.*') ? 'checked' : ''} onchange="clientToolset('${escAttr(c.name)}')">${escapeHtml(g)}</label>`).join('');
+  return `<div class="client-toolset"><div class="vlabel">Tool set (Pro): which tools the front door shows this app</div>
+    <span class="hint">Tick the groups it should see; untick them all, or press Whole grant, to show every tool it's allowed.${proOn ? '' : ' Needs HomeShed Pro; saved now, used while Pro is on.'}</span>
+    <div class="ts-groups"><div class="seg"><button type="button" class="${set.length ? '' : 'on'}" aria-pressed="${!set.length}" onclick="clientToolset('${escAttr(c.name)}', true)">Whole grant</button></div>
+      ${boxes || '<span class="hint">No tools granted yet: use Choose tools first.</span>'}</div></div>`;
+}
+async function clientToolset(name, whole) {
+  const boxes = [...document.querySelectorAll(`input[data-ts="${CSS.escape(name)}"]`)];
+  const shown = new Set(boxes.map(b => b.value));
+  const keep = ((_apiClients.find(c => c.name === name) || {}).toolset || []).filter(p => !shown.has(p));  // set elsewhere: kept
+  const patterns = whole ? null : [...keep, ...boxes.filter(b => b.checked).map(b => b.value)];
+  try { await apiCall('POST', `/api/clients/${encodeURIComponent(name)}/toolset`, { patterns: patterns && patterns.length ? patterns : null }); loadApi(); }
+  catch (e) { alert(e.message); }
 }
 async function clientPreset(name, preset) {
   const words = { read: 'every read-only tool', all: 'every tool, including write tools', none: 'no tools' };
@@ -4953,8 +5188,9 @@ async function loadTodo() {
 async function todoAgents() {
   if (Date.now() - _todo.agentsAt < 300000) return;
   try {
-    const d = await apiCall('GET', '/api/claude/sessions'), seen = new Set();
-    _todo.agents = (d.sessions || []).filter(r => r.folder_ok && !seen.has(r.folder.toLowerCase()) && seen.add(r.folder.toLowerCase()))
+    const [d, h] = await Promise.all([apiCall('GET', '/api/claude/sessions?limit=40'),
+      apiCall('GET', '/api/claude/sessions?hidden=1&limit=40').catch(() => ({ sessions: [] }))]), seen = new Set();
+    _todo.agents = [...(d.sessions || []), ...(h.sessions || [])].filter(r => r.folder_ok && !seen.has(r.folder.toLowerCase()) && seen.add(r.folder.toLowerCase()))
       .map(r => ({ name: r.name, folder: r.folder }));
     _todo.agentsAt = Date.now();
   } catch (e) { /* the PC is off: "Someone else" still takes a typed name */ }
@@ -5294,6 +5530,7 @@ async function loadProgress() {
   if (!card) return;
   const list = d && Array.isArray(d.projects) ? d.projects : null;
   card.hidden = !list;  // unreadable (tool server down, a view-only login, a demo without it): no card, no error
+  renderGhTile(list);
   if (!list) return;
   if (!list.length) {
     orb.classList.add('idle'); sub.textContent = 'What your agents report';
@@ -5676,31 +5913,116 @@ async function compactSession(sid) {
 // Past sessions (the owner, 2026-09-29: "can this remember previous claude sessions? and launch them back in their
 // terminal and locations from a click of a button?"). The GPU service's sessions.py lists them from Claude Code's
 // own files and, when switched on in Settings, opens one in Windows Terminal in its own folder. Owner only.
-const _past = { all: false, rows: [], on: false };
+// 2026-10-27 ("I always use the resume session buttons ... Can we remove chats?"): the first card on the Overview, with a
+// search, and a remove on each row that only takes it off this list (the helper keeps the id; the file is never touched),
+// with Undo, and a Hidden chats view to bring one back.
+const PAST_SHOWN = 6;
+const _past = { all: false, rows: [], on: false, can: true, q: '', hiddenView: false, hiddenRows: [], hiddenCount: 0, gone: new Set() };
 async function loadPastSessions() {
-  const box = document.getElementById('ctxPast');
-  let d;
-  try { d = await apiCall('GET', '/api/claude/sessions'); } catch (e) { box.hidden = true; return; }
+  const box = document.getElementById('ovResume');
+  let d, h = null;
+  try {
+    [d, h] = await Promise.all([apiCall('GET', '/api/claude/sessions?limit=40'),
+      _past.hiddenView ? apiCall('GET', '/api/claude/sessions?hidden=1&limit=40').catch(() => null) : null]);
+  } catch (e) { box.hidden = true; syncOverview(); return; }  // a view-only login, or no helper PC: no card
   _past.rows = d.sessions || [];
   _past.on = !!d.resume_on;
-  box.hidden = !_past.rows.length;
-  document.getElementById('ctxPastCount').textContent = _past.rows.length || '';
-  document.getElementById('ctxPastNote').innerHTML = !d.can_resume ? "Claude Code isn't installed on your PC for this user."
-    : _past.on ? "Resume opens a terminal on your PC in the session's own folder. Claude waits for you to type."
-    : 'To reopen one from here, switch on <a href="#" onclick="openSessionSetting(); return false;">Reopen past sessions</a> in Settings, under Claude.';
+  _past.can = d.can_resume !== false;
+  _past.hiddenCount = d.hidden_count || 0;
+  if (h) _past.hiddenRows = h.sessions || [];
+  if (!_past.hiddenCount) _past.hiddenView = false;
+  box.hidden = false;
+  syncOverview();
+  pastNote();
   renderPastSessions();
 }
+function pastNote(text, bad) {
+  const el = document.getElementById('ctxPastNote');
+  el.classList.toggle('bad', !!bad);
+  if (text != null) { el.textContent = text; return; }
+  el.innerHTML = _past.hiddenView ? 'Chats you removed from this list. Their files are still on your PC: bring one back to resume it here.'
+    : !_past.can ? "Claude Code isn't installed on your PC for this user, so chats can't be reopened from here."
+    : _past.on ? '' : 'To reopen a chat from here, switch on <a href="#" onclick="openSessionSetting(); return false;">Reopen past sessions</a> in Settings, under Claude.';
+}
 function openSessionSetting() { switchTab('settings'); showSetCat(sectionOf('Claude context')); }  // a section, not a group
+function pastFolder(f) {  // the last two folders: "Projects\dashboard", not the whole path
+  const parts = String(f || '').replace(/[\\/]+$/, '').split(/[\\/]/).filter(Boolean);
+  return parts.length > 2 ? '…\\' + parts.slice(-2).join('\\') : String(f || '');
+}
+function pastMark(text, q) {  // the search's match, highlighted (escaped first: nothing from the file is ever HTML)
+  const t = escapeHtml(text);
+  if (!q) return t;
+  const at = String(text).toLowerCase().indexOf(q);
+  return at < 0 ? t : escapeHtml(text.slice(0, at)) + '<mark>' + escapeHtml(text.slice(at, at + q.length)) + '</mark>' + escapeHtml(text.slice(at + q.length));
+}
+const PLAY_SVG = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.8v8.4c0 .5.6.8 1 .5l6.3-4.2a.6.6 0 0 0 0-1L4 1.3c-.4-.3-1 0-1 .5Z"/></svg>';
+const X_SVG = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="m2.5 2.5 7 7m0-7-7 7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
 function renderPastSessions() {
-  const rows = _past.all ? _past.rows : _past.rows.slice(0, 6);
+  const q = _past.q.trim().toLowerCase(), hv = _past.hiddenView;
+  const src = (hv ? _past.hiddenRows : _past.rows).filter(s => !_past.gone.has(s.id));
+  const hits = q ? src.filter(s => [s.name, s.title, s.folder].some(v => String(v || '').toLowerCase().includes(q))) : src;
+  const rows = q || _past.all || hv ? hits : hits.slice(0, PAST_SHOWN);
+  document.getElementById('ovResumeCount').textContent = hv ? `${src.length} hidden` : src.length ? `${src.length} recent` : '';
+  document.getElementById('ovResumeTitle').textContent = hv ? 'Hidden chats' : 'Pick up where you left off';
+  document.getElementById('ovSearch').hidden = !hv && src.length <= PAST_SHOWN && !q;
   document.getElementById('ctxPastList').innerHTML = rows.map(s => {
-    const go = s.open ? `<span class="ctx-open" title="${s.status === 'busy' ? 'Working on something now' : 'Waiting for you'}">Open now</span>`
-      : !_past.on ? '<span></span>'
-      : `<button type="button" class="ghost ctx-go" data-id="${escAttr(s.id)}" onclick="resumeSession(this)"${s.folder_ok ? '' : ` disabled title="Its folder isn't there any more"`}>Resume</button>`;
-    return `<div class="ctx-past-row" title="${escAttr(s.title && s.title !== s.name ? s.title : s.folder)}">
-      <span class="ctx-name"><b>${escapeHtml(s.name)}</b><span>${escapeHtml(s.folder)}</span></span>
-      <span class="ctx-when">${agoText(new Date(s.last_active * 1000).toISOString())}</span>${go}</div>`;
-  }).join('') + (_past.rows.length > 6 ? `<button type="button" class="ghost ctx-past-more" onclick="_past.all = !_past.all; renderPastSessions()">${_past.all ? 'Show fewer' : `Show all ${_past.rows.length}`}</button>` : '');
+    const when = agoText(new Date(s.last_active * 1000).toISOString());
+    const sub = [s.title && s.title !== s.name ? s.title : '', pastFolder(s.folder)].filter(Boolean);
+    const go = hv ? `<button type="button" class="ov-go ghosty" onclick="setPastHidden('${escAttr(s.id)}', false, this)">Bring back</button>`
+      : s.open ? `<span class="ctx-open" title="${s.status === 'busy' ? 'Working on something now' : 'Waiting for you'}: switch to its window">Open now</span>`
+      : !_past.on || !_past.can ? '<span></span>'
+      : `<button type="button" class="ov-go" data-id="${escAttr(s.id)}" onclick="resumeSession(this)"${s.folder_ok ? '' : ` disabled title="Its folder isn't there any more"`}
+          aria-label="Resume ${escAttr(s.name)}">${PLAY_SVG}Resume</button>`;
+    const x = hv ? '<span></span>' : `<button type="button" class="ov-x" onclick="setPastHidden('${escAttr(s.id)}', true, this)"
+        title="Remove from this list (the chat itself is kept)" aria-label="Remove ${escAttr(s.name)} from this list">${X_SVG}</button>`;
+    const letter = (String(s.folder || s.name).replace(/[\\/]+$/, '').split(/[\\/]/).pop() || s.name || '?').replace(/[^A-Za-z0-9]/g, '').charAt(0).toUpperCase() || '?';
+    return `<div class="ov-row" role="listitem" data-id="${escAttr(s.id)}" title="${escAttr(s.folder)}">
+      <span class="ov-av${s.open ? ' open' : ''}" aria-hidden="true">${escapeHtml(letter)}</span>
+      <span class="ov-name"><b>${pastMark(s.name, q)}</b><span><em class="ov-when-m">${escapeHtml(when)} · </em>${sub.map(v => pastMark(v, q)).join(' · ')}</span></span>
+      <span class="ov-when">${escapeHtml(when)}</span>${go}${x}</div>`;
+  }).join('') || `<div class="ov-empty">${q ? `No chat matches “${escapeHtml(_past.q.trim())}”.`
+    : hv ? 'No hidden chats.' : 'No past chats yet. Each Claude Code session on your PC shows up here, ready to resume.'}</div>`;
+  const more = document.getElementById('ovMore'), hid = document.getElementById('ovHiddenBtn');
+  more.hidden = hv || !!q || hits.length <= PAST_SHOWN;
+  more.textContent = _past.all ? 'Show fewer' : `Show all ${hits.length}`;
+  hid.hidden = !hv && !_past.hiddenCount;
+  hid.textContent = hv ? 'Back to recent chats' : `Hidden chats (${_past.hiddenCount})`;
+}
+function togglePastHidden() {
+  _past.hiddenView = !_past.hiddenView;
+  _past.q = ''; document.getElementById('ovSearch').value = '';
+  if (!_past.hiddenView) { pastNote(); renderPastSessions(); return; }
+  _past.hiddenRows = [];
+  pastNote();
+  renderPastSessions();
+  loadPastSessions();
+}
+// Remove (hide) and bring back. The row goes at once; Undo in the toast brings it straight back.
+let _toastTimer = 0;
+function ovToast(text, undo) {
+  const el = document.getElementById('ovToast');
+  clearTimeout(_toastTimer);
+  el.innerHTML = `<span>${escapeHtml(text)}</span>${undo ? '<button type="button">Undo</button>' : ''}`;
+  if (undo) el.querySelector('button').onclick = () => { el.hidden = true; undo(); };
+  el.hidden = false;
+  _toastTimer = setTimeout(() => { el.hidden = true; }, undo ? 7000 : 3500);
+}
+async function setPastHidden(sid, hide, btn) {
+  const row = btn && btn.closest('.ov-row'), all = [..._past.rows, ..._past.hiddenRows];
+  const name = (all.find(s => s.id === sid) || {}).name || 'That chat';
+  if (btn) btn.disabled = true;
+  if (row) row.classList.add('leaving');
+  _past.gone.add(sid);
+  try {
+    await apiCall('POST', `/api/claude/sessions/${encodeURIComponent(sid)}/${hide ? 'hide' : 'unhide'}`);
+    _past.hiddenCount = Math.max(0, _past.hiddenCount + (hide ? 1 : -1));
+    if (hide) ovToast(`Removed “${name}” from the list.`, () => setPastHidden(sid, false));
+    else ovToast(`“${name}” is back in the list.`);
+  } catch (e) {
+    pastNote(e.message, true);
+    if (btn) btn.disabled = false;
+  }
+  setTimeout(async () => { await loadPastSessions(); _past.gone.delete(sid); renderPastSessions(); }, row ? 260 : 0);
 }
 async function resumeSession(btn) {
   btn.disabled = true;
@@ -5709,12 +6031,91 @@ async function resumeSession(btn) {
     const r = await apiCall('POST', `/api/claude/sessions/${encodeURIComponent(btn.dataset.id)}/resume`);
     btn.textContent = 'Opened';
     btn.title = `Opened in ${r.terminal} on your PC`;
-    setTimeout(loadPastSessions, 5000);
+    pastNote(`Opened in ${r.terminal} on your PC, in ${r.folder}. Claude waits for you to type.`);
+    setTimeout(() => { pastNote(); loadPastSessions(); }, 6000);
   } catch (e) {
-    btn.textContent = 'Resume';
+    btn.innerHTML = PLAY_SVG + 'Resume';
     btn.disabled = false;
-    document.getElementById('ctxPastNote').textContent = e.message;
+    pastNote(e.message, true);
   }
+}
+
+// The two tiles beside it: tokens saved (all time, or RTK's measured last 30 / 7 days) and GitHub (repo.stats, from the
+// release progress reports). Each opens its detail: the Savings page, the Released card.
+const _tok = { all: null, daily: null, range: 'all' };
+try { _tok.range = localStorage.getItem('cp-tok-range') || 'all'; } catch (e) { /* per browser only */ }
+function setTokRange(r) {
+  _tok.range = r;
+  try { localStorage.setItem('cp-tok-range', r); } catch (e) { /* not remembered */ }
+  renderTokTile();
+}
+function renderTokTile() {
+  const box = document.getElementById('ovTok');
+  const days = _tok.daily || [];
+  box.hidden = _tok.all == null && !days.length;
+  if (box.hidden) { syncOverview(); return; }
+  const span = { week: 7, month: 30 }[_tok.range] || 0, since = new Date();
+  since.setDate(since.getDate() - (span ? span - 1 : 29));
+  const key = d => d.toLocaleDateString('en-CA');
+  const byDay = Object.fromEntries(days.map(x => [x.date, x.saved_tokens || 0]));
+  const sum = days.filter(x => x.date >= key(since)).reduce((a, x) => a + (x.saved_tokens || 0), 0);
+  const range = document.getElementById('ovTokRange');
+  range.hidden = !days.length;
+  if (!days.length) _tok.range = 'all';
+  range.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.r === _tok.range); b.setAttribute('aria-pressed', String(b.dataset.r === _tok.range)); });
+  const all = _tok.range === 'all';
+  document.getElementById('ovTokNum').textContent = all ? (_tok.all == null ? '—' : '≈ ' + fmtTok(_tok.all)) : fmtTok(sum);
+  document.getElementById('ovTokSub').textContent = all ? 'kept out of Claude, all time' : `measured by RTK, last ${span} days`;
+  // the last 30 days, one bar a day; the chosen range is solid, the rest faint
+  const start = new Date(); start.setDate(start.getDate() - 29);
+  const cells = [];
+  for (let k = 0; k < 30; k++) { const d = new Date(start); d.setDate(start.getDate() + k); cells.push([key(d), byDay[key(d)] || 0, k]); }
+  const max = Math.max(1, ...cells.map(c => c[1]));
+  const spark = document.getElementById('ovTokSpark');
+  spark.setAttribute('role', 'img');
+  spark.setAttribute('aria-label', `Tokens RTK saved each day, last 30 days: ${fmtTok(cells.reduce((a, c) => a + c[1], 0))} in all`);
+  spark.innerHTML = days.length ? cells.map(([d, v, k]) => `<i class="${all || k >= 30 - span ? 'in' : ''}" style="height:${Math.max(5, v / max * 100).toFixed(1)}%"
+      title="${escAttr(`${d}: ${fmtTok(v)} tokens saved`)}"></i>`).join('') : '';
+  syncOverview();
+}
+function renderGhTile(list) {
+  const box = document.getElementById('ovGh');
+  const repos = (list || []).filter(p => p.stats && !p.stats.private && p.repo);
+  box.hidden = !repos.length;
+  if (!repos.length) { syncOverview(); return; }
+  const sum = f => repos.reduce((a, p) => a + (Number(f(p.stats)) || 0), 0);
+  const n = v => Number(v).toLocaleString();
+  const stars = sum(s => s.stars), week = sum(s => s.stars_week);
+  const dl = sum(s => s.release_downloads) + sum(s => (s.pypi || {}).month);
+  const views = sum(s => (s.traffic || {}).views_14d), clones = sum(s => (s.traffic || {}).clones_14d);
+  const hasTraffic = repos.some(p => p.stats.traffic);
+  const rel = sum(s => (s.releases || []).length), latest = repos.map(p => (p.stats.releases || [])[0]).find(Boolean);
+  document.getElementById('ovGhRepo').textContent = repos.length === 1 ? repos[0].repo : `${repos.length} repos`;
+  document.getElementById('ovGhGrid').innerHTML = [
+    [n(stars) + (week ? `<em title="new stars this week">+${n(week)}</em>` : ''), week ? `stars · ${n(week)} new this week` : 'stars'],
+    [n(dl), 'downloads', repos.some(p => p.stats.pypi) ? 'Release downloads, plus PyPI downloads this month' : 'Release downloads'],
+    [hasTraffic ? n(views) : '–', hasTraffic ? `views, 14 days · ${n(clones)} clones` : 'views: needs a GitHub token'],
+    [n(rel), latest ? `releases · latest ${escapeHtml(latest.tag)}` : 'releases'],
+  ].map(([v, k, tip]) => `<span><b>${v}</b><small title="${escAttr(tip || k)}">${k}</small></span>`).join('');
+  syncOverview();
+}
+function openRepoStats() {
+  const card = ['relCard', 'progCard'].map(id => document.getElementById(id)).find(c => c && !c.hidden);
+  if (!card) return;
+  card.classList.remove('collapsed');
+  card.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
+}
+// A group heading shows only while one of its cards does; the top row only while it has something in it.
+function syncOverview() {
+  const top = document.getElementById('ovTop');
+  top.hidden = ['ovResume', 'ovTok', 'ovGh'].every(id => document.getElementById(id).hidden);
+  document.getElementById('ovTiles').hidden = ['ovTok', 'ovGh'].every(id => document.getElementById(id).hidden);
+  document.querySelectorAll('#opsView > .ov-group').forEach(h => {
+    let el = h.nextElementSibling, any = false;
+    while (el && !el.classList.contains('ov-group')) { if (!el.hidden) any = true; el = el.nextElementSibling; }
+    h.hidden = !any;
+  });
 }
 
 // --- Guide page: a central guide library (a Strapi site), or the guides that came with this install ---
@@ -7300,6 +7701,7 @@ async function loadAll() {
   document.getElementById('refreshTag').textContent = document.getElementById('sumUpdated').textContent =
     'Updated ' + new Date().toLocaleTimeString('en-GB', { hour12: false });
   renderHero();
+  if (_activeTab === 'ops') syncOverview();
   if (_firstLoadDone) { _firstLoadDone(); _firstLoadDone = null; }
 }
 
@@ -7404,17 +7806,44 @@ const APPROVAL_KINDS = {
   // HomeShed signs a read-only library script (Homeshed-addon #58): runners that trust the key then run it unasked
   sign: { label: 'Sign a library script', yes: 'Sign it', no: 'Decline', detailLabel: 'Read the code',
     act: (id, ok) => apiCall('POST', `/api/publisher/sign/${encodeURIComponent(id)}/${ok ? 'approve' : 'decline'}`) },
+  // a chat app signing in with OAuth (oauth_server.py, 2026-10-27): only the app name and the access level are sent
+  signin: { label: 'Sign-in waiting', no: 'Decline',
+    act: (id, ok, item) => apiCall('POST', `/api/oauth/pending/${encodeURIComponent(id)}/${ok ? 'approve' : 'decline'}`,
+      ok ? { app: item.querySelector('.signin-app').value.trim().toLowerCase(), preset: item.querySelector('.signin-preset').value } : undefined) },
 };
-let _appr = { items: [], unavailable: [], open: false };
+let _appr = { items: [], unavailable: [], open: false, seenSignins: new Set(), apps: [] };
+// A sign-in lasts 10 minutes, so a new one opens the list by itself (once), and its time left counts down every second.
+function noticeSignins() {
+  const ids = _appr.items.filter(i => i.kind === 'signin').map(i => i.id);
+  const fresh = ids.filter(id => !_appr.seenSignins.has(id));
+  ids.forEach(id => _appr.seenSignins.add(id));
+  if (!fresh.length) return;
+  apiCall('GET', '/api/clients').then(d => { _appr.apps = (d.clients || []).map(c => c.name); renderSigninApps(); }).catch(() => {});
+  if (!_appr.open) { _repl.open = _msg.open = false; _appr.open = true; renderReplies(); renderMessages(); }
+}
+function renderSigninApps() {
+  const dl = document.getElementById('signinApps');
+  if (dl) dl.innerHTML = _appr.apps.map(n => `<option value="${escAttr(n)}">`).join('');
+}
+function signinLeftText(deadline) {
+  const s = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+  return s ? `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s left` : 'expired: ask the app to sign in again';
+}
+setInterval(() => document.querySelectorAll('.signin-left').forEach(el => { el.textContent = signinLeftText(Number(el.dataset.deadline)); }), 1000);
 async function loadApprovals() {
   if (_viewer) return;
   let d;
   try { d = await apiCall('GET', '/api/approvals'); } catch (e) { return; }  // a view-only login is refused: nothing shows
   _appr.items = (d.items || []).filter(i => APPROVAL_KINDS[i.kind]);
+  _appr.items.forEach(i => { if (i.signin) i.deadline = Date.now() + (i.signin.expires_in_s || 0) * 1000; });
   _appr.unavailable = d.unavailable || [];
+  noticeSignins();
   const n = _appr.items.length;
   document.getElementById('apprPill').hidden = !n;
-  document.getElementById('apprCount').textContent = `${n} waiting for you`;
+  const sIn = _appr.items.filter(i => i.kind === 'signin').length;
+  // a first sign-in often comes while the welcome screen is up: lift the bar above it so it's seen (the prepper, 27 Oct)
+  document.getElementById('approvals').classList.toggle('has-signin', sIn > 0);
+  document.getElementById('apprCount').textContent = `${n} waiting for you${sIn ? `, ${sIn} ${sIn === 1 ? 'is a sign-in' : 'are sign-ins'}` : ''}`;
   if (!n) _appr.open = false;
   showTopPills();
   renderApprovals();
@@ -7542,8 +7971,13 @@ function renderApprovals() {
   list.hidden = !_appr.open;
   pill.setAttribute('aria-expanded', String(_appr.open));
   if (!_appr.open) return;
+  const typed = {};  // a sign-in's app name and access level, kept across the 30-second refresh
+  list.querySelectorAll('.appr-item.signin').forEach(el => {
+    typed[el.dataset.id] = [el.querySelector('.signin-app').value, el.querySelector('.signin-preset').value];
+  });
   list.innerHTML = _appr.items.map(i => {
     const k = APPROVAL_KINDS[i.kind], when = i.at ? `, ${agoText(new Date(i.at * 1000).toISOString())}` : '';
+    if (i.kind === 'signin') return signinCard(i, k, typed[i.id]);
     return `<div class="appr-item">
       <p class="hint"><b>${({ update: 'Update on Etsy', etsy: 'Etsy listing details', etsy_shop: 'Etsy shop texts', pinterest_pin: 'Pinterest pin', pinterest_board: 'Pinterest board' })[i.action] || k.label}</b>${i.from ? ` from ${escapeHtml(i.from)}` : ''}${when}</p>
       <div class="appr-text">${escapeHtml(i.title || '')}</div>
@@ -7555,6 +7989,38 @@ function renderApprovals() {
         <button type="button" class="ghost" onclick="decideApproval(this, false)">${k.no}</button></div>
     </div>`;
   }).join('') + (_appr.unavailable.length ? `<div class="appr-note">Couldn't check: ${escapeHtml(_appr.unavailable.join(', '))}.</div>` : '');
+  list.querySelectorAll('.appr-item.signin').forEach(el => {
+    const t = typed[el.dataset.id];
+    if (t) { el.querySelector('.signin-app').value = t[0]; el.querySelector('.signin-preset').value = t[1]; }
+  });
+  renderSigninApps();
+}
+// A chat app (Claude's custom connector, ChatGPT...) signing in: the owner checks the code matches the one on the
+// sign-in page, picks which app it becomes (a new name, or one already on the API page) and what it may use.
+function signinCard(i, k, typed) {
+  const s = i.signin || {};
+  return `<div class="appr-item signin" data-id="${escAttr(i.id)}">
+      <p class="hint"><b>${k.label}</b>: <span class="signin-left" data-deadline="${Number(i.deadline) || 0}">${signinLeftText(Number(i.deadline) || 0)}</span></p>
+      <div class="appr-text"><b>${escapeHtml(s.app_name || 'An app')}</b> wants to connect to HomeShed.</div>
+      <p class="hint">It says it comes from <b>${escapeHtml(s.client_host || 'an unknown place')}</b>${s.verified
+        ? ' (checked: it named itself by its own https web address, its published identity).'
+        : ' <span class="pill bad" title="It registered itself just now, so HomeShed cannot check who it really is">unverified</span> (it registered itself just now, so its name can\'t be checked).'}</p>
+      <div class="signin-code" aria-label="Sign-in code">${escapeHtml(s.match || '')}</div>
+      <p class="signin-warn"><b>Approve only if you just started this sign-in yourself and the code matches the one on your screen.</b></p>
+      <p class="hint">Check this matches the code on the sign-in page. If it doesn't, or you didn't start this sign-in, press Decline.</p>
+      <p class="hint">Once approved, it sends the person back to <b>${escapeHtml(s.redirect_host || 'the app')}</b>.${s.client_id ? ` The app calls itself <span style="font-family:var(--mono)">${escapeHtml(s.client_id)}</span>.` : ''}</p>
+      <div class="signin-form">
+        <label>App name (how it shows on the Access &gt; API page; pick an existing one to sign in as it)
+          <input class="signin-app" list="signinApps" maxlength="32" value="${escAttr(s.suggested_name || '')}" aria-label="App name"></label>
+        <label>Access (which tools it may use; change them later on the API page)
+          <select class="signin-preset" aria-label="Access">
+            <option value="none">No tools</option><option value="read" selected>Read-only (recommended)</option><option value="all">Everything</option>
+          </select></label>
+      </div>
+      <p class="hint">An existing app keeps the tools it already has. Read-only lets it look things up but not change anything.</p>
+      <div class="appr-act" data-kind="signin" data-id="${escAttr(i.id)}"><button type="button" onclick="decideApproval(this, true)">Approve</button>
+        <button type="button" class="ghost" onclick="decideApproval(this, false)">${k.no}</button></div>
+    </div>`;
 }
 function toggleApprovals() { onlyPopup('appr'); }
 async function decideApproval(btn, ok) {
@@ -7562,13 +8028,21 @@ async function decideApproval(btn, ok) {
   // Windows folder) was dropped, and the server got no such row (2026-10-24)
   const row = btn.closest('.appr-act'), { kind, id } = row.dataset, buttons = row.querySelectorAll('button');
   buttons.forEach(b => { b.disabled = true; });
-  try { await APPROVAL_KINDS[kind].act(id, ok); }
+  let res;
+  try { res = await APPROVAL_KINDS[kind].act(id, ok, btn.closest('.appr-item')); }
   catch (e) {  // it stays waiting: say why, and leave the buttons for another go
     btn.closest('.appr-item').querySelector('.hint').insertAdjacentHTML('beforeend', ` · <span style="color:var(--bad)">${escapeHtml(e.message)}</span>`);
     buttons.forEach(b => { b.disabled = false; });
     return;
   }
+  if (kind === 'signin') {  // say what happened for a few seconds before the card goes
+    btn.closest('.appr-item').querySelector('.appr-text').textContent = ok
+      ? `Approved: it's connected as "${(res || {}).app || 'the app'}". The sign-in page sends the person back by itself.`
+      : 'Declined: that sign-in ends and the app gets nothing.';
+    await new Promise(r => setTimeout(r, 4000));
+  }
   await loadApprovals();
+  if (kind === 'signin' && _activeTab === 'api') loadApi();
   if (kind === 'memory' && typeof loadSharedWaiting === 'function') loadSharedWaiting();  // the API page's own list
   if (kind === 'todo' && _activeTab === 'todo') loadTodo();
 }
@@ -7579,6 +8053,8 @@ loadApprovals();
 loadReplies();
 loadMessages();
 setInterval(() => { if (!document.hidden && !_viewer) { loadApprovals(); loadReplies(); loadMessages(); } }, 30000);
+// While the welcome screen is up, a new user is likely connecting their first chat app: check for sign-ins more often.
+setInterval(() => { if (!document.hidden && !_viewer && !document.getElementById('welcomeCard').hidden) loadApprovals(); }, 8000);
 // Announcements (the owner, 2026-10-01: "send an announcement to all active agents"): the helper on the PC posts it to
 // the notice board every Claude session's hooks read; each takes it once, at its next prompt or step. Owner only.
 async function loadAnnouncements(error) {

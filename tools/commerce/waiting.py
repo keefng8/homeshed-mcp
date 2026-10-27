@@ -22,7 +22,7 @@ def requests_list(days: int = 7) -> dict:
     owner sees everyone's.
 
     Args:
-        days: how far back the decisions go, 1-7 (default 7).
+        days: how far back the decisions go, 1-30 (default 7).
 
     Returns:
         {"waiting": [{"id", "kind", "product_id" or "listing_id", "summary", "asked_at", "expires_at", "last_error"?}],
@@ -32,7 +32,7 @@ def requests_list(days: int = 7) -> dict:
     """
     import clients
     import printify_pending as pp
-    days = h.clamp(days, 1, 7, "days")
+    days = h.clamp(days, 1, pp.HISTORY_S // 86400, "days")
     me = clients.current_client.get()
 
     def mine(row: dict) -> bool:

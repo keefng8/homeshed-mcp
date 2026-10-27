@@ -1222,6 +1222,75 @@ def test_client_admin_proxies_validate_and_forward(monkeypatch):
     for action in ("shared-read-off", "shared-read-on"):  # reading the shared memory, per app (2026-10-01)
         assert c.post(f"/api/clients/my-app/{action}").status_code == 200
         assert ("POST", f"/clients/my-app/{action}", "") in seen
+    # The front door, per app: only the keys sent go on, so setting one leaves the other alone.
+    assert c.post("/api/clients/my-app/view", json={"tool_view": "front_door", "extra": 1}).status_code == 200
+    assert seen[-1][:2] == ("POST", "/clients/my-app/view") and json.loads(seen[-1][2]) == {"tool_view": "front_door"}
+    assert c.post("/api/clients/my-app/view", json={"images": "content"}).status_code == 200
+    assert json.loads(seen[-1][2]) == {"images": "content"}
+    # The tool set (HomeShed Pro): only the patterns go on; null is the whole grant.
+    assert c.post("/api/clients/my-app/toolset", json={"patterns": ["etsy.*"], "tool_view": "full"}).status_code == 200
+    assert seen[-1][:2] == ("POST", "/clients/my-app/toolset") and json.loads(seen[-1][2]) == {"patterns": ["etsy.*"]}
+    assert c.post("/api/clients/my-app/toolset", json={"patterns": None}).status_code == 200
+    assert json.loads(seen[-1][2]) == {"patterns": None}
+
+
+def test_the_api_page_shows_tool_view_and_images_per_client():
+    """Each client card on the API page shows two open switches (not inside the collapsed tool list): Tool view (Full
+    list / Front door) and Images (Inline / As pictures), each with one plain line, and they post to /view."""
+    page = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
+    card = page.split("list.innerHTML = _apiClients.length ?")[1].split("loadSharedWaiting();")[0]
+    view = card.index('<div class="client-view">')
+    assert card.index('<div class="client-actions">') < view < card.index('<div class="client-tools')
+    assert "viewSeg(c, 'tool_view', [['full', 'Full list'], ['front_door', 'Front door']])" in card
+    assert "viewSeg(c, 'images', [['inline', 'Inline'], ['content', 'As pictures']])" in card
+    assert "5 tools that find and run all the others" in card and "Saves tokens" in card
+    setter = page.split("async function clientView(name, key, value) {")[1].split("\n}")[0]
+    assert "`/api/clients/${encodeURIComponent(name)}/view`, { [key]: value }" in setter and "alert(e.message)" in setter
+
+
+def test_the_api_page_shows_a_tool_set_for_front_door_apps():
+    """The tool set picker shows only for a Front door app, next to the Tool view switch; groups save as <group>.*,
+    Whole grant saves null, and with Pro off it says the set is saved now and used while Pro is on."""
+    page = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
+    card = page.split("list.innerHTML = _apiClients.length ?")[1].split("loadSharedWaiting();")[0]
+    assert card.index('<div class="client-view">') < card.index("${c.tool_view === 'front_door' ? toolsetPicker(") \
+        < card.index('<div class="client-tools')
+    picker = page.split("function toolsetPicker(c, proOn) {")[1].split("\n}")[0]
+    assert "Tool set (Pro): which tools the front door shows this app" in picker and "Whole grant" in picker
+    assert "Needs HomeShed Pro; saved now, used while Pro is on." in picker and "x.id.split('.')[0]" in picker
+    saver = page.split("async function clientToolset(name, whole) {")[1].split("\n}")[0]
+    assert "`/api/clients/${encodeURIComponent(name)}/toolset`, { patterns: patterns && patterns.length ? patterns : null }" in saver
+
+
+def test_front_door_savings_relays_the_tool_and_says_when_its_pro(monkeypatch):
+    """The API page's Front door savings card: tools.savings' rows as they are; without Pro (no such tool) a plain note,
+    not an error. The card is open on the page, not hidden."""
+    import main
+    seen = []
+    rows = {"apps": [{"app": "my-app", "listings": 3, "definitions_skipped_chars": 4000, "calls_trimmed": 1,
+                      "reply_chars_trimmed": 400, "tokens_saved_about": 1100}], "total_tokens_saved_about": 1100, "since": 1.0}
+
+    async def fake_call(name, args, **kw):
+        seen.append((name, args, kw.get("quiet")))
+        return rows
+    monkeypatch.setattr(main, "_mcp_call_tool", fake_call)
+    monkeypatch.setattr(main, "DASHBOARD_PASSWORD", OWNER_PW)
+    c = TestClient(main.app, headers=OWNER)
+    assert c.get("/api/front-door/savings").json() == rows and seen == [("tools.savings", {}, True)]
+
+    async def no_pro(name, args, **_):
+        raise RuntimeError("Unknown tool: tools.savings")
+    monkeypatch.setattr(main, "_mcp_call_tool", no_pro)
+    r = c.get("/api/front-door/savings")
+    assert r.status_code == 200 and r.json() == {"pro": False, "note": "HomeShed Pro shows what the front door saved each app."}
+
+    async def down(name, args, **_):
+        raise RuntimeError("mcp-server initialize returned http 503")
+    monkeypatch.setattr(main, "_mcp_call_tool", down)
+    assert c.get("/api/front-door/savings").status_code == 502  # a real failure still says so
+    page = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
+    assert '<section class="card sav-card" id="apSavings">' in page and "Front door savings" in page
+    assert "loadFrontDoorSavings();" in page.split("async function loadApi() {")[1].split("\n}")[0]
 
 
 def test_shared_memory_waiting_writes_are_the_owners_to_decide(monkeypatch):
@@ -1313,6 +1382,75 @@ def test_suggested_bugs_wait_with_the_rest_and_keep_or_dismiss_goes_to_the_tool_
     assert c.post("/api/bugs/suggested/not-a-key/keep").status_code == 400
     assert c.post("/api/bugs/suggested/0123456789ab/delete").status_code == 400
     assert "/api/bugs/suggested/{key}/{action}" not in main.VIEWER_ROUTES
+
+
+def test_oauth_sign_ins_are_proxied_and_only_app_and_preset_go_through(monkeypatch):
+    """2026-10-27: a chat app's OAuth sign-in waits for the owner. The panel lists them and approves with only the app
+    name and the access preset; anything else in the body is dropped, and bad ids, actions or presets never leave."""
+    import main
+    pid = "AbC_def-1234567890xyzXYZ"
+    sent = []
+
+    async def fake_admin(method, path, body=None, timeout=10):
+        sent.append((method, path, body))
+        if path == "/oauth/pending":
+            return main.JSONResponse({"enabled": True, "pending": [{"id": pid, "app_name": "Claude", "match": "042917"}]})
+        return main.JSONResponse({"id": pid, "status": "approved" if path.endswith("approve") else "declined", "app": "claude"})
+    monkeypatch.setattr(main, "_mcp_admin", fake_admin)
+    monkeypatch.setattr(main, "DASHBOARD_PASSWORD", OWNER_PW)
+    c = TestClient(main.app, headers=OWNER)
+    assert c.get("/api/oauth/pending").json()["pending"][0]["match"] == "042917"
+    r = c.post(f"/api/oauth/pending/{pid}/approve", json={"app": "Claude-Chat", "preset": "all", "token": "x", "grants": 1})
+    assert r.json()["status"] == "approved"
+    assert sent[-1] == ("POST", f"/oauth/pending/{pid}/approve", {"app": "claude-chat", "preset": "all"})
+    c.post(f"/api/oauth/pending/{pid}/approve")  # no body: the suggested name, read-only
+    assert sent[-1][2] == {"app": "", "preset": "read"}
+    c.post(f"/api/oauth/pending/{pid}/decline", json={"app": "x", "preset": "all"})
+    assert sent[-1] == ("POST", f"/oauth/pending/{pid}/decline", None)
+    n = len(sent)
+    for path, body in ((f"/api/oauth/pending/{pid}/approve", {"preset": "admin"}),
+                       (f"/api/oauth/pending/{pid}/approve", {"app": "../owner"}),
+                       (f"/api/oauth/pending/{pid}/revoke", {}), ("/api/oauth/pending/short/approve", {})):
+        assert c.post(path, json=body).status_code == 400, path
+    assert len(sent) == n
+    for route in ("/api/oauth/pending", "/api/oauth/pending/{item_id}/{action}"):
+        assert route not in main.VIEWER_ROUTES
+
+
+def test_a_waiting_sign_in_shows_first_in_the_approvals_bar(monkeypatch):
+    c, main = _approval_sources(monkeypatch, todo=[], memory=[{"id": "0a1b2c3d", "client": "my-app", "at": 9e9}],
+                                proxmox=[])
+    real = main._mcp_admin
+
+    async def fake_admin(method, path, body=None):
+        if path == "/oauth/pending":
+            return main.JSONResponse({"enabled": True, "pending": [
+                {"id": "p" * 32, "app_name": "Claude", "client_id": "https://claude.ai/oauth/mcp", "redirect_host": "claude.ai",
+                 "match": "042917", "at": 100.0, "expires_in_s": 540, "suggested_name": "claude",
+                 "client_host": "claude.ai", "verified": True}]})
+        return await real(method, path, body)
+    monkeypatch.setattr(main, "_mcp_admin", fake_admin)
+    d = c.get("/api/approvals").json()
+    assert d["count"] == 2 and [i["kind"] for i in d["items"]] == ["signin", "memory"]
+    s = d["items"][0]
+    assert s["title"] == "Claude wants to connect"
+    assert s["signin"] == {"app_name": "Claude", "client_id": "https://claude.ai/oauth/mcp", "match": "042917",
+                           "redirect_host": "claude.ai", "expires_in_s": 540, "suggested_name": "claude",
+                           "client_host": "claude.ai", "verified": True}
+
+
+def test_the_page_has_the_sign_in_card_and_the_connect_help():
+    page = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
+    kinds = page.split("const APPROVAL_KINDS")[1].split("};")[0]
+    assert "/api/oauth/pending/" in kinds and "signin:" in kinds
+    for words in ("wants to connect to HomeShed", "Check this matches the code on the sign-in page", "sends the person back to",
+                  'list="signinApps"', '<datalist id="signinApps">', ">No tools<", ">Read-only (recommended)<", ">Everything<",
+                  "signin-left", "Connect a chat app (Claude, ChatGPT…)", "custom connector", "/mcp", "Sign in now",
+                  "published identity", "automatic registration", "Sign-in needs this server's public https address",
+                  "MCP_PUBLIC_URL", "is a sign-in", "s.client_host", "s.verified", ">unverified</span>",
+                  "Approve only if you just started this sign-in yourself and the code matches the one on your screen."):
+        assert words in page, words
+    assert '<section class="card sav-card" id="apSignin">' in page  # open where the owner looks, never hidden
 
 
 def test_a_source_that_cant_be_read_is_named_and_the_rest_still_show(monkeypatch):
@@ -1888,6 +2026,34 @@ def test_projects_are_the_owners_only_and_carry_the_pc_token(owner, viewer, monk
     assert b"extra" not in calls[1][3]
     for method, path in (("get", "/api/projects"), ("post", "/api/projects/pins"), ("post", "/api/projects/pins/remove")):
         assert getattr(friend, method)(path).status_code == 403
+    assert len(calls) == 3  # the viewer's requests never reached the PC
+
+
+def test_hiding_a_chat_is_the_owners_only_and_carries_the_pc_token(owner, viewer, monkeypatch):
+    client, main = owner
+    friend, _, _ = viewer
+    monkeypatch.setattr(main, "GPU_SERVICE_URL", "http://gpu")
+    monkeypatch.setattr(main, "_GPU_AUTH", {"X-GPU-Token": "t0ken"})
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append((request.method, request.url.path, request.url.params.get("hidden"), request.headers.get("x-gpu-token")))
+        if request.method == "GET":
+            return httpx.Response(200, json={"sessions": [{"id": SID}], "hidden_count": 1})
+        if request.url.path.endswith("/unhide"):
+            return httpx.Response(404, json={"detail": "No such session on this PC."})
+        return httpx.Response(200, json={"id": SID, "hidden": True})
+    _patch_mcp_client(monkeypatch, main, httpx.MockTransport(handler))
+    assert client.post(f"/api/claude/sessions/{SID}/hide").json() == {"id": SID, "hidden": True}
+    r = client.post(f"/api/claude/sessions/{SID}/unhide")
+    assert r.status_code == 404 and r.json()["error"] == "No such session on this PC."
+    assert client.get("/api/claude/sessions?hidden=1").json()["hidden_count"] == 1
+    assert calls == [("POST", f"/sessions/{SID}/hide", None, "t0ken"), ("POST", f"/sessions/{SID}/unhide", None, "t0ken"),
+                     ("GET", "/sessions", "1", "t0ken")]
+    assert client.post("/api/claude/sessions/not-an-id/hide").status_code == 400 and len(calls) == 3
+    for path in (f"/api/claude/sessions/{SID}/hide", f"/api/claude/sessions/{SID}/unhide"):
+        assert friend.post(path).status_code == 403
+    assert friend.get("/api/claude/sessions?hidden=1").status_code == 403
     assert len(calls) == 3  # the viewer's requests never reached the PC
 
 

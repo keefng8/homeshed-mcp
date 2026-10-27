@@ -8,7 +8,7 @@ import os
 
 import uvicorn
 from mcp.server.mcpserver import MCPServer
-from mcp_types import CallToolResult, TextContent
+from mcp_types import CallToolResult, ImageContent, TextContent
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse
@@ -39,6 +39,8 @@ def http_checks() -> None:
 
 import asyncio
 import clients
+import copy
+import frontdoor
 import hmac
 import inspect
 import json
@@ -116,6 +118,12 @@ class GuardedMCPServer(MCPServer):
         client = _caller(ctx)
         if client is not None:
             result.tools = [t for t in result.tools if client != "<refused>" and clients.is_allowed(client, t.name, *_tool_meta(t.name))]
+            if client != "<refused>" and frontdoor.view(client) == "front_door":  # the rest stay callable by name
+                hidden = [t for t in result.tools if t.name not in frontdoor.FRONT_TOOLS]
+                result.tools = [t for t in result.tools if t.name in frontdoor.FRONT_TOOLS]
+                import usage
+                usage.record_front_door(client, hidden_chars=sum(
+                    len(t.model_dump_json(by_alias=True, exclude_none=True)) for t in hidden))
         if client != "<refused>":
             clients.seen(client, _source(ctx), call=False)
         return result
@@ -128,6 +136,8 @@ class GuardedMCPServer(MCPServer):
                 from registry import log_refusal
                 log_refusal(params.name, client, reason, clients.connection_tag(client, _source(ctx)))
                 return CallToolResult(content=[TextContent(type="text", text=reason)], is_error=True)
+        if params.name == "tools.call":
+            return await self._front_door_call(ctx, params, client)
         unknown = _unknown_inputs(params.name, getattr(params, "arguments", None))
         if unknown:
             takes = ", ".join(_inputs(params.name)) or "no inputs"
@@ -148,13 +158,115 @@ class GuardedMCPServer(MCPServer):
         quiet = client is None and request is not None and request.headers.get("x-homelab-quiet") == "1"
         qtoken = registry_quiet.set(quiet)
         try:
-            return await super()._handle_call_tool(ctx, params)
+            result = await super()._handle_call_tool(ctx, params)
+            if client is not None and frontdoor.image_mode(client) == "content":
+                result = _images_as_content(result, params.name)
+            return result
         finally:
             registry_quiet.reset(qtoken)
             projects.current_dir.reset(ptoken)
             clients.current_tool.reset(ttoken)
             clients.current_connection.reset(ctoken)
             clients.current_client.reset(token)
+
+
+    async def _front_door_call(self, ctx, params, client):
+        """tools.call: the inner tool goes back through _handle_call_tool as if it had been called directly (grant,
+        rate limit, inputs, switches, approvals, spend; usage counts it under its own name), then the reply is trimmed
+        or stored. tools.call itself was checked above like any tool. It has no output schema, so a trimmed reply
+        can't fail a client's schema check (R&D, 27 Oct)."""
+        def refuse(text: str) -> CallToolResult:
+            return CallToolResult(content=[TextContent(type="text", text=text)], is_error=True)
+
+        args = params.arguments if isinstance(params.arguments, dict) else {}
+        extra = sorted(set(args) - {"name", "arguments", "fields", "to_file"})
+        if extra:
+            return refuse(f"tools.call has no input named {', '.join(extra)}: it takes name, arguments, fields, "
+                          "to_file. Nothing was run.")
+        name, inner_args = args.get("name"), args.get("arguments") or {}
+        fields, to_file = args.get("fields") or [], args.get("to_file") is True
+        if not isinstance(name, str) or not name:
+            return refuse("tools.call needs name: the tool id, e.g. \"etsy.orders.list\" (tools.find finds one)")
+        if name.startswith("tools."):
+            return refuse(f"call {name} directly, not through tools.call")
+        if not isinstance(inner_args, dict):
+            return refuse("arguments is an object of the tool's inputs, e.g. {\"limit\": 5}")
+        if not isinstance(fields, list) or not all(isinstance(f, str) for f in fields):
+            return refuse("fields is a list of paths, e.g. [\"items[].title\", \"count\"]")
+        inner = copy.copy(params)
+        inner.name, inner.arguments = name, inner_args
+        result = await self._handle_call_tool(ctx, inner)
+        if getattr(result, "is_error", False) or not isinstance(result, CallToolResult):
+            return result  # errors and input requests pass through whole
+        value = _reply_value(result)
+        if value is _NO_VALUE:
+            return result
+        import usage
+        before = usage._size(value)
+        try:
+            if fields and not _is_queued(value):
+                value = frontdoor.trim(value, fields)
+            images = []
+            if client is not None and frontdoor.image_mode(client) == "content":
+                value, images = frontdoor.take_images(value)
+            if to_file:
+                value = frontdoor.store(value, client, name)
+        except frontdoor.FrontDoorError as exc:
+            return refuse(str(exc))
+        usage.record("tools.call", args, value, ok=True, client=client)  # the wrapper's own count, beside the tool's
+        if fields or to_file:
+            usage.record_front_door(client, trimmed_chars=max(0, before - usage._size(value)))
+        content = [TextContent(type="text", text=json.dumps(value, ensure_ascii=False, default=str))]
+        content += [ImageContent(type="image", data=b64, mime_type=mime) for b64, mime in images]
+        content += [c for c in result.content if not isinstance(c, TextContent)]  # a tool's own image blocks stay
+        return CallToolResult(content=content, is_error=False)
+
+
+_NO_VALUE = object()
+
+
+def _reply_value(result: CallToolResult):
+    """A tool reply as one value: its structured content, else its JSON text block(s); _NO_VALUE when it's plain text."""
+    if isinstance(result.structured_content, dict):
+        sc = result.structured_content
+        return sc["result"] if set(sc) == {"result"} else sc
+    blocks = [c.text for c in result.content if isinstance(c, TextContent)]
+    try:
+        parsed = [json.loads(b) for b in blocks]
+    except ValueError:
+        return _NO_VALUE
+    if not parsed:
+        return _NO_VALUE
+    return parsed[0] if len(parsed) == 1 else parsed
+
+
+def _is_queued(value) -> bool:
+    """A reply that queued something for the owner, or answered about an approval: never trimmed (R&D, 27 Oct)."""
+    if not isinstance(value, dict):
+        return False
+    text = " ".join(str(value.get(k, "")) for k in ("status", "note", "approval", "queued")).lower()
+    return bool(value.get("queued") or value.get("request_id") or value.get("approval")
+                or any(w in text for w in ("waiting for the owner", "queued", "approval")))
+
+
+def _images_as_content(result, tool_name: str):
+    """A direct call's reply with its base64 pictures as MCP image blocks, for a client whose images are "content".
+    Only for tools without an output schema: their structured content may be reshaped without failing validation."""
+    if not isinstance(result, CallToolResult) or result.is_error:
+        return result
+    info = mcp._tool_manager.get_tool(tool_name)
+    if info is None or info.output_schema:
+        return result
+    value = _reply_value(result)
+    if value is _NO_VALUE:
+        return result
+    value, images = frontdoor.take_images(value)
+    if not images:
+        return result
+    text = json.dumps(value, ensure_ascii=False, default=str)
+    return CallToolResult(content=[TextContent(type="text", text=text)]
+                          + [ImageContent(type="image", data=b64, mime_type=mime) for b64, mime in images],
+                          structured_content=value if isinstance(value, dict) else None, is_error=False)
 
 
 def _version() -> str:
@@ -203,7 +315,11 @@ for capability in discover():
         capability.func,
         name=f"{capability.category}.{capability.name}",
         description=_description(capability),
+        meta=frontdoor.tool_ui_meta.get(f"{capability.category}.{capability.name}"),  # HomeShed Pro's cards
     )
+
+for _uri, (_name, _html) in frontdoor.ui_resources.items():  # HomeShed Pro's approval cards (MCP Apps)
+    mcp.resource(_uri, name=_name, mime_type=frontdoor.UI_MIME, meta={"ui": {"prefersBorder": True}})(_html)
 
 
 @mcp.custom_route("/healthz", methods=["GET"])
@@ -477,7 +593,7 @@ async def clients_delete(request: Request) -> JSONResponse:
 
 @mcp.custom_route("/clients/{name}/{action}", methods=["POST"])
 async def clients_action(request: Request) -> JSONResponse:
-    """rotate | suspend | resume | limits (JSON rate_per_min, expires_days) | spend-cap (JSON usd, or null) | memory (JSON agent_id, or null: its own,
+    """rotate | suspend | resume | view (JSON tool_view, images) | limits (JSON rate_per_min, expires_days) | spend-cap (JSON usd, or null) | memory (JSON agent_id, or null: its own,
     made on first use) | shared-read-on|off (reading the shared memory) | preset-none|read|all."""
     name, action = request.path_params["name"], request.path_params["action"]
     try:
@@ -496,6 +612,12 @@ async def clients_action(request: Request) -> JSONResponse:
             clients.set_memory_agent(name, body.get("agent_id"))
         elif action in ("shared-read-on", "shared-read-off"):
             clients.set_memory_shared_read(name, action == "shared-read-on")
+        elif action == "view":  # JSON tool_view (full|front_door) and/or images (inline|content): frontdoor.py
+            body = await _body(request)
+            clients.set_view(name, body.get("tool_view"), body.get("images"))
+        elif action == "toolset":  # JSON patterns: a list, or null for the whole grant (HomeShed Pro applies it)
+            body = await _body(request)
+            clients.set_toolset(name, body.get("patterns"))
         elif action.startswith("preset-"):
             clients.set_preset(name, action[len("preset-"):])
         else:
@@ -503,6 +625,29 @@ async def clients_action(request: Request) -> JSONResponse:
     except (clients.ClientError, ValueError, TypeError) as exc:
         return _client_error(exc)
     return JSONResponse({"name": name, "done": action})
+
+
+@mcp.custom_route("/oauth/pending", methods=["GET"])
+async def oauth_pending(request: Request) -> JSONResponse:
+    """Sign-ins waiting for the owner (oauth_server.py), and whether sign-in is set up here at all."""
+    import oauth_server
+    return JSONResponse({"enabled": bool(oauth_server.public_url()), "pending": oauth_server.pending()})
+
+
+@mcp.custom_route("/oauth/pending/{pid}/{action}", methods=["POST"])
+async def oauth_decide(request: Request) -> JSONResponse:
+    """approve (JSON app: a new or existing app name, preset: none|read|all) | decline."""
+    import oauth_server
+    action = request.path_params["action"]
+    if action not in ("approve", "decline"):
+        return JSONResponse({"error": f"unknown action {action!r}"}, status_code=400)
+    try:
+        body = await _body(request) if action == "approve" else {}
+        out = oauth_server.decide(request.path_params["pid"], action == "approve", str(body.get("app") or ""),
+                                  str(body.get("preset") or "read"))
+    except (oauth_server.OAuthError, clients.ClientError, ValueError, TypeError) as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return JSONResponse(out)
 
 
 @mcp.custom_route("/memory/pending", methods=["GET"])
@@ -783,6 +928,15 @@ async def printify_pending_decide(request: Request) -> JSONResponse:
         return JSONResponse({"error": str(exc)}, status_code=404)
     except CommerceError as exc:  # it stays waiting, with the error
         return JSONResponse({"error": f"not published, still waiting: {exc}"}, status_code=502)
+
+
+@mcp.custom_route("/approvals/{item_id}", methods=["GET"])
+async def approvals_status(request: Request) -> JSONResponse:
+    """One request's status across the memory, Proxmox, commerce and inbox queues (approvals.py). Owner only, as every
+    custom route; apps ask with approvals.status. Read-only."""
+    import approvals
+    found = await asyncio.to_thread(approvals.status, request.path_params["item_id"], None)
+    return JSONResponse(found, status_code=404 if found["status"] == "unknown" else 200)
 
 
 @mcp.custom_route("/clients/{name}/tools/{tool_id}/{action}", methods=["POST"])
@@ -1118,6 +1272,58 @@ def _service_allowed(path: str, auth: bytes) -> bool:
     return len(token) >= 32 and hmac.compare_digest(auth, f"Bearer {token}".encode())
 
 
+OAUTH_OPEN_PATHS = ("/.well-known/oauth-authorization-server", "/.well-known/oauth-protected-resource",
+                    "/authorize", "/token", "/register", "/revoke", "/oauth/consent/")
+
+
+def _oauth_app() -> ASGIApp | None:
+    """The sign-in routes (oauth_server.py) when MCP_PUBLIC_URL is set, else None: the SDK's own OAuth handlers with
+    HomeShed's provider, the resource metadata for /mcp, and the page that waits for the owner's approval."""
+    import oauth_server
+    base = oauth_server.public_url()
+    if not base:
+        return None
+    from mcp.server.auth.routes import build_metadata, create_auth_routes, create_protected_resource_routes
+    from mcp.server.auth.settings import ClientRegistrationOptions, RevocationOptions
+    from pydantic import AnyHttpUrl
+    from starlette.applications import Starlette
+    from starlette.responses import HTMLResponse
+    from starlette.routing import Route
+    provider = oauth_server.Provider()
+    reg, rev = ClientRegistrationOptions(enabled=True), RevocationOptions(enabled=True)
+    routes = [r for r in create_auth_routes(provider, AnyHttpUrl(base), client_registration_options=reg,
+                                            revocation_options=rev)
+              if r.path != "/.well-known/oauth-authorization-server"]
+    meta = build_metadata(AnyHttpUrl(base), None, reg, rev).model_dump(mode="json", exclude_none=True)
+    # Public clients (a chat app has no secret to keep) and Claude's "published identity" (CIMD), which the SDK's
+    # metadata doesn't list.
+    meta["token_endpoint_auth_methods_supported"] = ["none", "client_secret_post", "client_secret_basic"]
+    meta["client_id_metadata_document_supported"] = True
+
+    async def as_meta(request: Request) -> JSONResponse:
+        return JSONResponse(meta, headers={"Access-Control-Allow-Origin": "*"})
+
+    async def consent_page(request: Request) -> HTMLResponse:
+        return HTMLResponse(oauth_server.CONSENT_HTML, headers={"Cache-Control": "no-store",
+                                                                "X-Frame-Options": "DENY"})
+
+    async def consent_status(request: Request) -> JSONResponse:
+        return JSONResponse(oauth_server.consent_status(request.path_params["pid"]),
+                            headers={"Cache-Control": "no-store"})
+
+    routes += [Route("/.well-known/oauth-authorization-server", as_meta, methods=["GET", "OPTIONS"]),
+               Route("/oauth/consent/{pid}", consent_page, methods=["GET"]),
+               Route("/oauth/consent/{pid}/status", consent_status, methods=["GET"])]
+    routes += create_protected_resource_routes(AnyHttpUrl(base + "/mcp"), [AnyHttpUrl(base)],
+                                               resource_name="HomeShed")
+    return Starlette(routes=routes)
+
+
+def _is_oauth_path(path: str) -> bool:
+    return any(path == p or (p.endswith("/") and path.startswith(p)) or path.startswith(p + "/")
+               for p in OAUTH_OPEN_PATHS)
+
+
 class RequestGuard:
     """Uniform gate in front of every route — MCP protocol routes and custom_route alike.
 
@@ -1139,6 +1345,20 @@ class RequestGuard:
         self.token = f"Bearer {token}"
         self.allowed_hosts = set(allowed_hosts)
         self._fails: dict[str, list[float]] = {}
+        self.oauth = _oauth_app()  # sign-in with OAuth, once MCP_PUBLIC_URL says where chat apps reach this server
+
+    OAUTH_WINDOW_S, OAUTH_MAX = 600, 60  # sign-in steps (register, authorize, token, revoke) per address
+
+    def _oauth_limited(self, ip: str, now: float) -> bool:
+        """Per-address limit on the sign-in routes (R&D, 27 Oct): one address can't fill the waiting list, churn
+        registrations or flood the owner's phone. A real sign-in takes about four steps."""
+        calls = self._oauth_calls = getattr(self, "_oauth_calls", {})
+        if len(calls) > self.FAIL_KEEP:
+            calls.clear()
+        recent = [t for t in calls.get(ip, []) if now - t < self.OAUTH_WINDOW_S]
+        limited = len(recent) >= self.OAUTH_MAX
+        calls[ip] = recent + ([] if limited else [now])
+        return limited
 
     def _throttled(self, ip: str, now: float, failed: bool = False) -> bool:
         if len(self._fails) > self.FAIL_KEEP:  # forget quiet addresses rather than grow without end
@@ -1165,6 +1385,14 @@ class RequestGuard:
         if scope.get("path") == "/healthz" and scope.get("method") == "GET":
             # Liveness only, for uptime monitors without the token (the prepper's clean-VM test): {"status": "ok"}.
             return await self.app(scope, receive, send)
+        if self.oauth is not None and _is_oauth_path(scope.get("path", "")):
+            ip, now = str((scope.get("client") or ("?",))[0]), time.time()
+            if scope.get("method") != "GET" or scope.get("path") == "/authorize":  # sign-in steps, not page polls
+                if self._oauth_limited(ip, now):
+                    response = PlainTextResponse("too many sign-in requests from this address: try again later",
+                                                 status_code=429)
+                    return await response(scope, receive, send)
+            return await self.oauth(scope, receive, send)  # the sign-in routes check their own requests
         auth = headers.get(b"authorization", b"")
         # The owner: checked first, so normal traffic never pays for a client lookup. Constant time (R&D's review: a
         # plain == leaks how much of a guess was right through its timing).
@@ -1184,6 +1412,10 @@ class RequestGuard:
         if status != "ok":
             self._throttled(ip, now, failed=True)
             response = PlainTextResponse("unauthorized", status_code=401)
+            if self.oauth is not None and scope.get("path", "").startswith("/mcp"):  # where a chat app signs in
+                import oauth_server
+                response.headers["WWW-Authenticate"] = (
+                    f'Bearer resource_metadata="{oauth_server.public_url()}/.well-known/oauth-protected-resource/mcp"')
             return await response(scope, receive, send)
         if not scope.get("path", "").startswith("/mcp"):
             # Client tokens reach the MCP endpoint only: never the admin routes that manage grants.
