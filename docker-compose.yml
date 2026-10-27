@@ -13,6 +13,12 @@ services:
       - observations:/data/observations
       # The docker.* tools need the Docker socket. It gives root on this machine: mount it only if you use them.
       # - /var/run/docker.sock:/var/run/docker.sock
+      # Settings > "When Claude Code compacts a chat" writes Claude Code's own settings, which live outside the
+      # container. To use it, remove the # from this line and the two environment lines below (on Windows, use
+      # ${USERPROFILE} in place of ${HOME}). The container's user must be able to write that folder.
+      # - ${HOME}/.claude:/claude
+    # environment:
+    #   CLAUDE_CONFIG_DIR: /claude
     # The server runs as an ordinary user, so with the socket mounted it also needs the socket's group. The number is
     # what `stat -c %g /var/run/docker.sock` prints on your machine:
     # group_add: ["999"]

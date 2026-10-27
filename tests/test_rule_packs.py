@@ -470,6 +470,15 @@ def test_compact_at_never_writes_settings_it_cant_read(place):
         assert rp.compact_at(50)["reason"] == "unreadable" and path.read_text(encoding="utf-8") == text
 
 
+def test_compact_window_refuses_bad_sizes_and_follows_claude_config_dir(place, monkeypatch):
+    for bad in (0, 49_999, 2_000_001, True, "400k"):
+        with pytest.raises(rp.PackError):
+            rp.compact_window(bad)
+    monkeypatch.delenv("CLAUDE_SETTINGS")
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(place / "moved"))
+    assert rp.claude_settings() == place / "moved" / "settings.json"
+
+
 def test_the_cli_shows_the_change_and_asks(place, monkeypatch, capsys):
     import cli
     monkeypatch.setattr(cli, "_prepare", lambda: None)

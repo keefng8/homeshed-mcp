@@ -78,6 +78,11 @@ either way.
 - **No echo**: never push a change that arrived by sync, and skip a push when the other store already reported that
   `content_hash`. Merges are idempotent, so a bounce does nothing.
 - **Hints** read only the local store, which holds the other store's bugs too.
+- **Catches counter** (optional, for the library's "Caught by HomeShed" box): the pack may carry `"catches": {"since":
+  unix_s, "week": n, "with_fix": n}`, meaning platform failures since the start of the UTC day 6 days ago, and how many
+  of them matched a known bug that has a fix or workaround (`bugs.seen` counts these per day). The library keeps only
+  the latest block and replies `"catches": "kept"` or the reason it dropped the block. HomeShed stores that reply in
+  its exchange state. A failure that's counted asks for an exchange only when the last one is over an hour old.
 
 ## Fingerprint v1
 The steps are in `mcp-server/tests/fixtures/bug_contract_v1_vectors.json` with test examples. Both sides must produce exactly those fingerprints.

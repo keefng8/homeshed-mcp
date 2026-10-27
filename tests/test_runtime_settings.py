@@ -54,7 +54,8 @@ try:  # the outgoing mail server comes with the email tools
 except ImportError:
     pass
 PUBLIC = {"local_ai_allow_cloud": True, "ntfy_default_topic": "Alerts", "local_ai_base_url": "", "ntfy_base_url": "",
-          "stray_command_stop": True, "bugs_search_public": False, "bug_capture": True, "library_url": "", "agents_messaging": True}
+          "stray_command_stop": True, "bugs_search_public": False, "bug_capture": True, "library_url": "", "agents_messaging": True,
+          "claude_compact_window": "default"}
 
 
 @pytest.fixture(autouse=True)
@@ -62,7 +63,35 @@ def settings_file(tmp_path, monkeypatch):
     monkeypatch.setattr(rs, "SETTINGS_FILE", tmp_path / "settings.json")
     monkeypatch.setattr(rs, "_cache", (None, {}))
     monkeypatch.setitem(rs.SCHEMA["ntfy_default_topic"], "default", "Alerts")
+    monkeypatch.setenv("CLAUDE_SETTINGS", str(tmp_path / "claude" / "settings.json"))  # never the real one
     return tmp_path / "settings.json"
+
+
+def test_the_compact_window_is_written_to_claude_codes_settings_and_back(settings_file):
+    claude = settings_file.parent / "claude" / "settings.json"
+    claude.parent.mkdir()
+    claude.write_text(json.dumps({"model": "opus"}), encoding="utf-8")
+    assert rs.update({"claude_compact_window": "400000"})["claude_compact_window"] == "400000"
+    assert json.loads(claude.read_text(encoding="utf-8")) == {"model": "opus", "autoCompactWindow": 400000}
+    assert json.loads((claude.parent / "settings.json.homeshed-bak").read_text(encoding="utf-8")) == {"model": "opus"}
+    rs.update({"claude_compact_window": "default"})
+    assert json.loads(claude.read_text(encoding="utf-8")) == {"model": "opus"}
+
+
+def test_without_claude_codes_folder_nothing_is_saved(settings_file):
+    with pytest.raises(ValueError, match="isn't reachable"):  # a container without the opt-in mount
+        rs.update({"claude_compact_window": "200000", "local_ai_allow_cloud": False})
+    assert not settings_file.exists() and not (settings_file.parent / "claude").exists()
+    assert rs.update({"claude_compact_window": "default"})["claude_compact_window"] == "default"  # nothing to remove
+
+
+def test_claude_codes_settings_it_cant_read_are_left_alone(settings_file):
+    claude = settings_file.parent / "claude" / "settings.json"
+    claude.parent.mkdir()
+    claude.write_text("{not json", encoding="utf-8")
+    with pytest.raises(ValueError, match="couldn't be read"):
+        rs.update({"claude_compact_window": "300000"})
+    assert claude.read_text(encoding="utf-8") == "{not json" and not settings_file.exists()
 
 
 def test_defaults_when_missing_or_corrupt(settings_file):

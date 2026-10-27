@@ -1,7 +1,7 @@
 {
   "name": "homeshed",
   "displayName": "HomeShed",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Adds HomeShed, a self-hosted MCP tool server: memory, a logic solver, git, network checks, known bugs and release checks. Runs on your own machine through uvx, which downloads the homeshed-mcp package from PyPI the first time. No key or account needed. Calls no other service unless you set one up.",
   "author": {
     "name": "Keith Stewartson",

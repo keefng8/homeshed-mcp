@@ -18,7 +18,7 @@ the owner's decisions, so it checks instead of assuming.
 ```
 {"waiting": [{"id", "kind", "product_id" | "listing_id", "summary", "asked_at", "expires_at", "last_error"?}],
  "decided": [{"id", "kind", "product_id" | "listing_id", "summary", "asked_at", "decided_at",
-              "outcome": "approved" | "declined" | "expired" | "withdrawn", "note"?}],
+              "outcome": "approved" | "declined" | "expired" | "withdrawn" | "parked", "note"?}],
  "days"}
 ```
 - `kind`: `publish` (printify.product.publish), `update` (printify.product.update_live) or `etsy`
@@ -28,7 +28,10 @@ the owner's decisions, so it checks instead of assuming.
 - `note` on an approved one: the result's note (e.g. "Printify is pushing the change to Etsy now").
 - A request not decided within 24 hours is `expired`.
 - One taken back unrun because it turned out not to be needed is `withdrawn` (not the owner's decision; the note says
-  why), e.g. Etsy re-applies after words-only updates, 2026-10-09.
+  why), e.g. Etsy re-applies after words-only updates, 2026-10-09. A live update whose product changed since it was
+  asked is `withdrawn` when it comes to run (2026-10-25): ask again with the product as it is now.
+- The third stale update of one product within 48 hours is `parked`: a trusted bot or the owner checks these, and no
+  new update of that product is queued for 24 hours.
 
 ## Who sees what
 An app sees only its own requests. The owner (no app token) sees everyone's, each with its `client`.

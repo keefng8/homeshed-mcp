@@ -419,6 +419,63 @@ def test_a_swap_reads_the_replacement_back_and_backs_up_before_deleting(photos, 
     assert meta["url"] == RAW["url_fullxfull"] and meta["alt_text"] == RAW["alt_text"] and len(ew._swaps_today()) == 1
 
 
+FIRST = {"listing_image_id": 501, "rank": 1, "alt_text": "Staffy tee mockup"}
+OLD = {"listing_image_id": 502, "rank": 2, "alt_text": "Staffy tee, back"}
+NEW = [{"image": "listing/size-guide.png"}]
+
+
+@pytest.mark.parametrize("removes, new, listed, why", [
+    ([502], [], [FIRST, OLD], "replacement for each photo"),
+    ([501, 502], NEW, [FIRST, OLD], "replacement for each photo"),
+    ([502], NEW, [OLD], "every photo"),  # its only photo, even with a replacement
+    ([501], NEW, [FIRST, OLD], "rank-1"),
+])
+def test_a_bot_delete_must_pass_its_limits(removes, new, listed, why, monkeypatch, tmp_path):
+    """A bot in approvals_photo_delete_bots may delete a photo outside a swap, within limits."""
+    monkeypatch.setattr(ew, "SWAP_FILE", tmp_path / "swaps.json")
+    assert why in ew._bot_delete_problem(removes, new, listed)
+    assert ew._bot_delete_problem([502], NEW, [FIRST, OLD]) == ""  # the clean case passes
+
+
+def test_bot_deletes_have_their_own_daily_cap(monkeypatch, tmp_path):
+    monkeypatch.setattr(ew, "SWAP_FILE", tmp_path / "swaps.json")
+    monkeypatch.setenv("ETSY_SWAP_DAILY_MAX", "2")
+    ew._record_swap({"at": __import__("time").time(), "listing_id": "1", "removed": [1, 2], "kind": "bot"})
+    assert "2 of 2 bot photo deletes" in ew._bot_delete_problem([502], NEW, [FIRST, OLD])
+    assert ew._swap_problem(True, [777], [{"image": "x.png"}], [RAW]) == ""  # a raw-art swap's cap is apart
+
+
+def test_a_named_bots_approval_keeps_its_delete_and_logs_the_reason(photos, monkeypatch, tmp_path):
+    state, writes, _ = photos
+    import runtime_settings
+    real_get = runtime_settings.get
+    monkeypatch.setattr(runtime_settings, "get", lambda key: "Checker" if key == ew.DELETE_BOTS_SETTING
+                        else real_get(key))
+    monkeypatch.setattr(ew, "SWAP_FILE", tmp_path / "swaps.json")
+    monkeypatch.setattr(ew, "SWAP_BACKUPS", tmp_path / "backups")
+    monkeypatch.setattr(ew, "_own_listing", lambda lid: {"listing_id": 4412})
+    monkeypatch.setattr(ew.httpx, "get", lambda url, **k: type("R", (), {"status_code": 200, "content": b"j" * 5000})())
+    state["images"] = {"count": 2, "results": [dict(FIRST), {**OLD, "url_fullxfull": RAW["url_fullxfull"]}]}
+    seen = {}
+    monkeypatch.setattr(ew, "_queue", lambda lid, title, summary, send, wanted, reapply, thumbs, ok:
+                        seen.update(ok=ok, send=send) or {"pending": True, "id": "q1"})
+    checker = {"id": "d1", "by": "bot:checker", "at": "2026-10-25T10:00:00Z"}
+    out = ew.listing_update("4412", images=NEW, remove_images=[501], owner_approval=checker)
+    assert "rank-1" in out["swap_held"] and seen["ok"] is None  # rank 1: waits for the owner
+    out = ew.listing_update("4412", images=NEW, remove_images=[502], owner_approval=checker)
+    assert "swap_held" not in out and seen["ok"]["id"] == "d1"
+    send = seen["send"]
+    assert send["swap"] is True and send["swap_kind"] == "bot" and "delete photos [502]" in send["delete_reason"]
+    state["images"]["results"].append({"listing_image_id": 909, "rank": 3})
+    send["images"] = [{**send["images"][0], "done_id": 909}]
+    assert ew.execute({"listing_id": "4412", "send": send})["photos_removed"] == [502]
+    [row] = ew._swaps_today()
+    assert row["kind"] == "bot" and row["listing_id"] == "4412" and "delete photos" in row["reason"]
+    other = {"id": "b1", "by": "bot:planner", "at": "2026-10-25T10:00:00Z"}  # a bot not named in the setting: no delete
+    out = ew.listing_update("4412", images=NEW, remove_images=[502], owner_approval=other)
+    assert out["swap_held"] and seen["ok"] is None
+
+
 def test_a_hero_at_rank_1_moves_the_other_photos_down(photos):
     """2026-10-18, live on a listing: Etsy put the hero at rank 1 but left the mockup there too, [1, 1, 2, 3, 4, 5]."""
     state, writes, _ = photos

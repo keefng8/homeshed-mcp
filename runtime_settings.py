@@ -71,7 +71,33 @@ SCHEMA = {
                 "Both then hold the same known bugs. Also add the library's key under Credentials as LIBRARY_BUGS_KEY. "
                 "Leave empty if you don't use the library: nothing is sent.",
     },
+    "claude_compact_window": {
+        "type": "select", "default": "default", "group": "Claude Code",
+        "options": ["default", "100000", "150000", "200000", "300000", "400000", "500000", "700000", "1000000"],
+        "option_labels": {"default": "Claude Code's default", "100000": "100k tokens", "150000": "150k tokens",
+                          "200000": "200k tokens", "300000": "300k tokens", "400000": "400k tokens",
+                          "500000": "500k tokens", "700000": "700k tokens", "1000000": "1M tokens"},
+        "label": "When Claude Code compacts a chat",
+        "help": "How full a chat gets before Claude Code summarises it to make room. Smaller is cheaper but forgets "
+                "sooner. A size above your model's window (200k on most models) just means its default. Written to "
+                "Claude Code's own settings (the old file is kept as settings.json.homeshed-bak). Claude Code reads it "
+                "when a chat starts: restart open chats (exit, then claude --continue).",
+    },
 }
+# Settings that also change something outside this file, applied before the save: a ValueError saves nothing.
+def _apply_compact_window(value: str) -> None:
+    import rule_packs  # here, not at the top: rule_packs is heavy and most saves never need it
+    try:
+        res = rule_packs.compact_window(None if value == "default" else int(value))
+    except rule_packs.PackError as e:
+        raise ValueError(str(e)) from None
+    if res["reason"] == "unreadable":
+        raise ValueError(f"Claude Code's settings ({res['path']}) couldn't be read, so nothing was changed.")
+    if res["reason"] == "changed meanwhile":
+        raise ValueError("Claude Code's settings changed while saving, so nothing was changed. Save again.")
+
+
+APPLY = {"claude_compact_window": _apply_compact_window}
 # Which .env name each address setting stands in for (address() below).
 ADDRESS_OVERRIDES = {"LOCAL_AI_BASE_URL": "local_ai_base_url", "NTFY_BASE_URL": "ntfy_base_url"}
 
@@ -207,6 +233,9 @@ def update(changes: dict) -> dict:
     if not isinstance(changes, dict) or not changes:
         raise ValueError("Send the changes as a JSON object.")
     checked = {key: validate(key, value) for key, value in changes.items()}
+    for key, value in checked.items():
+        if key in APPLY:
+            APPLY[key](value)
     with _lock:
         raw = _raw()
         raw.update(checked)

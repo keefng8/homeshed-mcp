@@ -18,6 +18,8 @@ LIVE = {"id": "abc123", "title": "Retro Frenchie Tee", "description": "A tee.", 
 def fake(monkeypatch, tmp_path):
     monkeypatch.setattr(pp, "PENDING_FILE", tmp_path / "pending.json")
     monkeypatch.setattr(pp, "DONE_FILE", tmp_path / "done.json")
+    monkeypatch.setattr(pp, "HISTORY_FILE", tmp_path / "history.json")
+    monkeypatch.setattr(pp, "STALE_FILE", tmp_path / "stale.json")
     for name in ("PRINTIFY_MIN_MARGIN", "PRINTIFY_DELIVERY_ESTIMATE_PENCE", "PRINTIFY_LIVE_UPDATE_DAILY_MAX"):
         monkeypatch.delenv(name, raising=False)
     switches = {pf.SETTING: True, pf.LIVE_UPDATE_SETTING: True}
@@ -151,7 +153,8 @@ def test_a_product_changed_since_it_was_asked_is_not_overwritten(fake):
     state["product"]["title"] = "Edited by hand meanwhile"
     with pytest.raises(h.CommerceError, match="changed since this was asked"):
         pp.decide(item["id"], True)
-    assert sent == [] and pp.list_pending()[0]["last_error"]  # stays waiting, with the reason
+    assert sent == [] and pp.list_pending() == []  # withdrawn (2026-10-25): the asker asks again
+    assert pp.history()[0]["outcome"] == "withdrawn" and "changed since" in pp.history()[0]["note"]
 
 
 def test_the_daily_cap_is_counted_at_approval(fake, monkeypatch):

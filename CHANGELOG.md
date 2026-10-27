@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-10-27
+
+### Added
+- Settings > Claude Code > "When Claude Code compacts a chat": choose Claude Code's own compaction point (its default, or 100k to 1M tokens). **This edits a Claude Code settings file of yours** (`settings.json`, only the `autoCompactWindow` key). The old file is kept as `settings.json.homeshed-bak`, a file that can't be read is never written, and `CLAUDE_CONFIG_DIR` is followed. Claude Code reads it when a chat starts, so restart open chats (exit, then `claude --continue`). A value above your model's window means Claude Code's default.
+- In Docker, `docker-compose.yml` has a commented mount for this setting; without it, saving a size is refused with the reason and nothing changes.
+- `bugs.seen` counts failures per day and how many matched a known bug with a fix.
+- Online shops setting "Bots that may delete listing photos" (empty by default): a named bot may delete an Etsy photo only when it adds a replacement in the same request, never the first photo, within a daily cap.
+
+### Changed
+- Shop approvals: a live product update whose product changed since it was asked is withdrawn (ask again), and repeated stale updates of one product are parked for a day.
+- The plugin runs 0.6.4.
+
 ## [0.6.3] - 2026-10-25
 
 ### Added

@@ -44,8 +44,10 @@ class PackError(RuntimeError):
 
 
 def claude_settings() -> Path:
-    """Claude Code's user settings, where the hook goes (CLAUDE_SETTINGS overrides it, for tests)."""
-    return Path(os.environ.get("CLAUDE_SETTINGS") or Path.home() / ".claude" / "settings.json")
+    """Claude Code's user settings, where the hook goes (CLAUDE_SETTINGS overrides it, for tests; CLAUDE_CONFIG_DIR is
+    Claude Code's own way to move the folder, and a container is pointed at a mounted copy with it)."""
+    folder = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
+    return Path(os.environ.get("CLAUDE_SETTINGS") or folder / "settings.json")
 
 
 # --- packs -------------------------------------------------------------------------------------------------------------
@@ -429,6 +431,36 @@ def compact_at(pct: int | None, confirm=None, settings: Path | None = None) -> d
     if not _write_settings(path, data, read_hash):
         return {"changed": False, "reason": "changed meanwhile", "path": str(path), "before": before}
     return {"changed": True, "reason": "set", "path": str(path), "before": before}
+
+
+WINDOW_SETTING = "autoCompactWindow"  # what /autocompact saves; Claude Code reads it when a chat starts
+
+
+def compact_window(tokens: int | None, settings: Path | None = None) -> dict:
+    """When Claude Code compacts a chat, in tokens, or None for its own default: the one autoCompactWindow line in its
+    user settings, nothing else touched, the file as it was kept beside it (.homeshed-bak). {changed, reason, path}.
+    PackError when the settings folder isn't there (a container without the opt-in mount): nothing could be written."""
+    if tokens is not None and not (isinstance(tokens, int) and 50_000 <= tokens <= 2_000_000):
+        raise PackError("Pick a size from 50k to 2M tokens, or Claude Code's default.")
+    path = settings or claude_settings()
+    data, read_hash = _read_settings(path)
+    if data is None:
+        return {"changed": False, "reason": "unreadable", "path": str(path)}
+    if data.get(WINDOW_SETTING) == tokens or (tokens is None and WINDOW_SETTING not in data):
+        return {"changed": False, "reason": "already", "path": str(path)}
+    if not path.parent.is_dir():
+        raise PackError(f"Claude Code's settings folder ({path.parent}) isn't reachable from here. In Docker, switch on "
+                        "the Claude settings mount in docker-compose.yml and restart; otherwise run "
+                        "/autocompact in Claude Code.")
+    if tokens is None:
+        data.pop(WINDOW_SETTING, None)
+    else:
+        data[WINDOW_SETTING] = tokens
+    if path.exists():
+        shutil.copyfile(path, path.with_name(path.name + ".homeshed-bak"))
+    if not _write_settings(path, data, read_hash):
+        return {"changed": False, "reason": "changed meanwhile", "path": str(path)}
+    return {"changed": True, "reason": "set", "path": str(path)}
 
 
 def hook_state(settings: Path | None = None) -> dict:

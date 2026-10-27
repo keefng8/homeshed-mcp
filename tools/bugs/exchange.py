@@ -145,6 +145,11 @@ def exchange(post=None) -> dict:
         outgoing = [r for r in (record(b) for b in bugs.values() if not b["id"].startswith("PRO-"))
                     if sent.get(r["origin"] + ":" + r["origin_id"]) != _sent_key(r)][:MAX_BUGS]
         pack = {"formatVersion": 2, "kind": "known-bugs", "from": HERE, "since": state.get("cursor"), "bugs": outgoing}
+        try:  # the "Caught by HomeShed" counter rides along; an unreadable failure store just leaves it out
+            from tools.bugs import seen
+            pack["catches"] = seen.catches()
+        except seen.SeenError:
+            pass
         try:
             reply = (post or _post)(url, key, pack)
         except Exception as exc:  # noqa: BLE001 - the library down or unreachable: try again next time
@@ -168,7 +173,7 @@ def exchange(post=None) -> dict:
             if merged:
                 known._save(bugs)
         state.update(sent=sent, cursor=reply.get("cursor", state.get("cursor")), last_ok=time.time(),
-                     last_try=time.time(), last_error="")
+                     last_try=time.time(), last_error="", catches=str(reply.get("catches") or "")[:200])
         _save_state(state)
         return {"ok": True, "sent": len(outgoing), "received": merged}
     finally:

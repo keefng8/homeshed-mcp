@@ -161,6 +161,12 @@ def product_update_live(product_id: str, title: str = "", description: str = "",
     return {**out, "changed": fields, "old": old}
 
 
+class Stale(h.CommerceError):
+    """The product changed since the update was asked: printify_pending.decide withdraws it instead of leaving it
+    waiting for the owner (2026-10-25), and the asker asks again."""
+    stale = True
+
+
 def execute_update(product_id: str, payload: dict) -> dict:
     """The update itself, run only by printify_pending.decide on the owner's approval: checks the product is still
     live and still has the values it had when asked (else it changed meanwhile: ask again), then edits it (built from
@@ -176,7 +182,7 @@ def execute_update(product_id: str, payload: dict) -> dict:
     stale += [f"variant {v} on/off" for v, was in (old.get("enabled") or {}).items() if on_now.get(int(v)) != was]
     enabled = {int(v): bool(on) for v, on in (payload.get("enabled") or {}).items()}
     if stale:
-        raise h.CommerceError(f"the product changed since this was asked ({', '.join(stale)}): decline it and ask again")
+        raise Stale(f"the product changed since this was asked ({', '.join(stale)}): withdrawn, ask again")
     body, _ = up.changes(p, payload.get("title") or "", payload.get("description") or "", payload.get("tags"), prices, {},
                          enabled)
     if not body:

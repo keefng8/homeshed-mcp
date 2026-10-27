@@ -125,11 +125,20 @@ SETTINGS = {
     },
     "approvals_trusted_bots": {
         "type": "names", "default": "", "group": "Online shops",
-        "label": "Bots that may approve Etsy listing details",
+        "label": "Bots that may approve listing details and live product words",
         "help": "Bot names, separated by commas (e.g. planner). An approval an app sends as \"bot:<name>\" counts for "
-                "Etsy listing details edits only (category, materials, partners, delivery, attributes, section, "
-                "photos), never for publishing or price changes, and only from an app in \"Apps whose own approval "
-                "counts\". Each is logged as that bot's, not yours. Empty: no bot.",
+                "Etsy listing details edits (category, materials, partners, delivery, attributes, section, "
+                "photos) and a live product's title, description and tags, never for publishing or price changes, "
+                "and only from an app in \"Apps whose own approval counts\". Each is logged as that bot's, not yours. "
+                "Empty: no bot.",
+    },
+    "approvals_photo_delete_bots": {
+        "type": "names", "default": "", "group": "Online shops",
+        "label": "Bots that may delete listing photos",
+        "help": "Bot names, separated by commas. A bot named here may approve deleting an Etsy photo outside a "
+                "raw-art swap, but only when a replacement comes in the same request, the listing keeps a photo it "
+                "has now, the first photo is never the one deleted, and within the daily swap limit. Each delete is "
+                "logged with its reason. Empty: no bot, so those deletes wait for you.",
     },
     "commerce_printify_billing_currency": {
         "type": "select", "default": "not set", "group": "Online shops",

@@ -357,6 +357,10 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
     if removes and _automatic(owner_approval):  # a machine never approves a delete outside a guarded swap
         held = (_hero_swap_problem(removes, new_images, listed, alts) if hero_swap and not swap
                 else _swap_problem(swap, removes, new_images, listed)) or None
+        if held and _by(owner_approval) in _delete_bots():
+            # a named bot's own delete (approvals_photo_delete_bots): its own guards, cap and log, instead of a swap's
+            if not (held := _bot_delete_problem(removes, new_images, listed) or None):
+                send["swap_kind"], send["delete_reason"] = "bot", summary
         if held:
             owner_approval = None
         else:
@@ -375,9 +379,40 @@ def swap_daily_max() -> int:
     return _env_int("ETSY_SWAP_DAILY_MAX", 60, ceiling=60)
 
 
+def _by(ok) -> str:
+    return str((ok or {}).get("by") or "").strip().lower() if isinstance(ok, dict) else ""
+
+
 def _automatic(ok) -> bool:
-    by = str((ok or {}).get("by") or "").strip().lower() if isinstance(ok, dict) else ""
-    return by.startswith(("auto", "bot:"))
+    return _by(ok).startswith(("auto", "bot:"))
+
+
+def _delete_bots() -> set[str]:
+    """The "bot:<name>" approvals that may delete photos outside a swap (approvals_photo_delete_bots); none unless the
+    owner names one."""
+    from printify_pending import trusted_clients
+    return {f"bot:{b.lower()}" for b in trusted_clients(DELETE_BOTS_SETTING)}
+
+
+DELETE_BOTS_SETTING = "approvals_photo_delete_bots"
+
+
+def _bot_delete_problem(removes: list[int], new_images: list[dict], listed: list) -> str:
+    """Why a named bot's approval can't delete these photos, or "" when every limit passes: each one has a
+    replacement in the same request, the listing keeps a photo it has now, rank 1 is never deleted, and at most
+    swap_daily_max() a day."""
+    photos = [p for p in listed if isinstance(p, dict)]
+    if not new_images or len(new_images) < len(removes):
+        return "a bot's delete adds a replacement for each photo in the same request: it waits for the owner"
+    if not any(int(p.get("listing_image_id") or 0) not in removes for p in photos):
+        return "that would delete every photo the listing has now: it waits for the owner"
+    first = min((p for p in photos if isinstance(p.get("rank"), int)), key=lambda p: p["rank"], default={})
+    if int(first.get("listing_image_id") or 0) in removes:
+        return "a bot's delete never removes the rank-1 photo: it waits for the owner"
+    done = sum(len(r.get("removed") or []) for r in _swaps_today() if r.get("kind") == "bot")
+    if done + len(removes) > swap_daily_max():
+        return f"{done} of {swap_daily_max()} bot photo deletes used in the last 24 hours: this waits for the owner"
+    return ""
 
 
 def _swaps_today() -> list[dict]:
@@ -408,7 +443,7 @@ def _swap_problem(swap: bool, removes: list[int], new_images: list[dict], listed
         return f"the photo is {w}x{hgt}, not a 2048 or 2400 px square: it waits for the owner"
     if not isinstance(rank, int) or rank <= 2:
         return f"the photo is at rank {rank}: a swap never deletes rank 1 or 2, it waits for the owner"
-    if len(_swaps_today()) >= swap_daily_max():
+    if sum(r.get("kind") != "bot" for r in _swaps_today()) >= swap_daily_max():
         return f"{swap_daily_max()} automatic swaps in the last 24 hours: this one waits for the owner"
     return ""
 
@@ -447,7 +482,7 @@ def _hero_swap_problem(removes: list[int], new_images: list[dict], listed: list,
               if isinstance(p, dict) and int(p.get("listing_image_id") or 0) != removes[0]]
     if not any(not HERO_ALT.search(a) and not any(w in a for w in NOT_A_MOCKUP) for a in others):
         return "no non-AI photo (the mockup) would stay on the listing: it waits for the owner"
-    if len(_swaps_today()) >= swap_daily_max():
+    if sum(r.get("kind") != "bot" for r in _swaps_today()) >= swap_daily_max():
         return f"{swap_daily_max()} automatic swaps in the last 24 hours: this one waits for the owner"
     return ""
 
@@ -590,10 +625,13 @@ def execute(payload: dict) -> dict:
                 raise
         removed.append(iid)
     if send.get("swap") and removed:
+        kind = send.get("swap_kind") or "swap"
         _record_swap({"at": time.time(), "listing_id": lid, "removed": removed,
-                      "backups": [b["listing_image_id"] for b in backed_up]})
+                      "backups": [b["listing_image_id"] for b in backed_up], "kind": kind,
+                      **({"reason": send["delete_reason"]} if send.get("delete_reason") else {})})
         import clients
-        clients._audit("etsy photo swap", None, listing=lid, removed=removed)
+        clients._audit(f"etsy photo {'delete by a bot' if kind == 'bot' else 'swap'}", None,
+                       listing=lid, removed=removed)
     # any photo change also tidies the ranks: closes a deletion's gap, repairs a listing an earlier upload left doubled
     reranked = _rerank(shop, lid, {i["listing_image_id"] for i in each if i["uploaded"] == "now"}) \
         if send.get("images") or send.get("images_alt") or removed else []

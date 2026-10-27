@@ -14,6 +14,9 @@ Otherwise its fingerprint is watched; seen in 2 different sessions it is suggest
 session's retries would trigger that for free). Suggestions wait in their own file, not in the known bugs, so bugs.find
 never returns unreviewed noise: the owner keeps one (it becomes a known bug) or dismisses it (that error is never
 suggested again). Everything stays on this machine; every stored text is redacted first.
+
+Platform failures are also counted per day ("caught", and how many met a known bug with a fix) for the library's
+"Caught by HomeShed" box: catches() is the week's total, sent with each bug exchange (sync-contract.md).
 """
 from __future__ import annotations
 
@@ -22,7 +25,7 @@ import json
 import os
 import re
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from registry import tool
@@ -33,6 +36,7 @@ SEEN_FILE = Path(os.environ.get("BUG_CANDIDATES_FILE") or data_path("observation
 SUGGEST_AT_SESSIONS = 2
 KEEP_SESSIONS, KEEP_DAYS, MAX_WATCHED, FORGET_AFTER_DAYS = 20, 30, 500, 14
 EXAMPLE_CHARS, TAIL_CHARS = 600, 400
+CAUGHT_DAYS = 8
 _lock = threading.Lock()
 
 # Matched on stable tags and tool messages, not on prose that changes (R&D: "match on the guard's tag").
@@ -147,6 +151,38 @@ def _count_occurrence(bug_id: str, session_key: str) -> bool:
     return True
 
 
+def _has_fix(bug_id: str) -> bool:
+    bug = known._load().get(bug_id) or {}
+    return bool(str(bug.get("fix") or "").strip() or str(bug.get("workaround") or "").strip())
+
+
+def _caught(data: dict, now: datetime, with_fix: bool) -> None:
+    days = data.get("caught") if isinstance(data.get("caught"), dict) else {}
+    day = days.get(now.date().isoformat())
+    day = day if isinstance(day, list) and len(day) == 2 else [0, 0]
+    days[now.date().isoformat()] = [day[0] + 1, day[1] + int(with_fix)]
+    data["caught"] = {d: days[d] for d in sorted(days)[-CAUGHT_DAYS:]}
+
+
+def _send_catches() -> None:
+    """The counts changed: the library gets them with the next exchange, at most about once an hour."""
+    from tools.bugs import exchange
+    exchange.soon(only_if_stale=True)
+
+
+def catches(now: datetime | None = None) -> dict:
+    """The library's "Caught by HomeShed" block: platform failures from the start of the UTC day 6 days ago, and
+    how many met a known bug with a fix or workaround."""
+    now = now or _now()
+    start = datetime.combine((now - timedelta(days=6)).date(), datetime.min.time(), tzinfo=timezone.utc)
+    week = with_fix = 0
+    for day, counts in (_load().get("caught") or {}).items():
+        if (str(day) >= start.date().isoformat() and isinstance(counts, list) and len(counts) == 2
+                and all(isinstance(n, int) and n >= 0 for n in counts)):
+            week, with_fix = week + counts[0], with_fix + min(counts[1], counts[0])
+    return {"since": int(start.timestamp()), "week": week, "with_fix": with_fix}
+
+
 @tool(name="seen", category="bugs", doc="bugs/known.md")
 def seen(error_text: str, tool_name: str = "", session: str = "", known_id: str = "", interrupted: bool = False) -> dict:
     """A tool call failed: count it, and suggest it as a bug once it comes back in another session. Sent by the
@@ -179,9 +215,13 @@ def seen(error_text: str, tool_name: str = "", session: str = "", known_id: str 
         if cls != "platform":
             _save(data)
             return {"class": cls}
-        if known_id and known.BUG_ID.fullmatch(str(known_id)):
+        matched = bool(known_id and known.BUG_ID.fullmatch(str(known_id)))
+        _caught(data, now, matched and _has_fix(known_id))
+        if matched:
             _save(data)
-            return {"class": cls, "known_id": known_id, "counted": _count_occurrence(known_id, skey)}
+            result = {"class": cls, "known_id": known_id, "counted": _count_occurrence(known_id, skey)}
+            _send_catches()
+            return result
         key = known.fingerprint(f"{tool_name.split(':')[0]} {tail(text)}")
         w = data["watched"].get(key)
         if w is None:
@@ -200,7 +240,8 @@ def seen(error_text: str, tool_name: str = "", session: str = "", known_id: str 
             w["items"] = now.isoformat(timespec="seconds")
         _prune(data["watched"], now)
         _save(data)
-        return {"class": cls, "status": w["status"], "sessions": len(w["sessions"])}
+    _send_catches()
+    return {"class": cls, "status": w["status"], "sessions": len(w["sessions"])}
 
 
 def _view(key: str, w: dict) -> dict:

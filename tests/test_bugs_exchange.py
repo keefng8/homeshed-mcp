@@ -6,6 +6,7 @@ import runtime_settings
 import vault
 import tools.bugs.exchange as ex
 import tools.bugs.known as kb
+import tools.bugs.seen as seen
 
 ERR = "ModuleNotFoundError: No module named 'httpx'"
 
@@ -14,6 +15,7 @@ ERR = "ModuleNotFoundError: No module named 'httpx'"
 def stores(tmp_path, monkeypatch):
     monkeypatch.setattr(kb, "BUGS_FILE", tmp_path / "known_bugs.json")
     monkeypatch.setattr(ex, "STATE_FILE", tmp_path / "bug_exchange.json")
+    monkeypatch.setattr(seen, "SEEN_FILE", tmp_path / "bug_candidates.json")
     monkeypatch.setattr(ex, "soon", lambda only_if_stale=False: None)  # no background threads in tests
     monkeypatch.setattr(runtime_settings, "get", lambda key: "http://library.test:8770" if key == "library_url" else None)
     monkeypatch.setattr(vault, "secret", lambda name: "hll_test" if name == "LIBRARY_BUGS_KEY" else "")
@@ -132,3 +134,13 @@ def test_an_edit_raises_the_rev_and_a_bare_repeat_doesnt():
     assert kb._load()[first["id"]]["rev"] == 1
     kb.report("x" * 5, id=first["id"], fix="stop the old server")
     assert kb._load()[first["id"]]["rev"] == 2
+
+
+def test_the_catches_counter_rides_along_and_the_reply_is_kept(tmp_path):
+    packs = []
+    ex.exchange(lambda url, key, pack: packs.append(pack) or {"cursor": "c1", "catches": "kept"})
+    assert packs[0]["catches"]["week"] == 0 and packs[0]["since"] is None
+    assert ex._state()["catches"] == "kept"
+    (tmp_path / "bug_candidates.json").write_text("not json", encoding="utf-8")
+    ex.exchange(lambda url, key, pack: packs.append(pack) or {})
+    assert "catches" not in packs[1] and packs[1]["since"] == "c1"

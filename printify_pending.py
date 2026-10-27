@@ -30,7 +30,11 @@ Rules this module keeps:
   that couldn't run and now waits for the owner.
 - A bot's approval (the owner, 2026-10-14: a trusted bot may approve Etsy listing details that match the plan): "by"
   as "bot:<name>" counts only for an Etsy details edit and only for a bot named in approvals_trusted_bots (empty by
-  default). It's logged as the bot's, so nobody mistakes it for the owner's own tap.
+  default). It's logged as the bot's, so nobody mistakes it for the owner's own tap. Since 2026-10-25 it also counts for a live
+  product's words (title, description, tags), never its prices or which variants sell: those still wait for the owner.
+- A live update whose product changed since it was asked (update_live.Stale) is withdrawn, not left waiting for the
+  owner, and the asker asks again. The STALE_PARK_AFTER-th on one product in STALE_WINDOW_S is logged "parked": a
+  trusted bot or the owner checks those, and no new update of that product is queued for PARKED_S.
 """
 from __future__ import annotations
 
@@ -55,7 +59,12 @@ APPROVALS_FILE = Path(os.environ.get("PRINTIFY_APP_APPROVALS_FILE") or data_path
 TRUST_SETTING = "approvals_trusted_clients"
 AUTO_TRUST_SETTING = "approvals_trusted_auto_clients"
 BOT_TRUST_SETTING = "approvals_trusted_bots"  # bots whose "bot:<name>" approval counts, for BOT_ACTIONS only
-BOT_ACTIONS = ("etsy",)  # Etsy listing details (owner, 2026-10-14: a trusted bot may approve those), never a publish
+BOT_ACTIONS = ("etsy", "update")  # Etsy listing details (owner, 2026-10-14) and a live product's words (2026-10-25),
+# never a publish
+STALE_FILE = Path(os.environ.get("PRINTIFY_STALE_FILE") or data_path("usage/printify_stale.json"))
+STALE_WINDOW_S = 48 * 3600
+STALE_PARK_AFTER = 3  # the first withdrawal and two failed re-asks (2026-10-25)
+PARKED_S = 24 * 3600
 APPROVAL_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{3,80}$")
 APPROVAL_MAX_AGE_S = 3600
 APPROVAL_SKEW_S = 300
@@ -182,6 +191,42 @@ def _record(row: dict) -> None:
     os.replace(tmp, DONE_FILE)
 
 
+def _stale_rows() -> dict:
+    """{product_id: {"n", "at", "parked_at"?}}: stale live updates per product, the last within STALE_WINDOW_S."""
+    try:
+        rows = json.loads(STALE_FILE.read_text(encoding="utf-8")).get("products") or {}
+    except (OSError, ValueError, AttributeError):
+        rows = {}
+    return {k: v for k, v in rows.items() if isinstance(v, dict) and time.time() - float(v.get("at") or 0) < STALE_WINDOW_S}
+
+
+def _save_stale(rows: dict) -> None:
+    STALE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = STALE_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"products": rows}, indent=1), encoding="utf-8")
+    os.replace(tmp, STALE_FILE)
+
+
+def _count_stale(product_id) -> int:
+    rows = _stale_rows()
+    n = int((rows.get(str(product_id)) or {}).get("n") or 0) + 1
+    rows[str(product_id)] = {"n": n, "at": time.time(), **({"parked_at": time.time()} if n >= STALE_PARK_AFTER else {})}
+    _save_stale(rows)
+    return n
+
+
+def _clear_stale(product_id) -> None:
+    rows = _stale_rows()
+    if rows.pop(str(product_id), None) is not None:
+        _save_stale(rows)
+
+
+def parked(product_id) -> dict | None:
+    """The product's stale row while it's parked (PARKED_S after the STALE_PARK_AFTER-th stale update), else None."""
+    row = _stale_rows().get(str(product_id))
+    return row if row and time.time() - float(row.get("parked_at") or 0) < PARKED_S else None
+
+
 def trusted_clients(setting: str = TRUST_SETTING) -> set[str]:
     """The apps whose own owner approval counts (approvals_trusted_clients), or whose AUTO mode counts as the owner's
     approval (approvals_trusted_auto_clients); none unless the owner names one."""
@@ -201,9 +246,10 @@ def _used_approvals() -> dict:
     return {k: v for k, v in rows.items() if time.time() - float(v.get("at") or 0) < APPROVALS_KEPT_S}
 
 
-def _approval_problem(client: str | None, ok, action: str = "publish") -> str | None:
-    """Why this owner_approval can't be used, or None. A bot's ("bot:<name>") counts only for BOT_ACTIONS and only
-    for a bot the owner named (approvals_trusted_bots): it's labelled as the bot's, never passed off as the owner's."""
+def _approval_problem(client: str | None, ok, action: str = "publish", payload: dict | None = None) -> str | None:
+    """Why this owner_approval can't be used, or None. A bot's ("bot:<name>") counts only for BOT_ACTIONS (a live
+    update only when it changes words, not prices or variants) and only for a bot the owner named
+    (approvals_trusted_bots): it's labelled as the bot's, never passed off as the owner's."""
     from datetime import datetime
     auto_ok = bool(client) and client in trusted_clients(AUTO_TRUST_SETTING)
     if not client or not (auto_ok or client in trusted_clients()):
@@ -220,10 +266,13 @@ def _approval_problem(client: str | None, ok, action: str = "publish") -> str | 
     if by.lower().startswith("bot:"):
         bot = by[4:].strip().lower()
         if action not in BOT_ACTIONS:
-            return f'a bot\'s approval ("{by}") counts only for Etsy listing details, not for a {action}'
+            return (f'a bot\'s approval ("{by}") counts only for Etsy listing details and a live product\'s words, '
+                    f'not for a {action}')
+        if action == "update" and ((payload or {}).get("prices") or (payload or {}).get("enabled")):
+            return f'a bot\'s approval ("{by}") doesn\'t count for a live price or variant change: that waits for the owner'
         if bot not in {b.lower() for b in trusted_clients(BOT_TRUST_SETTING)}:
             return (f'"{by}" isn\'t a bot the owner lets approve: the owner can name it in Settings > Shops and social '
-                    '> "Bots that may approve Etsy listing details"')
+                    '> "Bots that may approve listing details and live product words"')
     try:
         at = datetime.fromisoformat(str(ok.get("at")).replace("Z", "+00:00")).timestamp()
     except ValueError:
@@ -260,8 +309,12 @@ def add(product_id: str, summary: str, checks: dict, action: str = "publish", pa
     import clients
     from tools.commerce import _http as h
     client = clients.current_client.get()
-    problem = _approval_problem(client, owner_approval, action) if owner_approval is not None else "none given"
+    problem = (_approval_problem(client, owner_approval, action, payload) if owner_approval is not None
+               else "none given")
     with _lock:
+        if action == "update" and parked(product_id):
+            raise PendingError(f"updates of {product_id} went stale {STALE_PARK_AFTER} times running: it's parked: a trusted bot "
+                               "or the owner checks these (commerce.requests.list, outcome \"parked\"), not queued again yet")
         items = _load()
         if any(i.get("product_id") == product_id for i in items):
             raise PendingError("that product is already waiting for the owner's approval (a publish or an update)")
@@ -290,7 +343,13 @@ def add(product_id: str, summary: str, checks: dict, action: str = "publish", pa
     except NotYet as exc:  # only a daily limit or the pause: it runs by itself later (retry_waiting); no phone note,
         # as the owner has nothing to do (the owner, 2026-10-09: "important info to my phone only")
         return {**waiting, "owner_approval": f"used; not run yet: {exc}. It runs by itself when there's room."}
-    except (PendingError, h.CommerceError) as exc:
+    except h.CommerceError as exc:
+        if getattr(exc, "stale", False):  # withdrawn in decide(): nothing waits, so no phone note
+            return {"pending": False, "id": item_id, action: summary, "withdrawn": True, "error": str(exc)[:300]}
+        _note(f"{summary}. It was approved in {client} ({by}) but couldn't run: {exc}. Approve or decline it in the "
+              "Control Panel.", f"Waiting for you: {client}", "high", "warning")
+        return {**waiting, "owner_approval": f"used, but it didn't run: {exc}. It waits in the Control Panel."}
+    except PendingError as exc:
         _note(f"{summary}. It was approved in {client} ({by}) but couldn't run: {exc}. Approve or decline it in the "
               "Control Panel.", f"Waiting for you: {client}", "high", "warning")
         return {**waiting, "owner_approval": f"used, but it didn't run: {exc}. It waits in the Control Panel."}
@@ -419,6 +478,15 @@ def decide(item_id: str, approve: bool, via: str = "") -> dict:
                     clients._audit(f"printify {action} rate limited", item.get("client"), item=item_id)
                     raise NotYet(f"the shop said too many requests (HTTP 429); it runs again by itself in a few "
                                  "minutes") from None
+                if getattr(exc, "stale", False):  # the product changed since: withdrawn, the asker asks again
+                    n = _count_stale(item.get("product_id"))
+                    park = n >= STALE_PARK_AFTER
+                    _log(item, "parked" if park else "withdrawn",
+                         f"{exc}" + (f" ({n} times running: parked)" if park else ""))
+                    _save([i for i in items if i["id"] != item_id])
+                    clients._audit(f"printify {action} " + ("parked" if park else "withdrawn"), item.get("client"),
+                                   item=item_id, product=item.get("product_id"), stale=n)
+                    raise
                 item["last_error"] = str(exc)[:300]
                 _save(items)
                 clients._audit(f"printify {action} failed", item.get("client"), item=item_id, error=str(exc)[:200])
@@ -428,6 +496,8 @@ def decide(item_id: str, approve: bool, via: str = "") -> dict:
                 raise
             _record({"at": time.time(), "product_id": item["product_id"], "by": item.get("client"), "action": action,
                      **({"old": (item.get("payload") or {}).get("old")} if action == "update" else {})})  # for undo
+            if action == "update":
+                _clear_stale(item.get("product_id"))
         note = str((result.get("result") or {}).get("note") or "") if approve else "declined by the owner"
         _log(item, "approved" if approve else "declined", f"approved in {via}. {note}" if via else note)
         _save([i for i in items if i["id"] != item_id])

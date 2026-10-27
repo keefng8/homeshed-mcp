@@ -27,7 +27,8 @@ def requests_list(days: int = 7) -> dict:
     Returns:
         {"waiting": [{"id", "kind", "product_id" or "listing_id", "summary", "asked_at", "expires_at", "last_error"?}],
          "decided": [{"id", "kind", "product_id" or "listing_id", "summary", "asked_at", "decided_at", "outcome":
-         approved|declined|expired, "note"?}]}. "last_error": the owner approved it but it failed, so it still waits.
+         approved|declined|expired|withdrawn|parked, "note"?}]}. "last_error": the owner approved it but it failed, so
+         it still waits. "parked": a live update that went stale three times running; a trusted bot or the owner checks these.
     """
     import clients
     import printify_pending as pp

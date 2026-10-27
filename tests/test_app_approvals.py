@@ -25,7 +25,7 @@ def ok(i: str = "apr_1", by: str = "owner", minutes_ago: float = 1) -> dict:
 
 @pytest.fixture
 def fake(monkeypatch, tmp_path):
-    for name in ("PENDING_FILE", "DONE_FILE", "HISTORY_FILE", "APPROVALS_FILE"):
+    for name in ("PENDING_FILE", "DONE_FILE", "HISTORY_FILE", "APPROVALS_FILE", "STALE_FILE"):
         monkeypatch.setattr(pp, name, tmp_path / f"{name.lower()}.json")
     monkeypatch.delenv("PRINTIFY_PUBLISH_DAILY_MAX", raising=False)
     monkeypatch.setattr(h, "require", lambda key, label: None)
@@ -202,6 +202,52 @@ def test_a_bot_approves_etsy_details_only_when_named_and_never_a_publish(fake, m
     assert out["pending"] is True and "only for Etsy listing details" in out["owner_approval"] and fake["posts"] == []
     fake["trusted"] = ""                                                # the app itself must be trusted too
     assert "aren't trusted" in etsy(4)["owner_approval"]
+
+
+@pytest.fixture
+def bot_update(fake, monkeypatch):
+    """2026-10-25: a named bot approves a live product's words; prices and variants stay the owner's."""
+    from tools.printify import update_live as ul
+    real_get = runtime_settings.get
+    monkeypatch.setattr(runtime_settings, "get", lambda key: "checker" if key == pp.BOT_TRUST_SETTING else
+                        fake["trusted"] if key == pp.TRUST_SETTING else fake["auto"] if key == pp.AUTO_TRUST_SETTING
+                        else real_get(key))
+    fake["run"] = lambda pid, payload: {"note": "updated"}
+    monkeypatch.setattr(ul, "execute_update", lambda pid, payload: fake["run"](pid, payload))
+
+    def ask(i, payload=None, pid="abc123"):
+        return pp.add(pid, "Retitle the tee", {}, action="update", payload=payload or {"title": "New"},
+                      owner_approval=ok(f"apr_u{i}", by="bot:checker"))
+    return ask
+
+
+def test_a_bot_approves_a_live_products_words_but_never_its_prices(bot_update, fake):
+    assert bot_update(1)["pending"] is False and pp.list_pending() == []
+    for i, change in ((2, {"prices": {"1": 2999}}), (3, {"enabled": {"1": False}})):
+        out = bot_update(i, change, pid=f"p{i}")
+        assert out["pending"] is True and "live price or variant change" in out["owner_approval"]
+
+
+def test_a_stale_update_is_withdrawn_then_parked_and_a_success_clears_it(bot_update, fake):
+    from tools.printify import update_live as ul
+
+    def stale(pid, payload):
+        raise ul.Stale("the product's title changed since this was asked: ask again")
+    fake["run"] = stale
+    for i in (1, 2):
+        out = bot_update(i)
+        assert out["pending"] is False and out["withdrawn"] is True and pp.list_pending() == []
+    assert fake["notes"] == [] and [r["outcome"] for r in pp.history()] == ["withdrawn", "withdrawn"]
+    bot_update(3)
+    assert pp.history()[0]["outcome"] == "parked" and pp.parked("abc123")
+    with pytest.raises(pp.PendingError, match="parked: a trusted bot or the owner checks"):
+        bot_update(4)
+    assert fake["notes"] == []                                      # none of it reached the owner's phone
+    pp.STALE_FILE.unlink()
+    fake["run"] = stale
+    bot_update(5)                                                   # one stale, then a success: the count starts over
+    fake["run"] = lambda pid, payload: {"note": "updated"}
+    assert bot_update(6)["pending"] is False and "abc123" not in pp._stale_rows()
 
 
 def test_the_phone_hears_only_publishes_and_stuck_requests(fake, monkeypatch):

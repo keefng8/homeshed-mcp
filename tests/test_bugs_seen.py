@@ -128,3 +128,23 @@ def test_a_broken_file_is_refused_not_overwritten(stores):
     with pytest.raises(seen.SeenError):
         seen.seen(TRACE, "Bash:python", session="a")
     assert (stores / "bug_candidates.json").read_text(encoding="utf-8") == "{not json"
+
+
+def test_platform_failures_are_counted_for_the_week_and_a_known_fix_counts_as_with_fix():
+    fixed = kb.report("Service refused", error_text="ConnectionRefusedError: refused", fix="start it")
+    bare = kb.report("Other thing breaks", error_text="KeyError: other")
+    seen.seen(TRACE, "Bash:python", session="a")
+    seen.seen(TRACE, "Bash:python", session="b", known_id=fixed["id"])
+    seen.seen(TRACE, "Bash:python", session="c", known_id=bare["id"])
+    seen.seen("String to replace not found in file.", "Edit", session="a")  # misuse: not a catch
+    block = seen.catches()
+    assert (block["week"], block["with_fix"]) == (3, 1)
+    assert block["since"] % 86400 == 0 and seen._now().timestamp() - block["since"] < 7 * 86400
+
+
+def test_catches_older_than_the_week_drop_out(stores):
+    (stores / "bug_candidates.json").write_text(json.dumps({"classes": {}, "watched": {}, "caught": {
+        "2026-10-01": [5, 5], "2026-10-19": [2, 1], "2026-10-25": [1, 9], "bad": "x"}}), encoding="utf-8")
+    block = seen.catches(seen.datetime(2026, 10, 25, 12, tzinfo=seen.timezone.utc))
+    assert block == {"since": int(seen.datetime(2026, 10, 19, tzinfo=seen.timezone.utc).timestamp()),
+                     "week": 3, "with_fix": 2}
