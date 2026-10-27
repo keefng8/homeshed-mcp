@@ -13,7 +13,7 @@
 <h3 align="center">Every tool your AI needs, in one install: memory, reasoning, git, Docker and more.</h3>
 
 <p align="center">
-  A self-hosted MCP server for Claude Code, Claude Desktop, Claude.ai, ChatGPT, Cursor, VS Code, OpenCode and any MCP client.<br>
+  A self-hosted MCP server for Claude Code, Claude Desktop, Claude.ai, Cursor, VS Code, OpenCode and any MCP client.<br>
   Your model first, the cloud when you choose.
 </p>
 
@@ -50,11 +50,12 @@
 AI assistant and it can check your containers, work with git, remember what it learned across sessions, spot bugs
 it has seen before, and solve logic problems: <!--count:total-->167<!--/count--> tools behind one endpoint that you run and control.
 
-> ### New in 0.7.0: one-click sign-in for Claude.ai and ChatGPT
-> Your own tool server, in the chat apps you already use, with no token to copy and paste. Add HomeShed as a
-> connector, click **Sign in**, and approve it on your Control Panel when the 6-digit codes match. That's it: the chat
-> app gets only the tools you choose, and you can switch it off any time. Your memory, your tools and your keys stay
-> on your own machine. [Set it up](#connect-a-chat-app-with-sign-in-oauth)
+> ### New in 0.7.0: one-click sign-in for Claude.ai and other MCP apps
+> Add HomeShed to your chat app in one step: paste the address, sign in, approve the 6-digit code on your Control
+> Panel. No key to copy and paste. Every app gets its own access level, limits and an off switch, and your memory,
+> tools and keys stay on your own machine. It's the standard MCP sign-in (OAuth 2.1 with PKCE), so any MCP app that
+> supports sign-in can connect; tested with Claude's custom connectors. Free, in the open-source core.
+> [Set it up](#connect-a-chat-app-with-sign-in-oauth)
 
 <p align="center">
   <img src="docs/assets/hero.png" alt="The optional HomeShed Control Panel on a fresh install, beside the words: Your AI's tools, on one page. See what's running and what it saved you. A switch for every tool. A key for every app. On your own machine. Free and open source." width="820">
@@ -67,10 +68,11 @@ it has seen before, and solve logic problems: <!--count:total-->167<!--/count-->
 
 **New in 0.7.0**
 
-- **One-click sign-in for Claude.ai, ChatGPT and other chat apps.** No token to copy: the chat app signs in, you check
-  a 6-digit code on the Control Panel and approve it with just the tools you choose. Your HomeShed, its memory and its
-  tools, now reach every chat app you use, not just the ones on your computer
-  ([how](#connect-a-chat-app-with-sign-in-oauth)).
+- **One-click sign-in for Claude.ai and other MCP apps.** Paste the address, sign in, approve the 6-digit code on
+  your Control Panel: no key to copy. Every app gets only the tools you choose, its own limits and an off switch. Your
+  HomeShed, its memory and its tools, now reach your chat apps, not just the ones on your computer. It's the standard
+  MCP sign-in, tested with Claude's custom connectors ([how](#connect-a-chat-app-with-sign-in-oauth)). HomeShed Pro
+  adds per-app tool sets, a savings report and approve-in-chat cards on top.
 - **Cheaper on every turn: the front door.** Instead of loading 160+ tool descriptions, an app sees five tools that
   find and run all the others. Replies can be cut to just the fields you need, or kept on the server and read a page
   at a time, and pictures arrive as real images, not text. Fewer tokens, and small models pick the right tool more
@@ -402,7 +404,9 @@ Every page says **Not set up yet**, and what it needs, for anything you haven't 
 </p>
 <p align="center"><sub>What you see after clicking Sign in: approve it on your Control Panel when the code matches.</sub></p>
 
-Claude's custom connectors, ChatGPT and other chat apps can connect by signing in, so nobody copies a token. You need
+Chat apps can connect by signing in, so nobody copies a token. HomeShed uses the standard MCP sign-in (OAuth 2.1
+with PKCE, dynamic client registration and client metadata documents), so any MCP app that supports sign-in can
+connect; it's tested with Claude's custom connectors. You need
 the server running (Docker, above), the Control Panel (to approve each sign-in), and an https address the chat app can
 reach it at: a service that gives your server a public web address, such as Cloudflare Tunnel, Tailscale Funnel or
 Caddy.
@@ -1041,7 +1045,7 @@ Yes: one Python file plus a JSON manifest, and every MCP client sees it within i
 |---|---|
 | ✅ | <!--count:total-->167<!--/count--> tools across reasoning, memory, git, Docker, network and more |
 | ✅ | The front door: five tools that find and run the rest, with trimmed replies and real images (0.7.0) |
-| ✅ | Sign-in for chat apps (Claude.ai connectors, ChatGPT), approved by you with a matching code (0.7.0) |
+| ✅ | Sign-in for MCP apps (tested with Claude.ai connectors), approved by you with a matching code (0.7.0) |
 | ✅ | Per-app keys, tool grants and rate limits, with an audit log of every change to them |
 | ✅ | Persistent memory, built in, one per project (or connect memory-core) |
 | ✅ | Observations: log corrections, flag repeats |
