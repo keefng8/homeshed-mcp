@@ -26,6 +26,7 @@ import secrets
 import shutil
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -128,7 +129,7 @@ def cmd_init(args) -> int:
 def _get(url: str, timeout: float = 3.0) -> tuple[bool, str]:
     """(answered, body). Any HTTP answer, even an error status, means something is listening."""
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as r:
+        with urllib.request.urlopen(_public_request(url), timeout=timeout) as r:
             return True, r.read(200_000).decode("utf-8", "replace")
     except urllib.error.HTTPError:
         return True, ""
@@ -299,7 +300,7 @@ def _check(req: str) -> tuple[str, str]:
     return "ready", f"{live[0]} answers" if live and live[0].endswith("_URL") else "set"
 
 
-def diagnose() -> dict:
+def diagnose(env_file: str = ".env") -> dict:
     data = _prepare()
     import manifest
     import toolswitch
@@ -328,8 +329,9 @@ def diagnose() -> dict:
     hook = rule_packs.hook_state()  # reads Claude Code's settings; never changes them
     packs = {"installed": len(rule_packs.installed()), **hook,
              "state": "ready" if hook["current"] else "broken" if hook["on"] else "optional"}
+    oauth = oauth_state(env_file)
     broken = [g for g in groups.values() if g["state"] == "broken"] + ([memory] if memory["state"] == "broken" else []) \
-        + ([packs] if packs["state"] == "broken" else [])
+        + ([packs] if packs["state"] == "broken" else []) + ([oauth] if oauth["state"] == "broken" else [])
     core = [m for m in tools if not m.get("requires") and not toolswitch.is_disabled(m["id"])]
     import toolgroups
     hidden = sorted(toolgroups.hidden())
@@ -337,7 +339,7 @@ def diagnose() -> dict:
     return {"version": _version(), "transport": "stdio", "python": sys.version.split()[0], "data_dir": str(data),
             "core_ready": len(core), "tools_total": len(tools), "hidden_groups": hidden, "hidden_tools": hidden_tools,
             "tools_ready": ready, "groups": sorted(groups.values(), key=lambda g: g["name"].lower()),
-            "memory": memory, "packs": packs, "write_tools_off": off, "broken": len(broken)}
+            "memory": memory, "packs": packs, "oauth": oauth, "write_tools_off": off, "broken": len(broken)}
 
 
 def memory_state() -> dict:
@@ -357,6 +359,68 @@ def memory_state() -> dict:
     return {"state": "ready", "detail": f"built-in, {saved} saved ({memory_local.db_path()})"}
 
 
+CONNECTOR_STEPS = ("To connect a chat app with sign-in instead of a token: 1) put this server on an https address "
+                   "(e.g. a Cloudflare tunnel), 2) set MCP_PUBLIC_URL=https://<that address> in .env and restart, "
+                   "3) on claude.ai: Settings > Connectors > Add custom connector, URL https://<that address>/mcp, "
+                   "4) sign in when asked and approve it on your Control Panel (the page shows a 6-digit code).")
+
+
+def _get_json(url: str, timeout: float = 5.0) -> dict | None:
+    """The JSON object at url, or None (no answer, an error status, or not JSON). Nothing is sent but the GET."""
+    try:
+        with urllib.request.urlopen(_public_request(url), timeout=timeout) as r:
+            data = json.loads(r.read(200_000).decode("utf-8", "replace"))
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def _public_request(url: str) -> urllib.request.Request:
+    """A GET with HomeShed's own User-Agent: a Cloudflare front refuses Python's default one with 403 (2026-10-27)."""
+    return urllib.request.Request(url, headers={"User-Agent": f"{NAME}-doctor"})
+
+
+def oauth_state(env_file: str = ".env") -> dict:
+    """Sign-in with OAuth (oauth_server.py): on when MCP_PUBLIC_URL is set (the environment, else the .env serve --http
+    reads); whether the public address answers and serves the sign-in metadata; the apps signed in that way (names
+    only) and sign-ins waiting for the owner. Tokens are never read out of the store, only who they belong to."""
+    raw = (os.environ.get("MCP_PUBLIC_URL") or _env_values(Path(env_file)).get("MCP_PUBLIC_URL") or "").strip()
+    url = raw.rstrip("/")
+    base = {"public_url": url or None, "apps": [], "pending": 0}
+    if not url:
+        return {**base, "state": "optional", "on": False, "detail": "off (MCP_PUBLIC_URL not set)",
+                "next": CONNECTOR_STEPS}
+    if not (url.startswith("https://") or url.startswith("http://localhost")):
+        return {**base, "state": "broken", "on": False, "detail": f"MCP_PUBLIC_URL={url} isn't an https address",
+                "next": "set MCP_PUBLIC_URL to the https address chat apps reach this server at"}
+    out = {**base, "on": True, "answers": _get(url + "/healthz")[0]}
+    meta = _get_json(url + "/.well-known/oauth-authorization-server") or {}
+    resource = _get_json(url + "/.well-known/oauth-protected-resource/mcp") \
+        or _get_json(url + "/.well-known/oauth-protected-resource") or {}
+    out["metadata"] = {"issuer": meta.get("issuer"), "authorization_endpoint": meta.get("authorization_endpoint"),
+                       "token_endpoint": meta.get("token_endpoint"),
+                       "registration_endpoint": meta.get("registration_endpoint"),
+                       "client_id_metadata_document_supported": bool(meta.get("client_id_metadata_document_supported")),
+                       "resource": resource.get("resource")}
+    try:
+        _prepare()
+        import oauth_server
+        store, now = oauth_server._load(), time.time()
+        out["apps"] = sorted({str(v.get("app")) for v in store["refresh"].values()
+                              if v.get("app") and float(v.get("expires_at") or 0) > now})
+        out["pending"] = len(oauth_server.pending())
+        out["store_unreadable"] = bool(store.get("unreadable"))
+    except Exception:  # noqa: BLE001 - this install keeps no sign-ins (a Docker server keeps its own)
+        pass
+    if not out["answers"]:
+        return {**out, "state": "broken", "detail": f"on, but {url} didn't answer",
+                "next": "check the tunnel or proxy in front of the server, and that the server is running"}
+    if not (meta.get("authorization_endpoint") and meta.get("token_endpoint")):
+        return {**out, "state": "broken", "detail": f"on, but {url} serves no sign-in metadata",
+                "next": "restart the server after setting MCP_PUBLIC_URL, and check the proxy passes /.well-known/"}
+    return {**out, "state": "ready", "detail": f"on at {url}/mcp, answers, sign-in metadata served"}
+
+
 def _version() -> str:
     if str(HERE) not in sys.path:  # app_version sits next to this file (inside the package once installed)
         sys.path.insert(0, str(HERE))
@@ -374,7 +438,8 @@ def _marks() -> dict:
 
 
 def cmd_doctor(args) -> int:
-    report = diagnose()
+    env_file = getattr(args, "env_file", ".env")
+    report = diagnose(env_file) if env_file != ".env" else diagnose()
     if args.json:
         print(json.dumps(report, indent=1))
         return 1 if report["broken"] else 0
@@ -395,8 +460,22 @@ def cmd_doctor(args) -> int:
           f"the hook needs refreshing: {pk['why']}" if pk["on"] else f"off ({pk['installed']} installed)"))
     if not pk["current"]:
         print(f"{'':19}{'Fix' if pk['on'] else 'Add'}: {NAME} packs on   (it shows the change and asks first)")
+    oa = report.get("oauth") or {"state": "ready", "detail": "", "skip": True}
+    if not oa.get("skip"):
+        print(f"{mark[oa['state']]} {'Sign-in (OAuth)':<16}{oa['detail']}")
+    if oa.get("on"):
+        md = oa.get("metadata") or {}
+        print(f"{'':19}metadata: issuer {md.get('issuer') or '-'}, authorize {md.get('authorization_endpoint') or '-'}, "
+              f"token {md.get('token_endpoint') or '-'}, resource {md.get('resource') or '-'}")
+        apps = oa.get("apps") or []
+        print(f"{'':19}{len(apps)} app(s) signed in this way{': ' + ', '.join(apps) if apps else ''}; "
+              f"{oa.get('pending', 0)} sign-in(s) waiting for approval on the Control Panel")
+        if oa.get("store_unreadable"):
+            print(f"{'':19}Fix: the sign-in store is unreadable; no OAuth sign-in works until it's fixed")
+    if oa["state"] != "ready":
+        print(f"{'':19}{'Fix' if oa['state'] == 'broken' else 'Add'}: {oa['next']}")
     if report["write_tools_off"]:
-        print(f"{mark['off']} Write tools     off: {', '.join(report['write_tools_off'])}")
+        print(f"{mark['off']} Write tools    off: {', '.join(report['write_tools_off'])}")
         print(f"{'':19}Turn on only what you need: ENABLE_TOOLS=git.commit   (dev.* runs code)")
     if report["hidden_groups"]:
         print(f"{mark['optional']} {'Hidden groups':<16}{report['hidden_tools']} tool(s) the AI doesn't see: "
@@ -704,6 +783,7 @@ def main(argv: list[str] | None = None) -> int:
     answer.add_argument("--no", action="store_true", help="only print how to connect; never ask or change anything")
     d = sub.add_parser("doctor", help="what works, what doesn't, and the fix")
     d.add_argument("--json", action="store_true")
+    d.add_argument("--env-file", default=".env", help="where serve --http reads MCP_PUBLIC_URL (the environment wins)")
     pn = sub.add_parser("panel", help="run the optional web panel on this machine (needs the panel extra)")
     pn.add_argument("--port", type=int, default=9090)
     pn.add_argument("--server", default=f"http://127.0.0.1:{os.environ.get('MCP_PORT') or '8765'}",

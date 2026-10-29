@@ -13,7 +13,7 @@ Nothing is saved.
 ## Parameters
 | Name | Required | Notes |
 |---|---|---|
-| `image` | yes | The scene: an image name (`saved_as`), `"folder/name.png"`, or a Printify mockup address. |
+| `image` | yes | The scene: an image name (`saved_as`), `"folder/name.png"`, a Printify mockup address, or an Etsy listing photo's address (`url_fullxfull` on `i.etsystatic.com`, from `etsy.listing.get`): is the live photo the mockup? Only here: tools that reuse an image refuse Etsy photos. |
 | `reference` | yes | What the print must look like: the mockup the scene was made from, the print file, or the design (same forms). |
 | `region` | no | `"print"` (default): only the print on the reference counts (a print file's opaque part; on a mockup, the design on the tee). `"all"`: the whole reference. |
 

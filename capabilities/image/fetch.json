@@ -24,6 +24,11 @@
       "type": "number",
       "required": false,
       "default": 1.0
+    },
+    "raw": {
+      "type": "boolean",
+      "required": false,
+      "default": false
     }
   },
   "execution": {

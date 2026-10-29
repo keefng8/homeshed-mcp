@@ -509,6 +509,98 @@ def test_bad_photo_edits_are_refused_before_anything_queues(photos, kwargs, matc
     assert pp.list_pending() == [] and photos[1] == []
 
 
+R_HERO = {"listing_image_id": 901, "rank": 1, "alt_text": "Staffy tee, worn in"}
+R_MOCKUP = {"listing_image_id": 8714, "rank": 2, "alt_text": "Mockup, front"}
+R_BACK = {"listing_image_id": 602, "rank": 3, "alt_text": ""}
+
+
+def test_images_rank_alone_moves_the_mockup_to_1_and_keeps_every_photo(photos):
+    """2026-10-27 (the shop station): the Printify mockup to rank 1, the hero to 2; no upload, no delete."""
+    state, writes, _ = photos
+    state["images"] = {"count": 3, "results": [dict(R_HERO), dict(R_MOCKUP), dict(R_BACK)]}
+    out = ew.listing_update("4412", images_rank=[{"listing_image_id": 8714, "rank": 1}])
+    assert out["pending"] is True and writes == []
+    assert out["photo_order"] == [{"listing_image_id": 8714, "rank": 1}, {"listing_image_id": 901, "rank": 2},
+                                  {"listing_image_id": 602, "rank": 3}]
+    assert out["etsy"].endswith("move photos (none deleted): 8714 to 1, 901 to 2")
+    [item] = pp.list_pending()
+    assert item["action"] == "etsy" and item["checks"]["photos_to_rank"] == 1
+    res = pp.decide(item["id"], True)["result"]
+    assert writes == [  # each moved photo re-saved with its alt text; nothing uploaded, nothing deleted
+        ("POST", f"/v3/application/shops/{SHOP}/listings/4412/images",
+         {"listing_image_id": 8714, "rank": 1, "alt_text": "Mockup, front"}, None),
+        ("POST", f"/v3/application/shops/{SHOP}/listings/4412/images",
+         {"listing_image_id": 901, "rank": 2, "alt_text": "Staffy tee, worn in"}, None)]
+    assert res["photos_reranked"] == [{"listing_image_id": 8714, "rank": 1}, {"listing_image_id": 901, "rank": 2}]
+    assert res["photo_order"] == out["photo_order"] and res["photos_removed"] == [] and res["photos"] == 0
+    assert "4412" not in ew.applied() or "images_rank" not in ew.applied()["4412"]  # photos are never re-applied
+
+
+def test_images_rank_carries_new_alt_text_and_a_full_order_can_be_given(photos):
+    state, writes, _ = photos
+    state["images"] = {"count": 3, "results": [dict(R_HERO), dict(R_MOCKUP), dict(R_BACK)]}
+    ew.listing_update("4412", images_rank=[{"listing_image_id": 602, "rank": 1}, {"listing_image_id": 901, "rank": 3}],
+                      images_alt=[{"listing_image_id": 602, "alt_text": "Staffy tee, back"}])
+    [item] = pp.list_pending()
+    res = pp.decide(item["id"], True)["result"]
+    assert [o["listing_image_id"] for o in res["photo_order"]] == [602, 8714, 901]
+    assert [w[2] for w in writes] == [  # the alt text first (at its rank now), then each move carrying the new text;
+        {"listing_image_id": 602, "alt_text": "Staffy tee, back", "rank": 3},  # the mockup stays at 2: not re-saved
+        {"listing_image_id": 602, "rank": 1, "alt_text": "Staffy tee, back"},
+        {"listing_image_id": 901, "rank": 3, "alt_text": "Staffy tee, worn in"}]
+    assert res["alt_text_set"] == [602] and [m["listing_image_id"] for m in res["photos_reranked"]] == [602, 901]
+
+
+def test_images_rank_already_in_place_queues_nothing(photos):
+    photos[0]["images"] = {"count": 3, "results": [dict(R_HERO), dict(R_MOCKUP), dict(R_BACK)]}
+    out = ew.listing_update("4412", images_rank=[{"listing_image_id": 901, "rank": 1}])
+    assert out["pending"] is False and out["photo_order"][0] == {"listing_image_id": 901, "rank": 1}
+    assert pp.list_pending() == []
+
+
+@pytest.mark.parametrize("kwargs, match", [
+    ({"images_rank": [{"listing_image_id": 999, "rank": 1}]}, "not photos of this listing"),
+    ({"images_rank": [{"listing_image_id": 8714, "rank": 4}]}, "has 3 photos, so no rank 4"),
+    ({"images_rank": [{"listing_image_id": 8714, "rank": 1}, {"listing_image_id": 602, "rank": 1}]}, "each photo"),
+    ({"images_rank": [{"listing_image_id": 8714, "rank": 1}, {"listing_image_id": 8714, "rank": 2}]}, "each photo"),
+    ({"images_rank": [{"listing_image_id": 900 + i, "rank": 1 + i % 10} for i in range(11)]}, "1-10"),
+    ({"images_rank": [{"listing_image_id": 8714, "rank": 0}]}, "whole number"),
+    ({"images_rank": [{"listing_image_id": 8714, "rank": True}]}, "whole number"),
+    ({"images_rank": [{"listing_image_id": "abc", "rank": 1}]}, "listing_image_id"),
+    ({"images_rank": [{"listing_image_id": 8714, "rank": 1}], "remove_images": [602]}, "request of their own"),
+    ({"images_rank": [{"listing_image_id": 8714, "rank": 1}], "images": [{"image": "listing/size-guide.png"}]},
+     "request of their own"),
+])
+def test_bad_images_rank_asks_are_refused_before_anything_queues(photos, kwargs, match):
+    photos[0]["images"] = {"count": 3, "results": [dict(R_HERO), dict(R_MOCKUP), dict(R_BACK)]}
+    with pytest.raises(h.CommerceError, match=match):
+        ew.listing_update("4412", **kwargs)
+    assert pp.list_pending() == [] and photos[1] == []
+
+
+def test_images_rank_keeps_the_approval_path_and_is_never_held_like_a_delete(photos, monkeypatch):
+    state, _, _ = photos
+    state["images"] = {"count": 3, "results": [dict(R_HERO), dict(R_MOCKUP), dict(R_BACK)]}
+    seen = {}
+    monkeypatch.setattr(ew, "_queue", lambda lid, title, summary, send, wanted, reapply, thumbs, ok:
+                        seen.update(ok=ok, send=send) or {"pending": True, "id": "q1"})
+    auto = {"id": "r1", "by": "auto:full", "at": "2026-10-27T10:00:00Z"}
+    out = ew.listing_update("4412", images_rank=[{"listing_image_id": 8714, "rank": 1}], owner_approval=auto)
+    assert "swap_held" not in out and seen["ok"] == auto and "swap" not in seen["send"]  # passed on to the queue as is
+    assert seen["send"]["images_rank"] == [{"listing_image_id": 8714, "rank": 1}] and seen["send"]["remove_images"] == []
+
+
+def test_images_rank_is_refused_on_approval_when_the_photos_changed(photos):
+    state, writes, _ = photos
+    state["images"] = {"count": 3, "results": [dict(R_HERO), dict(R_MOCKUP), dict(R_BACK)]}
+    ew.listing_update("4412", images_rank=[{"listing_image_id": 8714, "rank": 1}])
+    [item] = pp.list_pending()
+    state["images"]["results"] = [dict(R_HERO), dict(R_BACK)]  # the mockup went meanwhile
+    with pytest.raises(h.CommerceError, match="changed since this was asked"):
+        pp.decide(item["id"], True)
+    assert writes == []
+
+
 def test_only_printify_hosts_and_safe_names_are_fetched():
     with pytest.raises(h.CommerceError, match="only Printify mockup addresses"):
         ew._image("https://example.com/x.png")

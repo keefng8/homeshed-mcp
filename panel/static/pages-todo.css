@@ -1,0 +1,131 @@
+/* The To-do page's styles (static/pages-todo.css). Linked by index.html right after panel.css. */
+/* To-do canvas (2026-09-30, the owner: "a canvas where the todo list is, and you can assign easily to an agent / project") */
+.tdo-top { display: flex; justify-content: flex-end; }
+.tdo-top:has(.tdo-runner[hidden]) { display: none; }
+.tdo-runner { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-2);
+  background: var(--fill); padding: 6px 12px; border-radius: 999px; }
+.tdo-runner b { color: var(--text); font-weight: 600; } .tdo-runner a { color: var(--accent-text); text-decoration: none; }
+.tdo-runner button { font-size: 12px; padding: 2px 10px; }
+.tdo-composer { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.tdo-composer textarea { width: 100%; resize: vertical; min-height: 58px; font-size: 14.5px; }
+.tdo-compose-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.tdo-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-2); flex: 1 1 150px; min-width: 0; }
+.tdo-field select { width: 100%; color: var(--text); }
+#todoWhoIn { flex: 1 1 180px; align-self: flex-end; }
+.tdo-auto-opt { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--text); height: 36px; white-space: nowrap; }
+.tdo-report { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; font: 12.5px/1.55 var(--mono, ui-monospace, monospace);
+  background: var(--fill); border-radius: 10px; padding: 10px 12px; max-height: 360px; overflow: auto; }
+.tdo-primary { height: 36px; padding: 0 18px; border-radius: 9px; border: 0; background: var(--accent-fill); color: var(--on-accent);
+  font-weight: 600; font-size: 13.5px; cursor: pointer; white-space: nowrap; }
+.tdo-primary:hover { filter: brightness(1.08); } .tdo-primary:disabled { opacity: .5; cursor: default; }
+.tdo-primary:focus-visible, .tdo-tab:focus-visible, .tdo-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tdo-bar { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.tdo-tabs { display: flex; gap: 2px; background: var(--fill); padding: 3px; border-radius: 10px; overflow-x: auto; max-width: 100%;
+  scrollbar-width: none; }
+.tdo-tab { border: 0; background: none; color: var(--text-2); font-size: 13px; font-weight: 500; padding: 6px 11px; border-radius: 8px;
+  cursor: pointer; display: inline-flex; gap: 7px; align-items: center; white-space: nowrap; }
+.tdo-tab.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.14); }
+.tdo-n { font-size: 11px; min-width: 18px; text-align: center; padding: 1px 5px; border-radius: 9px; background: var(--fill-2);
+  color: var(--text-2); font-variant-numeric: tabular-nums; }
+.tdo-tab.hot .tdo-n { background: var(--warn); color: #1c1c1e; }
+.tdo-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tdo-tools input[type=search] { width: 190px; }
+.tdo-views { display: flex; gap: 4px; }
+.tdo-bulk { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 12px; border-radius: 10px;
+  background: var(--accent-soft); font-size: 13px; }
+.tdo-bulk label { display: inline-flex; gap: 6px; align-items: center; min-width: 0; }
+.tdo-bulk select { min-width: 0; }
+button.ghost.danger { color: var(--bad); }
+.tdo-table { border-radius: 14px; overflow: hidden; background: var(--surface); border: 1px solid var(--separator); }
+.tdo-row { display: grid; grid-template-columns: 26px minmax(200px, 1fr) minmax(150px, 220px) 92px 150px minmax(96px, 150px);
+  gap: 12px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--separator); cursor: pointer; }
+.tdo-row:first-child { border-top: 0; }
+.tdo-row:hover { background: var(--fill); } .tdo-row.sel { background: var(--accent-soft); }
+.tdo-row.open { box-shadow: inset 3px 0 0 var(--accent); }
+.tdo-head { cursor: default; font-size: 12px; color: var(--text-2); font-weight: 500; background: var(--surface-2); padding: 8px 14px; }
+.tdo-head:hover { background: var(--surface-2); }
+.tdo-c-task { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.tdo-title { font-weight: 600; font-size: 14px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; overflow-wrap: anywhere; }
+.tdo-sub { font-size: 12px; color: var(--text-2); }
+.tdo-c-agent { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.tdo-agent-col { display: flex; flex-direction: column; min-width: 0; gap: 1px; flex: 1; }
+.tdo-agent-col .tdo-sub, .tdo-agent-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tdo-agent-sel { padding: 4px 8px; font-size: 13px; width: 100%; }
+.tdo-av { width: 28px; height: 28px; border-radius: 8px; display: inline-grid; place-items: center; flex: 0 0 auto; font-size: 11px;
+  font-weight: 700; letter-spacing: .02em; color: #fff; background: hsl(var(--h, 210) 50% 44%); }
+.tdo-av.any { background: var(--fill-2); color: var(--text-2); }
+.tdo-prio { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 7px; border: 0; background: var(--fill); color: var(--text-2); }
+select.tdo-prio { padding: 3px 6px; cursor: pointer; }
+.tdo-prio.high { background: var(--bad-soft); color: var(--bad); } .tdo-prio.low { color: var(--text-3); }
+.tdo-st { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; padding: 3px 9px; border-radius: 999px;
+  background: var(--fill); color: var(--text-2); white-space: nowrap; }
+.tdo-st::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+.tdo-st.new::before, .tdo-st.sched::before { background: none; box-shadow: inset 0 0 0 1.5px currentColor; }
+.tdo-st.sched::before { border-radius: 2px; }
+.tdo-st.run { background: var(--accent-soft); color: var(--accent-text); } .tdo-st.run::before { animation: tdoPulse 1.4s ease-in-out infinite; }
+.tdo-st.warn { background: var(--warn-soft); color: var(--warn); } .tdo-st.ok { background: var(--ok-soft); color: var(--ok); }
+.tdo-st.bad { background: var(--bad-soft); color: var(--bad); } .tdo-st.off { opacity: .7; }
+/* code work's second-session check (2026-10-28): one small tag under the task, commit in mono */
+.tdo-chk { display: inline-block; align-self: flex-start; font-size: 11.5px; font-weight: 500; padding: 1px 7px; border-radius: 6px;
+  background: var(--fill); color: var(--text-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tdo-chk code { font-size: 11px; } .tdo-chk.submitted { background: var(--accent-soft); color: var(--accent-text); }
+.tdo-chk.verified { background: var(--ok-soft); color: var(--ok); } .tdo-chk.rejected { background: var(--bad-soft); color: var(--bad); }
+@keyframes tdoPulse { 50% { opacity: .3; } }
+.tdo-c-when { font-size: 12.5px; color: var(--text-2); }
+.tdo-empty { padding: 28px; text-align: center; color: var(--text-2); font-size: 13.5px; border: 1px dashed var(--separator); border-radius: 14px; }
+/* Board with many tasks (the owner, 2026-10-01: "the todo board is messed up if a lot of items"): columns wrap onto new rows
+   instead of running off the right edge, and a long column scrolls inside itself instead of growing without end. */
+.tdo-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; align-items: start; padding-bottom: 6px; }
+.tdo-col { min-width: 0; background: var(--fill); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 8px;
+  transition: box-shadow .15s, background .15s; }
+.tdo-col-cards { display: flex; flex-direction: column; gap: 8px; max-height: min(560px, 62vh); overflow-y: auto; padding-right: 2px; }
+.tdo-col.empty .tdo-col-empty { padding: 10px 8px; }
+.tdo-col.drop { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-soft); }
+.tdo-col > header { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 2px 2px 4px; }
+.tdo-col > header b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tdo-card { background: var(--surface); border: 1px solid var(--separator); border-radius: 10px; padding: 10px; display: flex;
+  flex-direction: column; gap: 7px; cursor: pointer; }
+.tdo-card[draggable=true] { cursor: grab; } .tdo-card:hover, .tdo-card.open { border-color: var(--accent); }
+.tdo-card-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+.tdo-col-empty { font-size: 12px; color: var(--text-3); text-align: center; padding: 18px 8px; border: 1px dashed var(--separator); border-radius: 10px; }
+.tdo-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100vw); background: var(--surface); color: var(--text);
+  border-left: 1px solid var(--separator); box-shadow: -12px 0 32px rgba(0,0,0,.2); z-index: 60; padding: 18px 20px; overflow-y: auto;
+  transform: translateX(100%); visibility: hidden; transition: transform .2s ease, visibility .2s; display: flex; flex-direction: column; gap: 14px; }
+.tdo-drawer.show { transform: none; visibility: visible; }
+.tdo-dr-head { display: flex; align-items: center; gap: 10px; } .tdo-dr-head .tdo-x { margin-left: auto; }
+.tdo-dr-title { margin: 0; font-size: 18px; line-height: 1.35; font-weight: 650; overflow-wrap: anywhere; }
+.tdo-fields { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px 12px; margin: 0; font-size: 13.5px; align-items: center; }
+.tdo-fields dt { color: var(--text-2); } .tdo-fields dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.tdo-fields select { width: 100%; }
+.tdo-fields select.tdo-prio { padding: 8px 10px; font-size: 13.5px; font-weight: 400; border-radius: 8px; border: 1px solid var(--separator); }
+.tdo-ok { background: var(--warn-soft); border-radius: 12px; padding: 12px; display: flex; gap: 10px; align-items: center; font-size: 13px; }
+.tdo-ok p { margin: 0; flex: 1; }
+.tdo-drawer h4 { margin: 4px 0 0; font-size: 13px; color: var(--text-2); font-weight: 600; }
+.tdo-activity { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.tdo-activity li { background: var(--fill); border-radius: 10px; padding: 8px 10px; overflow-wrap: anywhere; }
+.tdo-act-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 3px; }
+.tdo-act-head span { color: var(--text-3); font-size: 12px; white-space: nowrap; }
+.tdo-reply { display: flex; flex-direction: column; gap: 8px; } .tdo-reply textarea { width: 100%; resize: vertical; }
+.tdo-reply .tdo-primary { align-self: flex-end; }
+.tdo-dr-foot { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--separator); }
+@media (prefers-reduced-motion: reduce) { .tdo-st.run::before { animation: none; } .tdo-drawer, .tdo-col { transition: none; } }
+@media (max-width: 860px) {
+  .tdo-head { display: none; }
+  .tdo-row { grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-areas: "check task task" "check status when" "check agent prio";
+    row-gap: 8px; column-gap: 8px; padding-left: 4px; }  /* the task gets the whole first line: a wide pill beside it squeezed the words apart */
+  .tdo-c-check { grid-area: check; align-self: start; display: flex; justify-content: center; min-height: 44px; padding-top: 2px; }
+  .tdo-c-check input { width: 22px; height: 22px; }  /* the whole cell is the label: a 36x44 tap target */
+  .tdo-c-task { grid-area: task; }
+  .tdo-row select, .tdo-tab, .tdo-views button, .tdo-bulk select, .tdo-bulk button { min-height: 44px; }
+  .tdo-bulk label { flex: 1 1 100%; } .tdo-bulk select { flex: 1; }
+  /* composer: one line until used, so the first tasks show on the first screen */
+  .tdo-composer:not(:focus-within):not(:has(textarea:not(:placeholder-shown))) :is(.tdo-compose-row, .hint) { display: none; }
+  .tdo-composer:not(:focus-within):not(:has(textarea:not(:placeholder-shown))) textarea { min-height: 0; height: 44px; resize: none; white-space: nowrap; overflow: hidden; }
+  .tdo-composer:not(:focus-within):not(:has(textarea:not(:placeholder-shown))) { padding: 8px; }
+  .tdo-c-status { grid-area: status; } .tdo-c-agent { grid-area: agent; } .tdo-c-prio { grid-area: prio; }
+  .tdo-c-when { grid-area: when; text-align: right; }
+  .tdo-tools { width: 100%; } .tdo-tools input[type=search] { flex: 1 1 140px; width: auto; }
+  .tdo-drawer { width: 100vw; border-left: 0; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+  .tdo-primary { flex: 1 1 100%; }
+}

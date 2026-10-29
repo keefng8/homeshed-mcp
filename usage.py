@@ -33,6 +33,11 @@ _lock = threading.Lock()
 MEMORY_READS = {"memory.recall": "read", "memory.recall_facts": "read", "memory.recall_relevant": "read"}
 MEMORY_WRITES = {"memory.capture": "write", "memory.remember_fact": "write"}
 MAX_MEMORY_CATEGORIES = 200
+# Per-hour counts for the Control Panel's Pulse chart (2026-10-27): the totals above have no history, and the activity
+# feed keeps only the last 200 calls. One bucket per clock hour (UTC epoch hour) that saw a call; the oldest are dropped
+# past two weeks, so the file stays small. Counts only, like everything here.
+MAX_HOURS = 24 * 14
+HOUR_FIELDS = ("calls", "errors", "refused", "saved_chars", "fd_chars")
 GENERATION = {"local_ai.ask", "reasoning.delegate", "reasoning.pipeline", "local_ai.decide", "local_ai.assess"}
 RULES = {
     "generation": "output the local model wrote (Claude didn't generate it)",
@@ -86,6 +91,17 @@ def ledger_id(capability_id: str, args: dict | None) -> str:
     return capability_id
 
 
+def _hour(data: dict, now: float, **add: int) -> None:
+    """Add to this hour's bucket, and drop buckets past MAX_HOURS (oldest first)."""
+    hours = data.setdefault("hours", {})
+    b = hours.setdefault(str(int(now // 3600 * 3600)), dict.fromkeys(HOUR_FIELDS, 0))
+    for k, v in add.items():
+        b[k] = b.get(k, 0) + int(v)
+    if len(hours) > MAX_HOURS:
+        for k in sorted(hours, key=int)[:len(hours) - MAX_HOURS]:
+            del hours[k]
+
+
 def record_front_door(client: str | None, hidden_chars: int = 0, trimmed_chars: int = 0) -> None:
     """What the front door saved one app (frontdoor.py): tool definitions it didn't load, and reply characters fields or
     to_file cut. Kept per app under "front_door"; HomeShed Pro reports it. Never raises."""
@@ -101,6 +117,8 @@ def record_front_door(client: str | None, hidden_chars: int = 0, trimmed_chars: 
                 fd["calls"] += 1
                 fd["trimmed_chars"] += int(trimmed_chars)
             fd["last"] = time.time()
+            if hidden_chars or trimmed_chars:
+                _hour(data, fd["last"], fd_chars=int(hidden_chars) + int(trimmed_chars))
             USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
             tmp = USAGE_FILE.with_suffix(".tmp")
             tmp.write_text(json.dumps(data), encoding="utf-8")
@@ -124,6 +142,7 @@ def record(capability_id: str, args: dict, result, ok: bool, client: str | None 
             c["saved_chars"] += saved
             c["rule"] = c.get("rule") or rule
             c["last"] = time.time()
+            _hour(data, c["last"], calls=1, errors=0 if ok else 1, saved_chars=saved)
             if capability_id == "image.generate" and ok:
                 c["images"] = c.get("images", 0) + 1
             kind = MEMORY_READS.get(capability_id) or MEMORY_WRITES.get(capability_id)
@@ -159,6 +178,7 @@ def record_refusal(client: str | None) -> None:
             data = _load()
             pc = data.setdefault("clients", {}).setdefault(client, {"calls": 0, "errors": 0, "refused": 0, "tools": {}})
             pc["refused"] = pc.get("refused", 0) + 1
+            _hour(data, time.time(), refused=1)
             USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
             tmp = USAGE_FILE.with_suffix(".tmp")
             tmp.write_text(json.dumps(data), encoding="utf-8")
@@ -202,4 +222,9 @@ def summary() -> dict:
         "chars_per_token": CHARS_PER_TOKEN,
         "capabilities": {k: {**v, "saved_tokens": v["saved_chars"] // CHARS_PER_TOKEN} for k, v in caps.items()},
         "clients": data.get("clients", {}),
+        # Totals over every app, no app names (the panel shows them to view-only logins too). Characters, measured.
+        "front_door_total": {k: sum(int(v.get(k) or 0) for v in (data.get("front_door") or {}).values())
+                             for k in ("listings", "hidden_chars", "calls", "trimmed_chars")},
+        "hours": [{"t": int(k), **{f: int(b.get(f) or 0) for f in HOUR_FIELDS}}
+                  for k, b in sorted((data.get("hours") or {}).items(), key=lambda kv: int(kv[0]))],
     }

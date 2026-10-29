@@ -31,6 +31,8 @@ GROUPS: dict[str, tuple[str, tuple[str, ...], tuple[str, ...]]] = {
     "notify": ("Phone notifications through ntfy", ("notify",), ("NTFY_BASE_URL",)),
     "images": ("Image generation (your own local image service, or a paid provider on your key)", ("image",),
                ("IMAGE_BASE_URL", "IMAGE_DEFAULT_PROVIDER")),
+    "tts": ("Text to speech (Google Chirp 3 HD) as MP3s, on your own key, free up to 1 million characters a month",
+            ("tts",), ("GOOGLE_TTS_API_KEY",)),
     "paid-ai": ("A paid language model relayed for your apps, on your own key (xAI first)", ("llm",),
                 ("XAI_API_KEY", "X_AI")),
     "proxmox": ("Proxmox VE: nodes, VMs, storage; changes wait for your approval", ("proxmox",),

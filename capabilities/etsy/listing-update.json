@@ -2,7 +2,7 @@
   "id": "etsy.listing.update",
   "name": "Ask To Set Etsy Listing Details",
   "version": "1.0.0",
-  "description": "Ask to set an Etsy listing's category, materials, production partners, delivery profile, attributes (colour, occasion, recipient, holiday) and extra photos (up to 5 at a time, shown to the owner as thumbnails). Nothing changes until the owner approves it; only what differs is sent; details (not photos) are re-queued after a Printify re-publish.",
+  "description": "Ask to set an Etsy listing's category, materials, production partners, delivery profile, attributes (colour, occasion, recipient, holiday), extra photos (up to 5 at a time, shown to the owner as thumbnails) and the order of its photos. Nothing changes until the owner approves it; only what differs is sent; details (not photos) are re-queued after a Printify re-publish.",
   "category": "etsy",
   "risk": "write",
   "requires": [
@@ -79,6 +79,11 @@
       "type": "boolean",
       "required": false,
       "default": false
+    },
+    "images_rank": {
+      "type": "array",
+      "required": false,
+      "description": "[{listing_image_id, rank: 1..photo count}], up to 10, each id and rank once: moves photos already on the listing, the rest keep their order. Low risk (there's no per-field risk level; the tool stays risk write): nothing uploaded or deleted, so it takes the same approval path as images_alt. Works alone; not with images or remove_images."
     }
   },
   "execution": {

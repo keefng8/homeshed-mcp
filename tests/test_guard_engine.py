@@ -73,6 +73,18 @@ def test_a_tool_server_call_is_checked_by_its_arguments(packs):
     assert answer("Read", {"file_path": "/etc/passwd"}) is None  # a tool no guard can watch
 
 
+def test_a_connector_or_front_door_call_is_the_same_tool(packs):
+    # claude.ai connector: the user's own name for the server
+    assert answer("mcp__claude_ai_HomeShed__git_push", {"repo": "/r", "force": True})["permissionDecision"] == "deny"
+    # the front door: tools_call runs git.push with these arguments, under either name
+    for server in ("mcp__homeshed__", "mcp__claude_ai_My_Shed__"):
+        got = answer(server + "tools_call", {"name": "git.push", "arguments": {"repo": "/r", "force": True}})
+        assert got["permissionDecision"] == "deny"
+        assert answer(server + "tools_call", {"name": "git.push", "arguments": {"repo": "/r", "force": False}}) is None
+    assert answer("mcp__github__git_push", {"repo": "/r", "force": True}) is None  # another server's own tool
+    assert answer("mcp__homeshed__tools_call", {"name": "../../etc", "arguments": {"force": True}}) is None
+
+
 @pytest.mark.parametrize("change, words", [
     (lambda p: p["guards"][0].update(kind="hook", script="evil.py"), "can't run a script"),
     (lambda p: p.update(slug="Bad Slug"), "bad slug"),

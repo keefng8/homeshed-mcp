@@ -260,3 +260,44 @@ def test_the_phone_hears_only_publishes_and_stuck_requests(fake, monkeypatch):
     monkeypatch.setenv("PRINTIFY_PUBLISH_DAILY_MAX", "0")
     out = pb.product_publish("abc123", owner_approval=ok("apr_q2", by="auto:full-auto"))
     assert out["pending"] is True and fake["notes"] == []  # held by the limit: it runs later, nothing to tell
+
+
+def _in(days: float) -> str:
+    return (datetime.now(timezone.utc) + timedelta(days=days)).isoformat().replace("+00:00", "Z")
+
+
+def sweep(i: str, minutes_ago: float = 300, sid: str = "apr_sweep", items: int = 2, until_days: float = 2) -> dict:
+    return {**ok(i, minutes_ago=minutes_ago), "sweep": {"id": sid, "items": items, "until": _in(until_days)}}
+
+
+WORDS = {"title": "New title"}
+
+
+def test_a_sweep_grant_covers_a_batch_after_its_first_hour_up_to_its_items(fake):
+    # the owner, 2026-10-28: one approval for a batch's whole run; each request still has its own one-use id
+    assert pp._approval_problem("shop-app", sweep("apr_s1"), "update", WORDS) is None
+    pp._use_approval(sweep("apr_s1"), "shop-app", "item1")
+    assert pp._approval_problem("shop-app", sweep("apr_s2"), "etsy", {}) is None
+    pp._use_approval(sweep("apr_s2"), "shop-app", "item2")
+    assert "covered its 2 requests" in pp._approval_problem("shop-app", sweep("apr_s3"), "update", WORDS)
+    assert "already used" in pp._approval_problem("shop-app", sweep("apr_s1", sid="other"), "update", WORDS)
+    assert "last hour" in pp._approval_problem("shop-app", ok("apr_s4", minutes_ago=300), "update", WORDS)
+
+
+@pytest.mark.parametrize("grant, action, payload, why", [
+    (sweep("apr_a1"), "publish", {}, "not a publish"),
+    (sweep("apr_a2"), "update", {"prices": [1]}, "price or variant"),
+    (sweep("apr_a3"), "update", {"enabled": [1]}, "price or variant"),
+    (sweep("apr_a4", until_days=-0.01), "update", WORDS, "ended at"),
+    (sweep("apr_a5", until_days=8), "update", WORDS, "at most 7 days"),
+    (sweep("apr_a6", items=0), "update", WORDS, "whole number"),
+    (sweep("apr_a7", items=501), "update", WORDS, "whole number"),
+    ({**ok("apr_a8"), "sweep": {"id": "x!", "items": 1, "until": _in(1)}}, "update", WORDS, 'sweep needs "id"'),
+    ({**ok("apr_a9"), "sweep": {"id": "apr_x", "items": 1, "until": "soon"}}, "update", WORDS, "ISO time"),
+])
+def test_a_sweep_grant_never_covers_more_than_words_in_its_window(fake, grant, action, payload, why):
+    assert why in pp._approval_problem("shop-app", grant, action, payload)
+
+
+def test_a_sweep_grant_still_needs_a_trusted_app(fake):
+    assert "aren't trusted" in pp._approval_problem("other-app", sweep("apr_t1"), "update", WORDS)

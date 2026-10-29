@@ -9,6 +9,7 @@ Etsy orders to products by SKU (R&D, 2026-10-08), so a new one can stop orders a
 """
 from __future__ import annotations
 
+import contextvars
 import threading
 import time
 
@@ -29,7 +30,8 @@ LABEL = "Updating live Printify products"
 # update of a listing that isn't active on Etsy is held, when asked and again on approval, for every client; and each
 # re-publish is checked again on Etsy a few minutes later (Printify publishes in the background).
 OFF_ON_ETSY = "listing is off on Etsy: the owner turns it on first"
-RECHECK_AT_S = (20, 60, 120, 180)  # while Printify publishes (a minute or two), then once it's done
+# Once while Printify publishes, once after (was 4 reads: 300 of a day's Etsy requests in the 28 Oct sweep)
+RECHECK_AT_S = (60, 180)
 
 
 def _etsy_state(p: dict) -> str:
@@ -60,7 +62,8 @@ def _recheck_later(p: dict, before: str, sleep=time.sleep) -> None:
             sleep(at - waited)
             waited = at
             try:
-                seen.append(_etsy_state(p))
+                with h.counted_as("printify.update_live:recheck", force=True):
+                    seen.append(_etsy_state(p))
             except h.CommerceError:
                 continue
         after = seen[-1]
@@ -71,7 +74,9 @@ def _recheck_later(p: dict, before: str, sleep=time.sleep) -> None:
             send(f'"{title}" (Etsy {(p.get("external") or {}).get("id")}) was {was} and is ON again after a '
                  "Printify re-publish the tool server ran. Turn it off on Etsy if it should stay off.",
                  title="Etsy listing switched back on", priority="high", tags=["warning"])
-    threading.Thread(target=run, name="etsy-reactivation-check", daemon=True).start()
+    # A new thread starts with empty context: copy it, so its Etsy reads count under the app that asked, not "owner ?"
+    ctx = contextvars.copy_context()
+    threading.Thread(target=lambda: ctx.run(run), name="etsy-reactivation-check", daemon=True).start()
 
 
 def _live(pid: str) -> dict:

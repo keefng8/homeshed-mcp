@@ -52,6 +52,8 @@ CIMD_MAX_BYTES = 64 * 1024
 CIMD_CACHE_S = 3600
 CIMD_CACHE_MAX = 200
 ALERTS_PER_HOUR = 10
+TRUST_TTL_S = 90 * 86400
+MAX_TRUSTED = 50
 PRESETS = ("none", "read", "all")
 _lock = threading.Lock()
 _cimd_cache: dict[str, tuple[float, dict]] = {}
@@ -76,7 +78,7 @@ def _h(value: str) -> str:
 # --- the store ---------------------------------------------------------------------------------------------------------
 
 def _empty() -> dict:
-    return {"clients": {}, "pending": {}, "codes": {}, "access": {}, "refresh": {}, "used_refresh": {}}
+    return {"clients": {}, "pending": {}, "codes": {}, "access": {}, "refresh": {}, "used_refresh": {}, "trusted": {}}
 
 
 def _load() -> dict:
@@ -101,6 +103,7 @@ def _save(data: dict) -> None:
     data["access"] = {k: v for k, v in data["access"].items() if v["expires_at"] > now}
     data["refresh"] = {k: v for k, v in data["refresh"].items() if v["expires_at"] > now}
     data["used_refresh"] = {k: v for k, v in data["used_refresh"].items() if v["expires_at"] > now}
+    data["trusted"] = {k: v for k, v in data["trusted"].items() if v["expires_at"] > now}
     STORE_FILE.parent.mkdir(parents=True, exist_ok=True)
     tmp = STORE_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, indent=1), encoding="utf-8")
@@ -125,7 +128,7 @@ def end_app(app: str) -> int:
     with _lock:
         data = _load()
         n = 0
-        for kind in ("access", "refresh", "codes"):
+        for kind in ("access", "refresh", "codes", "trusted"):
             for k in [k for k, v in data[kind].items() if v.get("app") == app]:
                 del data[kind][k]
                 n += 1
@@ -245,8 +248,7 @@ class Provider:
                 "resource": params.resource, "at": time.time(), "status": "waiting",
                 "match": f"{secrets.randbelow(1_000_000):06d}"}
             _save(data)
-        _tell_owner(data["pending"][pid])
-        return f"{base}/oauth/consent/{pid}"
+        return f"{base}/oauth/consent/{pid}"  # the owner is told when the page opens (consent_view)
 
     async def load_authorization_code(self, client, authorization_code: str):
         from mcp.server.auth.provider import AuthorizationCode
@@ -389,9 +391,11 @@ def suggest_name(item: dict) -> str:
     return name
 
 
-def decide(pid: str, approve: bool, app: str = "", preset: str = "read") -> dict:
+def decide(pid: str, approve: bool, app: str = "", preset: str = "read", trust: bool = False) -> dict:
     """The owner's answer to one sign-in. Approve as a new app (named app, or the suggested name) with an access
-    preset, or as an existing app (its grants are kept). Returns {"id", "status", "app"?}."""
+    preset, or as an existing app (its grants are kept). trust: the browser that asked gets a 90-day cookie, and
+    the same app signing in again from that browser to the same return address is approved without asking.
+    Returns {"id", "status", "app"?, "trusted"?}."""
     import clients
     from mcp.server.auth.provider import construct_redirect_uri
     with _lock:
@@ -418,9 +422,72 @@ def decide(pid: str, approve: bool, app: str = "", preset: str = "read") -> dict
                                    "expires_at": time.time() + CODE_TTL_S}
         item.update(status="approved", app=name,
                     redirect=construct_redirect_uri(item["redirect_uri"], code=code, state=item["state"]))
+        if trust:
+            if len(data["trusted"]) >= MAX_TRUSTED:
+                raise OAuthError(f"{MAX_TRUSTED} trusted apps already: remove one on the API page first")
+            cookie = secrets.token_urlsafe(32)
+            data["trusted"][_h(cookie)] = {"app": name, "client_id": item["client_id"],
+                                           "client_name": item["client_name"], "redirect_uri": item["redirect_uri"],
+                                           "at": time.time(), "expires_at": time.time() + TRUST_TTL_S}
+            item["trust_cookie"] = cookie  # handed to the asking browser once, with its redirect
         _save(data)
-    clients._audit("oauth sign-in approved", name, oauth_client=item["client_id"][:120])
-    return {"id": pid, "status": "approved", "app": name}
+    clients._audit("oauth sign-in approved", name, oauth_client=item["client_id"][:120], trusted=bool(trust))
+    return {"id": pid, "status": "approved", "app": name, **({"trusted": True} if trust else {})}
+
+
+def trust_cookie_name(client_id: str) -> str:
+    """One cookie per app, so a browser can trust several."""
+    return "hst_" + _h(client_id)[:16]
+
+
+def consent_view(pid: str, cookie: str | None) -> None:
+    """The consent page opened. A browser the owner trusted for this same app and return address is approved at
+    once, as the app it was approved as; otherwise the owner is told about the sign-in. Trust is tied to the browser,
+    never to the app's id alone: anyone can start a sign-in as a public app like claude.ai from their own account."""
+    import clients
+    data = _load()
+    item = data["pending"].get(pid)
+    if not item or item["status"] != "waiting" or item.get("told"):
+        return
+    row = data["trusted"].get(_h(cookie)) if cookie else None
+    if (row and row["expires_at"] > time.time() and row["client_id"] == item["client_id"]
+            and row["redirect_uri"] == item["redirect_uri"]):
+        app_row = clients._load()["clients"].get(row["app"])
+        if app_row and not app_row.get("suspended"):
+            try:
+                decide(pid, True, row["app"])
+                clients._audit("oauth sign-in approved by a trusted browser", row["app"],
+                               oauth_client=item["client_id"][:120])
+                return
+            except OAuthError:
+                pass
+    with _lock:
+        data = _load()
+        if pid in data["pending"]:
+            data["pending"][pid]["told"] = True
+            _save(data)
+    _tell_owner(item)
+
+
+def trusted() -> list[dict]:
+    """Trusted browsers, for the API page: never the cookie, only an id to remove one by."""
+    now = time.time()
+    return sorted(({"id": k[:16], "app": v["app"], "app_name": v["client_name"],
+                    "redirect_host": urlsplit(v["redirect_uri"]).hostname, "at": v["at"],
+                    "expires_in_days": int((v["expires_at"] - now) // 86400)}
+                   for k, v in _load()["trusted"].items() if v["expires_at"] > now), key=lambda r: -r["at"])
+
+
+def untrust(tid: str) -> bool:
+    """Forget one trusted browser; its next sign-in asks the owner again. Sign-ins already made are kept."""
+    with _lock:
+        data = _load()
+        keys = [k for k in data["trusted"] if k[:16] == tid] if len(tid) == 16 else []
+        for k in keys:
+            del data["trusted"][k]
+        if keys:
+            _save(data)
+    return bool(keys)
 
 
 def consent_status(pid: str) -> dict:
@@ -435,6 +502,8 @@ def consent_status(pid: str) -> dict:
         out = {"status": item["status"], "app_name": item["client_name"], "match": item["match"]}
         if item.get("redirect"):
             out["redirect"] = item.pop("redirect")  # handed out once
+            if item.get("trust_cookie"):  # the route turns this into a cookie; never in the page's JSON
+                out["_trust_cookie"] = (trust_cookie_name(item["client_id"]), item.pop("trust_cookie"))
             item["status"] = "done-" + item["status"]
             _save(data)
         return out

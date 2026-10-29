@@ -32,6 +32,8 @@ Rules this module keeps:
   as "bot:<name>" counts only for an Etsy details edit and only for a bot named in approvals_trusted_bots (empty by
   default). It's logged as the bot's, so nobody mistakes it for the owner's own tap. Since 2026-10-25 it also counts for a live
   product's words (title, description, tags), never its prices or which variants sell: those still wait for the owner.
+- A sweep grant (the owner, 2026-10-28): owner_approval's "sweep" {"id", "items", "until"} lets one approval cover a
+  batch's run instead of its first hour, for words only (SWEEP_ACTIONS, no prices or variants), never a publish.
 - A live update whose product changed since it was asked (update_live.Stale) is withdrawn, not left waiting for the
   owner, and the asker asks again. The STALE_PARK_AFTER-th on one product in STALE_WINDOW_S is logged "parked": a
   trusted bot or the owner checks those, and no new update of that product is queued for PARKED_S.
@@ -44,6 +46,7 @@ import re
 import secrets
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 
 from paths import data_path
@@ -70,6 +73,11 @@ APPROVAL_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{3,80}$")
 APPROVAL_MAX_AGE_S = 3600
 APPROVAL_SKEW_S = 300
 APPROVALS_KEPT_S = 30 * 86400
+# A sweep grant (the owner, 2026-10-28: "approvals only for important things"): one approval covers a batch's run,
+# not just its first hour. Words only (live updates without prices or variants, Etsy details), never a publish.
+SWEEP_ACTIONS = ("update", "etsy")
+SWEEP_MAX_ITEMS = 500
+SWEEP_MAX_S = 7 * 86400
 _lock = threading.Lock()
 
 
@@ -94,8 +102,20 @@ def daily_max() -> int:
     # 2026-10-09, 20 until 2026-10-11 (the owner: "raise to 100")
 
 
-def update_daily_max() -> int:
-    return _env_int("PRINTIFY_LIVE_UPDATE_DAILY_MAX", 10)
+def update_daily_max(now: float | None = None) -> int:
+    """PRINTIFY_LIVE_UPDATE_DAILY_MAX (at most 50), or a short raise the owner approved:
+    PRINTIFY_LIVE_UPDATE_BOOST="100 until 2026-11-01T00:00:00+00:00" (at most 100). The raise ends by itself at that
+    time, with no restart: a short raise the owner approved for a batch of edits."""
+    base = _env_int("PRINTIFY_LIVE_UPDATE_DAILY_MAX", 10)
+    m = re.fullmatch(r"\s*(\d{1,3})\s+until\s+(\S+)\s*", os.environ.get("PRINTIFY_LIVE_UPDATE_BOOST") or "")
+    if m:
+        try:
+            end = datetime.fromisoformat(m.group(2)).timestamp()
+        except ValueError:
+            return base
+        if (time.time() if now is None else now) < end:
+            return max(base, min(100, int(m.group(1))))
+    return base
 
 
 def _load() -> list[dict]:
@@ -278,16 +298,51 @@ def _approval_problem(client: str | None, ok, action: str = "publish", payload: 
         at = datetime.fromisoformat(str(ok.get("at")).replace("Z", "+00:00")).timestamp()
     except ValueError:
         return '"at" must be an ISO time, e.g. 2026-10-09T12:30:00Z'
-    if not -APPROVAL_SKEW_S <= time.time() - at <= APPROVAL_MAX_AGE_S:
+    if ok.get("sweep") is not None:
+        problem = _sweep_problem(ok["sweep"], at, action, payload)
+        if problem:
+            return problem
+    elif not -APPROVAL_SKEW_S <= time.time() - at <= APPROVAL_MAX_AGE_S:
         return f"the approval is from {datetime.fromtimestamp(at).isoformat(timespec='minutes')}: it must be from the last hour"
     if str(ok["id"]) in _used_approvals():
         return f"approval {ok['id']} was already used"
     return None
 
 
+def _sweep_problem(sweep, at: float, action: str, payload: dict | None) -> str | None:
+    """Why this sweep grant {"id", "items", "until"} can't cover the request, or None. The grant (its "at") stays good
+    until "until" (at most SWEEP_MAX_S after it) for at most "items" requests; each request keeps its own one-use id."""
+    from datetime import datetime
+    if action not in SWEEP_ACTIONS:
+        return f"a sweep grant covers live product words and Etsy listing details only, not a {action}"
+    if action == "update" and ((payload or {}).get("prices") or (payload or {}).get("enabled")):
+        return "a sweep grant doesn't cover a live price or variant change: that waits for the owner"
+    if not isinstance(sweep, dict) or not APPROVAL_ID_RE.match(str(sweep.get("id") or "")):
+        return 'sweep needs "id" (3-80 letters, digits, _ . : -), "items" and "until"'
+    items = sweep.get("items")
+    if not isinstance(items, int) or isinstance(items, bool) or not 0 < items <= SWEEP_MAX_ITEMS:
+        return f'sweep "items" must be a whole number from 1 to {SWEEP_MAX_ITEMS}'
+    try:
+        until = datetime.fromisoformat(str(sweep.get("until")).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return 'sweep "until" must be an ISO time, e.g. 2026-11-01T00:00:00Z'
+    now = time.time()
+    if at - now > APPROVAL_SKEW_S:
+        return "the sweep grant's \"at\" is in the future"
+    if until - at > SWEEP_MAX_S:
+        return f"a sweep grant lasts at most {SWEEP_MAX_S // 86400} days from its \"at\""
+    if now > until:
+        return f"sweep grant {sweep['id']} ended at {datetime.fromtimestamp(until).isoformat(timespec='minutes')}"
+    used = sum(1 for v in _used_approvals().values() if v.get("sweep") == str(sweep["id"]))
+    if used >= items:
+        return f"sweep grant {sweep['id']} has covered its {items} requests"
+    return None
+
+
 def _use_approval(ok: dict, client: str, item_id: str) -> None:
     rows = _used_approvals()
-    rows[str(ok["id"])] = {"at": time.time(), "client": client, "by": str(ok["by"])[:60], "item": item_id}
+    rows[str(ok["id"])] = {"at": time.time(), "client": client, "by": str(ok["by"])[:60], "item": item_id,
+                           **({"sweep": str(ok["sweep"]["id"])} if isinstance(ok.get("sweep"), dict) else {})}
     APPROVALS_FILE.parent.mkdir(parents=True, exist_ok=True)
     tmp = APPROVALS_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps({"used": rows}, indent=1), encoding="utf-8")
@@ -326,6 +381,8 @@ def add(product_id: str, summary: str, checks: dict, action: str = "publish", pa
                 "checks": checks, "at": time.time(), "action": action, **({"payload": payload} if payload else {})}
         if problem is None:
             item["owner_approval"] = {k: str(owner_approval[k])[:80] for k in ("id", "by", "at")}
+            if isinstance(owner_approval.get("sweep"), dict):
+                item["owner_approval"]["sweep"] = str(owner_approval["sweep"]["id"])[:80]
             _use_approval(owner_approval, client, item_id)  # before running: an id never works twice
         items.append(item)
         _save(items)

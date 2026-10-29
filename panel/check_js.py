@@ -1,8 +1,8 @@
-"""Syntax-check the inline <script> blocks of the Control Panel's pages with `node --check`.
+"""Syntax-check the inline <script> blocks of the Control Panel's pages, and its script files, with `node --check`.
 
-Run before every dashboard deploy (the page is one big HTML file; a JS syntax error blanks it).
-Exit code 0 = every page parses; 1 = a page failed (the error is printed); 2 = node is missing.
-Usage: python check_js.py            (checks static/*.html next to this file)
+Run before every dashboard deploy (a JS syntax error blanks the page, or the page it belongs to).
+Exit code 0 = everything parses; 1 = something failed (the error is printed); 2 = node is missing.
+Usage: python check_js.py            (checks static/*.html and static/*.js next to this file)
 """
 import shutil
 import subprocess
@@ -31,6 +31,14 @@ def main() -> int:
         else:
             failed += 1
             print(f"FAIL  {page.name}\n{r.stderr[:1500]}")
+    # the page's own script files (most of its code since the split of 2026-10-28; static/vendor is someone else's)
+    for js in sorted((Path(__file__).parent / "static").glob("*.js")):
+        r = subprocess.run([node, "--check", str(js)], capture_output=True, text=True)
+        if r.returncode == 0:
+            print(f"OK    {js.name}")
+        else:
+            failed += 1
+            print(f"FAIL  {js.name}\n{r.stderr[:1500]}")
     return 1 if failed else 0
 
 

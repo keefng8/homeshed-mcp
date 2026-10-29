@@ -1,0 +1,40 @@
+{
+  "id": "tts.fetch",
+  "name": "Fetch Spoken MP3",
+  "version": "1.0.0",
+  "description": "An MP3 that tts.synthesize made, byte for byte as base64 (audio_b64), so the caller can save it. An app gets only its own files; files are kept 7 days.",
+  "category": "tts",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "download the mp3",
+    "get the spoken audio",
+    "fetch tts file"
+  ],
+  "inputs": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "max_mb": {
+      "type": "number",
+      "required": false,
+      "default": 4.0
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.tts.fetch.fetch"
+  },
+  "latency": {
+    "expected_ms": 200
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "tts.synthesize"
+  ]
+}

@@ -1,0 +1,331 @@
+/* The Overview below the cockpit's top half (overview-lower, 2026-10-27): the cards in the cockpit's language.
+   Drawn by pages-ovlower.js; the tokens (--tm-*) and the provenance strokes come from telemetry.css.
+   #opsView.ovl-ck = Cockpit on (the header's switch). Off: the instruments (.ovl-i) hide and the classic cards return.
+   The panels' chrome changes only on the Overview itself (never on the summary screen, which keeps its own layout). */
+
+/* ---- which one shows ---- */
+.ovl-i { display: none; }
+#opsView.ovl-ck .ovl-i { display: block; }
+#opsView.ovl-ck svg.ovl-i { display: inline-block; }
+#opsView.ovl-ck .ovl-plain { display: none !important; }
+.ovl-wait { display: grid; place-items: center; height: 100%; min-height: 36px; font-size: 12px; color: var(--tm-ink-3); border-radius: 6px;
+  background: repeating-linear-gradient(135deg, transparent 0 7px, var(--tm-grid-2) 7px 8.5px); }
+
+/* ---- the shared marks: tones, bezel, lit arcs, figures ---- */
+.t-live, .o-lit { --k: var(--tm-live); }
+.t-measured { --k: var(--tm-measured); } .t-estimated { --k: var(--tm-estimated); }
+.t-warn { --k: var(--warn); } .t-bad { --k: var(--bad); }
+.t-live .o-lit { --k: var(--tm-live); } .t-measured .o-lit { --k: var(--tm-measured); } .t-estimated .o-lit { --k: var(--tm-estimated); }
+.t-warn .o-lit { --k: var(--warn); } .t-bad .o-lit { --k: var(--bad); }
+.o-lit.warn { --k: var(--warn); } .o-lit.bad { --k: var(--bad); }
+.o-ctx .o-lit:not(.warn):not(.bad), .o-gates .o-lit, .o-relbez .o-lit { --k: var(--tm-measured); }
+.o-hair { fill: none; stroke: var(--tm-grid); stroke-width: 0.6; }
+.o-ticks { fill: none; stroke: var(--tm-ink-3); stroke-width: 0.5; opacity: 0.75; }
+.o-track { fill: none; stroke: var(--tm-grid); stroke-width: 3; }
+.o-in { fill: none; stroke: var(--tm-grid-2); stroke-width: 0.6; }
+.o-glow, .o-glow2, .o-core { fill: none; stroke: var(--k); stroke-linecap: round; stroke-linejoin: round; }
+.o-glow { opacity: calc(0.07 * var(--tm-glow)); }
+.o-glow2 { opacity: calc(0.18 * var(--tm-glow)); }
+.o-lit.est .o-core { stroke-dasharray: 3 2; stroke-linecap: butt; }
+.o-head { fill: var(--k); }
+[data-theme="dark"] .o-head, [data-theme="mavis"] .o-head { filter: drop-shadow(0 0 2.5px var(--k)); }
+.o-hatch { fill: none; stroke: var(--tm-ink-3); stroke-width: 5; stroke-dasharray: 0.8 2.2; opacity: 0.55; }
+.o-mark { stroke: var(--bad); stroke-width: 1.4; }
+.o-mark.warn { stroke: var(--warn); }
+.o-mark.auto { stroke: var(--tm-estimated); stroke-dasharray: 2 1.6; }
+.o-val { font: 600 11px var(--tm-mono); fill: var(--tm-ink); text-anchor: middle; font-variant-numeric: tabular-nums slashed-zero; letter-spacing: -0.03em; }
+.o-val.big { font-size: 17px; }
+.o-sub { font: 500 6.4px var(--font); fill: var(--tm-ink-3); text-anchor: middle; }
+.o-scale { font: 500 5.4px var(--tm-mono); fill: var(--tm-ink-3); text-anchor: middle; }
+.o-slot { fill: none; stroke: var(--tm-grid); stroke-width: 4; }
+.o-gates .o-slot { stroke-width: 4; }
+.o-gates .o-slot.on { stroke: var(--tm-live); stroke-width: 2.6; }
+.o-seg { fill: none; stroke: var(--k); stroke-width: 6; }
+.o-seg.est { stroke-dasharray: 3 1.8; }
+.o-dial { width: 64px; height: 64px; display: block; overflow: visible; }
+.o-dial .o-val { font-size: 10.5px; }
+.o-dial .o-sub { font-size: 6px; }
+
+/* the legend: a sample of each stroke and its word */
+.o-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 14px; font-size: 11.5px; color: var(--tm-ink-2); min-height: 16px; }
+.o-key { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; --k: var(--tm-ink-2); }
+.o-key i { width: 14px; height: 0; border-top: 2px solid var(--k); }
+.o-key.m { --k: var(--tm-measured); } .o-key.l { --k: var(--tm-live); } .o-key.e { --k: var(--tm-estimated); } .o-key.bad { --k: var(--bad); }
+.o-key.ref i { border-top: 1.5px dashed var(--tm-ink-3); }
+.o-key.auto { --k: var(--tm-estimated); } .o-key.auto i, .o-key.dash i { border-top-style: dashed; }
+.o-key.pt i { width: 6px; height: 6px; border: 0; border-radius: 50%; background: var(--k); }
+.o-legend .prov { margin-left: auto; }
+.o-note { color: var(--tm-ink-3); font-size: 11px; margin-left: auto; }
+
+/* ---- the trace (oscilloscope on a precision grid) ---- */
+.o-trace { position: relative; height: var(--o-h, 72px); margin-left: 40px; margin-bottom: 15px; }
+.o-trace svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; display: block; }
+.o-trace path, .o-tape path { vector-effect: non-scaling-stroke; }
+.o-trace::before, .o-trace::after { content: ''; position: absolute; width: 7px; height: 7px; border-color: var(--tm-ink-3); pointer-events: none; }
+.o-trace::before { top: -1px; left: -1px; border-top: 1px solid; border-left: 1px solid; }
+.o-trace::after { bottom: -1px; right: -1px; border-bottom: 1px solid; border-right: 1px solid; }
+.o-grid { fill: none; stroke: var(--tm-grid-2); stroke-width: 1; }
+.o-tr .o-core { stroke-width: 1.6; }
+.o-tr .o-glow { stroke-width: 7; opacity: calc(0.06 * var(--tm-glow)); }
+.o-tr .o-glow2 { stroke-width: 3.5; opacity: calc(0.14 * var(--tm-glow)); }
+.o-tr.est .o-core { stroke-dasharray: 5 4; stroke-linecap: butt; }
+.o-tr .o-area { fill: var(--k); stroke: none; opacity: calc(0.07 + 0.05 * var(--tm-glow)); }
+.o-tr .o-headdot { fill: none; stroke: var(--k); stroke-width: 6; stroke-linecap: round; }
+.o-tr.dots .o-core { stroke-width: 5; }
+.o-tr.dots .o-glow { stroke-width: 12; opacity: calc(0.12 * var(--tm-glow)); }
+.o-ref { fill: none; stroke: var(--tm-ink-3); stroke-width: 1; stroke-dasharray: 4 4; }
+.o-col { fill: transparent; }
+.o-col:hover { fill: var(--tm-grid-2); }
+.o-y, .o-x { position: absolute; font: 500 10px/1 var(--tm-mono); color: var(--tm-ink-3); white-space: nowrap; pointer-events: none; font-variant-numeric: tabular-nums; }
+.o-y { right: calc(100% + 6px); } .o-y.top { top: 0; } .o-y.mid { top: 50%; transform: translateY(-50%); }
+.o-trace .o-x { top: calc(100% + 4px); } .o-trace .o-x.l { left: 0; } .o-trace .o-x.r { right: 0; }
+
+/* ---- the call tape: each call a stroke at its time, as tall as it took ---- */
+.o-tape { position: relative; height: 62px; }
+.o-tape svg { position: absolute; left: 0; right: 0; top: 0; width: 100%; height: 46px; display: block; overflow: visible; }
+.o-tape .o-grid { stroke: var(--tm-grid); stroke-dasharray: 1 3; }
+.o-base { stroke: var(--tm-line-2); stroke-width: 1; }
+.o-tape .o-ticks { stroke-width: 1; }
+.o-tape g { --k: var(--tm-live); }
+.o-tape .k-write { --k: var(--tm-estimated); } .o-tape .k-failed { --k: var(--bad); } .o-tape .k-refused { --k: var(--tm-ink-2); }
+.o-tape .o-core { stroke-width: 1.6; stroke-linecap: butt; }
+.o-tape .o-glow { stroke-width: 5; opacity: calc(0.16 * var(--tm-glow)); stroke-linecap: butt; }
+.o-tape .k-refused .o-core { stroke-width: 4; stroke-linecap: round; }
+.o-tape .k-refused .o-glow { display: none; }
+.o-xs { position: absolute; left: 0; right: 0; top: 49px; height: 12px; }
+.o-xs .o-x { transform: translateX(-50%); }
+.o-xs .o-x:first-child { transform: translateX(-100%); }
+.o-xs .o-x:last-child:not(:first-child) { transform: none; }
+.o-ping { position: absolute; top: 34px; width: 0; height: 0; pointer-events: none; --k: var(--tm-live); }
+.o-ping.k-write { --k: var(--tm-estimated); } .o-ping.k-failed { --k: var(--bad); }
+.o-ping::after { content: ''; position: absolute; left: -8px; top: -8px; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--k);
+  opacity: 0; animation: tmPing 1s cubic-bezier(0, 0, 0.38, 0.9) 1; }
+.tm-still .o-ping::after { animation: none; }
+.ovl-tapebox { height: 84px; }
+#opsView.ovl-ck .ovl-tapebox { display: flex; flex-direction: column; gap: 4px; }
+.ovl-tapebox.small { margin-top: 10px; }
+
+/* ---- the micro marks: a row's ring in the context reactor, and a client's read/write split ---- */
+.o-rmark { width: 13px; height: 13px; margin-right: 7px; vertical-align: -2px; flex: none; }
+.o-rmark circle { fill: none; stroke: var(--tm-grid); stroke-width: 0.6; }
+.o-rmark circle.on { stroke: var(--tm-measured); stroke-width: 1.4; }
+.o-split { width: 18px; height: 18px; flex: none; display: none; }
+#opsView.ovl-ck .o-split { display: inline-block; }
+.o-split .o-track { stroke-width: 2.6; }
+.o-part { fill: none; stroke-width: 2.6; } .o-part.r { stroke: var(--tm-live); } .o-part.w { stroke: var(--tm-estimated); }
+.o-split .o-hatch { stroke-width: 2.6; stroke-dasharray: 0.6 1.6; }
+
+/* =================================================================================================================
+   The panels' chrome, Cockpit on, on the Overview itself
+   ================================================================================================================= */
+body:not(.summary) :is(#opsView.ovl-ck > .card, #opsView.ovl-ck > .cols > .col) { position: relative; border-radius: 14px; border: 1px solid var(--tm-line);
+  background-color: var(--tm-panel); box-shadow: none;
+  background-image: linear-gradient(var(--tm-grid-2) 1px, transparent 1px), linear-gradient(90deg, var(--tm-grid-2) 1px, transparent 1px);
+  background-size: 24px 24px; background-position: -1px -1px; }
+body:not(.summary) #opsView.ovl-ck > .cols > .col { position: relative; }
+body:not(.summary) :is(#opsView.ovl-ck > .card, #opsView.ovl-ck > .cols > .col)::before,
+body:not(.summary) :is(#opsView.ovl-ck > .card, #opsView.ovl-ck > .cols > .col)::after { content: ''; position: absolute; width: 9px; height: 9px; pointer-events: none;
+  border-color: var(--tm-ink-3); opacity: 0.7; background: none; }
+body:not(.summary) :is(#opsView.ovl-ck > .card, #opsView.ovl-ck > .cols > .col)::before { top: 6px; left: 6px; border-top: 1px solid; border-left: 1px solid; }
+body:not(.summary) :is(#opsView.ovl-ck > .card, #opsView.ovl-ck > .cols > .col)::after { bottom: 6px; right: 6px; border-bottom: 1px solid; border-right: 1px solid; }
+body:not(.summary) #opsView.ovl-ck > .cols { gap: 14px; }
+
+/* the section rails: the name, then a hairline with fine tick marks */
+body:not(.summary) #opsView.ovl-ck > .ov-group { display: flex; align-items: center; gap: 10px; margin: 14px 2px -4px;
+  font: 600 12.5px var(--head-font); letter-spacing: 0.01em; color: var(--tm-ink-2); }
+body:not(.summary) #opsView.ovl-ck > .ov-group::before { content: ''; width: 7px; height: 7px; border-radius: 2px; border: 1.5px solid var(--tm-measured); flex: none; }
+body:not(.summary) #opsView.ovl-ck > .ov-group::after { content: ''; flex: 1; height: 6px; opacity: 0.8;
+  background: linear-gradient(var(--tm-line-2), var(--tm-line-2)) left bottom / 100% 1px no-repeat,
+              repeating-linear-gradient(90deg, var(--tm-ink-3) 0 1px, transparent 1px 12px) left bottom / 100% 4px no-repeat;
+  -webkit-mask-image: linear-gradient(90deg, #000 60%, transparent); mask-image: linear-gradient(90deg, #000 60%, transparent); }
+
+/* headers and figures: the windows' type */
+#opsView.ovl-ck .live-title, #opsView.ovl-ck > .cols .panel-title, #opsView.ovl-ck .ai-strip-card > .panel-title { font: 600 15px/1.2 var(--head-font); letter-spacing: -0.01em; color: var(--tm-ink); }
+#opsView.ovl-ck .live-stats b, #opsView.ovl-ck .rw-count, #opsView.ovl-ck .biz-sum-grid b, #opsView.ovl-ck .repo-stats b, #opsView.ovl-ck .reasoning-stat-num,
+#opsView.ovl-ck .tok-cell b, #opsView.ovl-ck .ai-cell-num { font-family: var(--tm-mono); letter-spacing: -0.02em; font-variant-numeric: tabular-nums slashed-zero; }
+#opsView.ovl-ck .live-stats b { font-size: 17px; color: var(--tm-ink); }
+#opsView.ovl-ck .live-stats span { font-size: 11.5px; color: var(--tm-ink-2); }
+#opsView.ovl-ck :is(.live-time, .live-ms, .ctx-when, .ctx-pct, .cl-last, .cl-num b, .mem-count, .cap-id) { font-family: var(--tm-mono); font-variant-numeric: tabular-nums; }
+#opsView.ovl-ck :is(.ctx-row, .act-row, .live-row, .cl-row, .prog-row) { border-color: var(--tm-line); }
+
+/* the live lamp: a still reticle with fine marks; it turns only while the card is really busy, and pings on a real event */
+#opsView.ovl-ck .live-orb .ring { animation: none; background: repeating-conic-gradient(var(--tm-ink-3) 0 2deg, transparent 2deg 15deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3.5px)); }
+#opsView.ovl-ck .live-orb::after { content: ''; position: absolute; inset: 6px; border-radius: 50%; border: 1px solid var(--tm-grid); }
+#opsView.ovl-ck .live-orb .dot { inset: 12px; background: var(--tm-live); opacity: 1; box-shadow: none; }
+:is([data-theme="dark"], [data-theme="mavis"]) #opsView.ovl-ck .live-orb:not(.idle) .dot { box-shadow: 0 0 10px var(--tm-live); }
+#opsView.ovl-ck .live-orb.idle .dot { background: var(--tm-ink-3); opacity: 0.55; }
+#opsView.ovl-ck .live-orb.busy .ring { animation: spin 6s linear infinite; background: repeating-conic-gradient(var(--tm-live) 0 2deg, transparent 2deg 15deg); }
+#opsView.ovl-ck .live-orb.shipped .dot { background: var(--tm-measured); }
+#opsView.ovl-ck .live-orb.down .dot { background: var(--bad); }
+#opsView.ovl-ck .live-orb.down .ring { background: repeating-conic-gradient(var(--bad) 0 2deg, transparent 2deg 15deg); }
+.tm-still #opsView.ovl-ck .live-orb .ring { animation: none !important; }
+
+/* ---- Claude context: the reactor beside the sessions; each session's gauge with a fine scale ---- */
+body:not(.summary) #opsView.ovl-ck #ctxCard:not([hidden]) { display: grid; grid-template-columns: 176px minmax(0, 1fr); column-gap: 22px; align-items: start; }
+body:not(.summary) #opsView.ovl-ck #ctxCard > :not(#ovlCtxDial) { grid-column: 2; }
+body:not(.summary) #opsView.ovl-ck #ovlCtxDial { grid-column: 1; grid-row: 1 / span 6; align-self: center; display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 176px; }
+#ctxCard.collapsed #ovlCtxDial { display: none !important; }
+.o-ctx { width: 168px; height: 168px; display: block; overflow: visible; }
+.o-ctx .o-track { stroke-width: 3; }
+.ovl-ruler .ctx-row { padding: 0 0 2px; border: 0; }
+.o-rl { font-size: 11px; color: var(--tm-ink-3); } .o-rl.r { text-align: right; }
+.o-scale-row { position: relative; height: 12px; }
+.o-scale-row i { position: absolute; top: 0; font: 500 10px/1 var(--tm-mono); font-style: normal; color: var(--tm-ink-3); transform: translateX(-50%); }
+.o-scale-row i:first-child { transform: none; } .o-scale-row i:last-child { transform: translateX(-100%); }
+#opsView.ovl-ck .ctx-bar { height: 12px; border-radius: 2px; overflow: visible; --k: var(--tm-measured);
+  background: linear-gradient(var(--tm-grid), var(--tm-grid)) left 5px / 100% 2px no-repeat,
+              repeating-linear-gradient(90deg, var(--tm-ink-3) 0 1px, transparent 1px 5%) left bottom / 100% 3px no-repeat,
+              repeating-linear-gradient(90deg, var(--tm-ink-2) 0 1px, transparent 1px 25%) left top / 100% 12px no-repeat; }
+#opsView.ovl-ck .ctx-bar::after { content: ''; position: absolute; right: 0; top: 0; height: 12px; border-right: 1px solid var(--tm-ink-2); }
+#opsView.ovl-ck .ctx-bar i { inset: 3px 0 auto 0; height: 6px; border-radius: 1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--k) 30%, transparent), var(--k) 92%, color-mix(in srgb, var(--k) 40%, #fff)); }
+#opsView.ovl-ck .ctx-bar i.warn { --k: var(--warn); background: linear-gradient(90deg, color-mix(in srgb, var(--warn) 30%, transparent), var(--warn)); }
+#opsView.ovl-ck .ctx-bar i.bad { --k: var(--bad); background: linear-gradient(90deg, color-mix(in srgb, var(--bad) 30%, transparent), var(--bad)); }
+:is([data-theme="dark"], [data-theme="mavis"]) #opsView.ovl-ck .ctx-bar i { box-shadow: 0 0 8px color-mix(in srgb, var(--k) 45%, transparent); }
+#opsView.ovl-ck .ctx-bar em { top: -3px; bottom: -3px; width: 0; margin: 0; background: none; border-left: 1.5px solid var(--bad); opacity: 1; border-radius: 0; }
+#opsView.ovl-ck .ctx-bar em::before { content: ''; position: absolute; top: -3px; left: -4.5px; border: 4px solid transparent; border-top: 4px solid var(--bad); }
+#opsView.ovl-ck .ctx-pct { font-weight: 600; }
+#opsView.ovl-ck .ctx-plan { font-family: var(--tm-mono); font-size: 11.5px; }
+
+/* ---- Release progress: the gates dial beside the report; the bars go (the dial shows the same) ---- */
+#opsView.ovl-ck .prog-row:has(> .ovl-gates) { display: grid; grid-template-columns: minmax(0, 1fr) 132px; column-gap: 20px; row-gap: 0; align-items: start; }
+#opsView.ovl-ck .prog-row:has(> .ovl-gates) > :not(.ovl-gates) { grid-column: 1; margin-bottom: 6px; }
+#opsView.ovl-ck .prog-row > .ovl-gates { grid-column: 2; grid-row: 1 / span 9; text-align: center; }
+#opsView.ovl-ck .prog-row:has(> .ovl-gates) > .prog-bar { display: none; }
+.o-gates { width: 116px; height: 116px; display: block; margin: 0 auto; overflow: visible; }
+.ovl-gates .o-cap { font: 500 11px/1.45 var(--tm-mono); color: var(--tm-ink-2); }
+.ovl-gates .o-cap b { color: var(--tm-ink); }
+#opsView.ovl-ck .prog-bar .ctx-bar i { background: var(--tm-live); }
+
+/* ---- Released: the live ring with a bezel; no endless shine or spin (only real events move) ---- */
+#opsView.ovl-ck .rel-ring > svg:not(.o-relbez), #opsView.ovl-ck .rel-ring::before { display: none; }
+#opsView.ovl-ck .rel-ring .o-relbez { position: absolute; inset: -6px; width: calc(100% + 12px); height: calc(100% + 12px); overflow: visible; }
+#opsView.ovl-ck .rel-hero { border-color: var(--tm-line); border-radius: 12px;
+  background: radial-gradient(90% 140% at 0% 50%, color-mix(in srgb, var(--tm-measured) 9%, transparent), transparent 60%), var(--tm-panel-2); }
+#opsView.ovl-ck .rel-hero::after, #opsView.ovl-ck .rel-badge i, #opsView.ovl-ck .rel-mini i { animation: none; }
+#opsView.ovl-ck .rel-core b { font-family: var(--tm-mono); color: var(--tm-measured-text); }
+#opsView.ovl-ck .rel-core span { color: var(--tm-ink-2); letter-spacing: 0.08em; font-size: 10px; }
+#opsView.ovl-ck .rel-badge { color: var(--tm-measured-text); background: none; border: 1px solid color-mix(in srgb, var(--tm-measured) 45%, transparent); }
+#opsView.ovl-ck .rel-mini { background: none; border: 1px solid var(--tm-line); }
+#opsView.ovl-ck .rel-chip { background: var(--tm-panel); border-color: var(--tm-line-2); }
+#opsView.ovl-ck .repo-stats { gap: 0; }
+#opsView.ovl-ck .repo-stats > div { background: none; border-radius: 0; border-left: 1px solid var(--tm-line); padding: 4px 12px; }
+#opsView.ovl-ck .repo-stats > div:first-child { border-left: 0; padding-left: 0; }
+#opsView.ovl-ck .repo-stats b { font-size: 18px; color: var(--tm-ink); }
+#opsView.ovl-ck .rel-chart > svg, #opsView.ovl-ck .rel-chart-head { display: none; }
+#opsView.ovl-ck .rel-chart:has(+ .ovl-traffic) { display: none; }
+.ovl-traffic { margin-top: 6px; }
+.ovl-traffic .o-legend { margin-bottom: 6px; }
+.ovl-traffic .o-trace { --o-h: 78px; }
+
+/* ---- Live activity: the read/write dials, the call tape, the ticker as a mono line ---- */
+#opsView.ovl-ck .rw-panel .rw-ring { display: none; }
+#opsView.ovl-ck .rw-panel { gap: 14px; }
+.ovl-rwdial { width: 64px; height: 64px; flex: none; }
+#opsView.ovl-ck .rw-panel .rw-count { font-size: 26px; }
+#opsView.ovl-ck .rw-panel.read .rw-count { color: var(--tm-live-text); } #opsView.ovl-ck .rw-panel.write .rw-count { color: var(--tm-estimated-text); }
+#opsView.ovl-ck .rw-panel.pulsing { background: linear-gradient(90deg, color-mix(in srgb, var(--rw) 10%, transparent), transparent 70%); }
+#opsView.ovl-ck .rw-panel::after { display: none; }
+#opsView.ovl-ck .rw-panel + .rw-panel { border-color: var(--tm-line); }
+#opsView.ovl-ck .rw-panel.read { --rw: var(--tm-live); } #opsView.ovl-ck .rw-panel.write { --rw: var(--tm-estimated); }
+#opsView.ovl-ck .activity-card #ovlTape { margin: 6px 16px 0; padding-top: 10px; border-top: 1px solid var(--tm-line); }
+#opsView.ovl-ck .ticker { border-top: 1px solid var(--tm-line); }
+#opsView.ovl-ck .ticker-feed { font: 11.5px var(--tm-mono); }
+#opsView.ovl-ck .ticker .t-id { color: var(--tm-live-text); } #opsView.ovl-ck .ticker .t-write { color: var(--tm-estimated-text); }
+
+/* Systems (the cockpit window): the same tape under its readouts */
+#opsView.ovl-ck #ovlSysTape { grid-column: 1 / -1; padding-top: 8px; }
+#opsView.ovl-ck #ovlSysTape .o-tape { height: 58px; }
+/* a wide Systems window: three readouts a row and the call tape under them; at its first (medium) size the tape stays in Live activity */
+@container (min-width: 720px) {
+  #cockpit:not(.classic) .ck-read:has(> #ovlSysTape) { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 12px; }
+  #cockpit:not(.classic) .ck-read:has(> #ovlSysTape) > div:not(#ovlSysTape), #cockpit:not(.classic) .ck-read:has(> #ovlSysTape) .stat-box { padding: 4px 0; }
+}
+@container (max-width: 719px) { #ovlSysTape { display: none !important; } }
+#cockpit.classic #ovlSysTape { display: none !important; }
+
+/* ---- AI models: each cell an instrument, the lamp a lit point with a ring ---- */
+#opsView.ovl-ck .ai-cell { background: var(--tm-panel-2); border: 1px solid var(--tm-line); border-radius: 10px; }
+#opsView.ovl-ck .ai-cell .dot { width: 9px; height: 9px; background: var(--tm-ink-3); box-shadow: 0 0 0 3px var(--tm-grid-2); }
+#opsView.ovl-ck .ai-cell.online .dot { background: var(--tm-measured); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tm-measured) 22%, transparent); }
+#opsView.ovl-ck .ai-cell canvas { height: 34px; }
+#opsView.ovl-ck .ai-cell-num { color: var(--tm-ink); }
+#opsView.ovl-ck .ai-cell.busy { animation: none; border-color: color-mix(in srgb, var(--tm-live) 55%, transparent); }
+
+/* ---- Shedkeeper and Agents ---- */
+.ovl-scope { margin-top: 12px; }
+.ovl-scope .o-legend { margin: 0 0 6px; }
+.ovl-scope .o-trace { --o-h: 64px; }
+#opsView.ovl-ck .live-chip { background: var(--tm-panel-2); border: 1px solid var(--tm-line); border-radius: 6px; }
+#opsView.ovl-ck .live-chip em { font-family: var(--tm-mono); color: var(--tm-live-text); }
+#opsView.ovl-ck .act-verb { font-family: var(--tm-mono); font-size: 11.5px; color: var(--tm-ink-2); }
+[data-card].collapsed :is(#ovlLaya, #ovlAgent) { display: none !important; }
+
+/* ---- Clients live: the read/write split beside each name ---- */
+#opsView.ovl-ck .cl-name { display: flex; align-items: center; gap: 8px; }
+#opsView.ovl-ck .cl-num.w b { color: var(--tm-estimated-text); }
+#opsView.ovl-ck .cl-num:not(.w):not(.cl-sess) b { color: var(--tm-live-text); }
+
+/* ---- Tools and memory: what each is made of, above its list ---- */
+.ovl-compbox { height: 104px; flex: none; }
+#opsView.ovl-ck .ovl-compbox { display: grid; grid-template-columns: 88px minmax(0, 1fr) auto; gap: 16px; align-items: center;
+  padding: 0 0 10px; margin-bottom: 8px; border-bottom: 1px solid var(--tm-line); }
+#opsView.ovl-ck #ovlMem { grid-template-columns: 88px minmax(0, 1fr); }
+#opsView.ovl-ck .ovl-compbox > .ovl-wait { grid-column: 1 / -1; }
+.o-comp { width: 88px; height: 88px; display: block; overflow: visible; }
+.o-comp .o-track { stroke-width: 6; }
+.o-comp .o-val { font-size: 13px; } .o-comp .o-sub { font-size: 7px; }
+.o-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 16px; min-width: 0; align-content: center; }
+.o-list div { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 12px; }
+.o-list i { width: 12px; height: 0; border-top: 3px solid var(--tm-live); opacity: var(--o, 1); flex: none; }
+.o-list span { color: var(--tm-ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.o-list b { margin-left: auto; font: 600 12px var(--tm-mono); color: var(--tm-ink); font-variant-numeric: tabular-nums; }
+#opsView.ovl-ck .cap-row .badge.write { color: var(--tm-estimated-text); }
+#opsView.ovl-ck .mem-count { color: var(--tm-ink); font-weight: 600; }
+[data-card].collapsed .ovl-compbox { display: none !important; }
+
+/* ---- Business at a glance and Grok tokens ---- */
+#opsView.ovl-ck .biz-sum-grid > div { position: relative; background: var(--tm-panel-2); border: 1px solid var(--tm-line); }
+.ovl-bizdial { position: absolute; top: 6px; right: 6px; width: 40px; height: 40px; }
+.ovl-bizdial .o-dial { width: 40px; height: 40px; }
+#opsView.ovl-ck .biz-sum-mode.live { color: var(--tm-measured-text); }
+#opsView.ovl-ck #grokCard:not([hidden]) { display: grid; grid-template-columns: 72px minmax(0, 1fr); column-gap: 16px; align-items: center; }
+#opsView.ovl-ck #grokCard > :not(#ovlGrok) { grid-column: 2; }
+#opsView.ovl-ck #ovlGrok { grid-column: 1; grid-row: 1 / span 4; width: 72px; height: 72px; }
+#opsView.ovl-ck #ovlGrok .o-dial { width: 72px; height: 72px; }
+#opsView.ovl-ck #grokCard .grok-bar { display: none; }
+#opsView.ovl-ck .grok-head span { font-family: var(--tm-mono); }
+
+/* ---- the summary screen's strips: the savings parts with their provenance; each local count with its spoke ---- */
+#opsView.ovl-ck #tokBar { display: block; height: 14px; background: none; overflow: visible; border-radius: 0; }
+.o-plainbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--fill); }
+.o-plainbar span { display: block; height: 100%; }
+.o-spec { position: relative; height: 14px; }
+.o-spec span { position: absolute; top: 2px; height: 7px; background: var(--k); box-shadow: inset -2px 0 0 var(--tm-panel); }
+.o-spec span.est { background: repeating-linear-gradient(135deg, var(--k) 0 3px, color-mix(in srgb, var(--k) 25%, transparent) 3px 5px); }
+.o-spec .o-rule { position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+  background: repeating-linear-gradient(90deg, var(--tm-ink-3) 0 1px, transparent 1px 5%); opacity: 0.7; }
+#opsView.ovl-ck .reasoning-stat { position: relative; padding-left: 40px; }
+#opsView.ovl-ck .reasoning-stat::before { content: ''; position: absolute; left: 10px; top: 50%; width: 24px; height: 24px; margin-top: -12px; border-radius: 50%;
+  background: conic-gradient(from 225deg, var(--tm-live) 0 calc(var(--o-f, 0) * 270deg), var(--tm-grid) 0 270deg, transparent 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); }
+
+/* ---- narrower screens ---- */
+@media (max-width: 760px) {
+  body:not(.summary) #opsView.ovl-ck #ctxCard:not([hidden]) { grid-template-columns: minmax(0, 1fr); }
+  body:not(.summary) #opsView.ovl-ck #ctxCard > :not(#ovlCtxDial) { grid-column: 1; }
+  body:not(.summary) #opsView.ovl-ck #ovlCtxDial { grid-column: 1; grid-row: auto; margin: 10px 0 4px; min-height: 0; }
+  #opsView.ovl-ck .ovl-ruler { display: none; }  /* each gauge sits on its own line here: the scale on the gauge says it */
+  #opsView.ovl-ck .prog-row:has(> .ovl-gates) { grid-template-columns: minmax(0, 1fr) 96px; column-gap: 12px; }
+  .o-gates { width: 92px; height: 92px; }
+  #opsView.ovl-ck .ovl-compbox { grid-template-columns: 76px minmax(0, 1fr); height: auto; min-height: 96px; }
+  #opsView.ovl-ck .ovl-compbox .o-side { display: none; }
+  .o-comp { width: 76px; height: 76px; }
+  .o-list { grid-template-columns: minmax(0, 1fr); }
+  .o-note { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .o-ping::after { animation: none; } }
+#opsView.ovl-ck #progFeed { max-height: 460px; }

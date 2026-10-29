@@ -15,12 +15,15 @@ import httpx
 from tools.commerce import _http as h
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
+# Etsy's photo host (a listing's url_fullxfull). Only for a read-only check such as image.compare: a tool that puts
+# the image somewhere (a listing, a pin, an edit) never takes one, so another shop's photo can't be reused.
+ETSY_PHOTO_HOST = "i.etsystatic.com"
 FOLDER_REF = re.compile(r"^([A-Za-z0-9][A-Za-z0-9 _-]{0,39})/([A-Za-z0-9][A-Za-z0-9._-]{0,100}\.(?:png|jpg|jpeg))$")
 NAME_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,100}\.(?:png|jpg|jpeg|webp)$")
 
 
-def image_bytes(ref: str, max_bytes: int = MAX_IMAGE_BYTES) -> bytes:
-    """The image's bytes, or a CommerceError saying why not."""
+def image_bytes(ref: str, max_bytes: int = MAX_IMAGE_BYTES, etsy_photos: bool = False) -> bytes:
+    """The image's bytes, or a CommerceError saying why not. etsy_photos: also an Etsy listing photo's address."""
     from tools.image import providers as prov
     from tools.image.generate import base_url
     from tools.printify.mockup import MOCKUP_HOSTS
@@ -28,8 +31,10 @@ def image_bytes(ref: str, max_bytes: int = MAX_IMAGE_BYTES) -> bytes:
     headers: dict = {}
     if ref.startswith("https://"):
         u = urlsplit(ref)
-        if u.hostname not in MOCKUP_HOSTS or u.username or u.password or len(ref) > 1000:
-            raise h.CommerceError(f"{h.trim(ref, 80)}: only Printify mockup addresses (printify.product.get lists them)")
+        hosts = (*MOCKUP_HOSTS, ETSY_PHOTO_HOST) if etsy_photos else MOCKUP_HOSTS
+        if u.hostname not in hosts or u.username or u.password or len(ref) > 1000:
+            raise h.CommerceError(f"{h.trim(ref, 80)}: only Printify mockup addresses (printify.product.get lists them)"
+                                  + (" or Etsy listing photos (etsy.listing.get)" if etsy_photos else ""))
         url, headers = ref, {"User-Agent": "HomeShed-mcp-server"}
     elif m := FOLDER_REF.match(ref):
         url = f"{base_url()}/image/folder-files/{quote(m[1])}/{m[2]}"

@@ -11,6 +11,7 @@ patching methods, avoiding the awkwardness that ruled out testing the simpler en
 """
 import asyncio
 import base64
+import gzip
 import json
 import re
 import time
@@ -19,6 +20,14 @@ from pathlib import Path
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+
+
+def panel_text() -> str:
+    """The Control Panel as one text: index.html, then every script and style file beside it (the split of 2026-10-28
+    moved the page's code into static/panel*.js/.css and pages-*.js/.css). The checks that look for code read this."""
+    static = Path(__file__).parent / "static"
+    files = [static / "index.html"] + sorted(f for f in static.iterdir() if f.suffix in (".js", ".css"))
+    return "\n".join(f.read_text(encoding="utf-8") for f in files)
 
 
 @pytest.fixture(autouse=True)
@@ -1036,11 +1045,15 @@ def test_health_names_the_pages_version_so_an_old_tab_notices_a_redeploy(monkeyp
 
     monkeypatch.setattr(main, "DASHBOARD_PASSWORD", OWNER_PW)
     _patch_mcp_client(monkeypatch, main, httpx.MockTransport(lambda request: httpx.Response(200, json={})))
-    page = (Path(main.__file__).parent / "static" / "index.html").read_bytes()
+    static = Path(main.__file__).parent / "static"
+    page = (static / "index.html").read_bytes()
     got = TestClient(main.app, headers=OWNER).get("/api/health").json()["panel"]
-    assert got == hashlib.sha256(page).hexdigest()[:12]
-    html = page.decode("utf-8")
-    assert 'id="updatePill"' in html and "function panelUpdated()" in html
+    # the core (2026-10-28), the Overview's engine files, the Overview's lower half's pair (overview-lower) and the page
+    # groups' own files (2026-10-27) are part of the page: a change to one alone offers the reload too; none counts twice
+    files = (*main.CORE_FILES, *main.ENGINE_FILES, *main.OVERVIEW_LOWER_FILES, *main.PAGE_FILES)
+    assert len(files) == len(set(files))
+    assert got == hashlib.sha256(page + b"".join((static / f).read_bytes() for f in files)).hexdigest()[:12]
+    assert 'id="updatePill"' in page.decode("utf-8") and "function panelUpdated()" in panel_text()
 
 
 def test_the_memory_card_counts_an_installs_own_categories(monkeypatch):
@@ -1235,26 +1248,52 @@ def test_client_admin_proxies_validate_and_forward(monkeypatch):
 
 
 def test_the_api_page_shows_tool_view_and_images_per_client():
-    """Each client card on the API page shows two open switches (not inside the collapsed tool list): Tool view (Full
-    list / Front door) and Images (Inline / As pictures), each with one plain line, and they post to /view."""
-    page = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
-    card = page.split("list.innerHTML = _apiClients.length ?")[1].split("loadSharedWaiting();")[0]
+    """A client's Permissions tab (the API page's drawer, 2026-10-27) shows two open switches above the tool list:
+    Tool view (Full list / Front door) and Images (Inline / As pictures), each with one plain line, and they post to
+    /view; a failure is said, not swallowed."""
+    page = panel_text()
+    card = page.split("function apTabAccess(c) {")[1].split("\nfunction ")[0]
     view = card.index('<div class="client-view">')
-    assert card.index('<div class="client-actions">') < view < card.index('<div class="client-tools')
+    assert card.index("preset('read', 'Read-only tools')") < view < card.index('<h3>Choose tools</h3>')
     assert "viewSeg(c, 'tool_view', [['full', 'Full list'], ['front_door', 'Front door']])" in card
     assert "viewSeg(c, 'images', [['inline', 'Inline'], ['content', 'As pictures']])" in card
     assert "5 tools that find and run all the others" in card and "Saves tokens" in card
-    setter = page.split("async function clientView(name, key, value) {")[1].split("\n}")[0]
-    assert "`/api/clients/${encodeURIComponent(name)}/view`, { [key]: value }" in setter and "alert(e.message)" in setter
+    setter = page.split("async function clientView(name, key, value, btn) {")[1].split("\n}")[0]
+    assert "`/api/clients/${encodeURIComponent(name)}/view`, { [key]: value }" in setter and "UI.toast(e.message, 'bad')" in setter
+
+
+def test_the_api_page_keeps_every_control_and_guards_the_dangerous_ones():
+    """The API page redesign (2026-10-27): every client control still posts to its route; suspend, stop shared reads,
+    presets, new token, delete and suspend-all ask first, naming the client, and only report success after the
+    server answers; the token goes only to the show-once box, and page state never holds one."""
+    page = panel_text()
+    for route in ("'GET', '/api/clients'", "'POST', '/api/clients', body", "/rotate`", "'DELETE', `/api/clients/${encodeURIComponent(name)}`",
+                  "'POST', '/api/clients/suspend-all'", "/limits`, { rate_per_min: rate || null, expires_days: expiresDays || null }",
+                  "/spend-cap`, { usd }", "/tools/${encodeURIComponent(tool)}/${box.checked ? 'grant' : 'revoke'}`",
+                  "clientAction(name, 'suspend')", "clientAction(name, 'resume')", "clientAction(name, 'shared-read-off')",
+                  "clientAction(name, 'shared-read-on')", "clientAction(name, 'preset-' + preset)", "/api/shared-memory/waiting/"):
+        assert route in page, route
+    for fn in ("async function rotateClient(", "async function deleteClient(", "async function suspendAllClients(",
+               "async function clientPreset(", "async function clientSharedRead(", "async function clientSuspend("):
+        body = page.split(fn)[1].split("\n}")[0]
+        assert "UI.confirm({" in body and "run: () =>" in body, fn
+    assert "permanent: true" in page.split("async function deleteClient(")[1].split("\n}")[0]
+    kit = page.split("const UI = (() => {")[1].split("\n})();")[0]
+    assert "d.oncancel = e => { if (ok.disabled) e.preventDefault(); }" in kit  # no cancelling a request in flight
+    assert "btn.disabled = true" in kit  # no double submits
+    state = page.split("const _apSt = UI.keep(")[1].split(");")[0]
+    assert "token" not in state
+    assert page.count("showToken(") == 3  # the definition, create and new token: nowhere else
+    assert 'Signed in with OAuth: (.+)' in page  # OAuth apps are labelled by how they connect
 
 
 def test_the_api_page_shows_a_tool_set_for_front_door_apps():
     """The tool set picker shows only for a Front door app, next to the Tool view switch; groups save as <group>.*,
     Whole grant saves null, and with Pro off it says the set is saved now and used while Pro is on."""
-    page = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
-    card = page.split("list.innerHTML = _apiClients.length ?")[1].split("loadSharedWaiting();")[0]
+    page = panel_text()
+    card = page.split("function apTabAccess(c) {")[1].split("\nfunction ")[0]
     assert card.index('<div class="client-view">') < card.index("${c.tool_view === 'front_door' ? toolsetPicker(") \
-        < card.index('<div class="client-tools')
+        < card.index('<h3>Choose tools</h3>')
     picker = page.split("function toolsetPicker(c, proOn) {")[1].split("\n}")[0]
     assert "Tool set (Pro): which tools the front door shows this app" in picker and "Whole grant" in picker
     assert "Needs HomeShed Pro; saved now, used while Pro is on." in picker and "x.id.split('.')[0]" in picker
@@ -1288,7 +1327,7 @@ def test_front_door_savings_relays_the_tool_and_says_when_its_pro(monkeypatch):
         raise RuntimeError("mcp-server initialize returned http 503")
     monkeypatch.setattr(main, "_mcp_call_tool", down)
     assert c.get("/api/front-door/savings").status_code == 502  # a real failure still says so
-    page = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
+    page = panel_text()
     assert '<section class="card sav-card" id="apSavings">' in page and "Front door savings" in page
     assert "loadFrontDoorSavings();" in page.split("async function loadApi() {")[1].split("\n}")[0]
 
@@ -1402,9 +1441,14 @@ def test_oauth_sign_ins_are_proxied_and_only_app_and_preset_go_through(monkeypat
     assert c.get("/api/oauth/pending").json()["pending"][0]["match"] == "042917"
     r = c.post(f"/api/oauth/pending/{pid}/approve", json={"app": "Claude-Chat", "preset": "all", "token": "x", "grants": 1})
     assert r.json()["status"] == "approved"
-    assert sent[-1] == ("POST", f"/oauth/pending/{pid}/approve", {"app": "claude-chat", "preset": "all"})
+    assert sent[-1] == ("POST", f"/oauth/pending/{pid}/approve", {"app": "claude-chat", "preset": "all", "trust": False})
+    c.post(f"/api/oauth/pending/{pid}/approve", json={"app": "claude", "preset": "read", "trust": True})
+    assert sent[-1][2] == {"app": "claude", "preset": "read", "trust": True}  # trust only when the tick says true
+    c.post(f"/api/oauth/pending/{pid}/approve", json={"app": "claude", "preset": "read", "trust": "yes"})
+    assert sent[-1][2]["trust"] is False
+    assert c.post("/api/oauth/trusted/not-hex/remove").status_code == 400
     c.post(f"/api/oauth/pending/{pid}/approve")  # no body: the suggested name, read-only
-    assert sent[-1][2] == {"app": "", "preset": "read"}
+    assert sent[-1][2] == {"app": "", "preset": "read", "trust": False}
     c.post(f"/api/oauth/pending/{pid}/decline", json={"app": "x", "preset": "all"})
     assert sent[-1] == ("POST", f"/oauth/pending/{pid}/decline", None)
     n = len(sent)
@@ -1440,7 +1484,7 @@ def test_a_waiting_sign_in_shows_first_in_the_approvals_bar(monkeypatch):
 
 
 def test_the_page_has_the_sign_in_card_and_the_connect_help():
-    page = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
+    page = panel_text()
     kinds = page.split("const APPROVAL_KINDS")[1].split("};")[0]
     assert "/api/oauth/pending/" in kinds and "signin:" in kinds
     for words in ("wants to connect to HomeShed", "Check this matches the code on the sign-in page", "sends the person back to",
@@ -1650,7 +1694,7 @@ def test_replies_are_helpers_comments_since_the_read_mark(monkeypatch):
 
 
 def test_the_approvals_bar_is_on_every_page_and_never_for_view_only_logins():
-    page = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
+    page = panel_text()
     assert '<div class="approvals" id="approvals" hidden>' in page
     assert ".viewer .approvals" in page
     assert "setInterval(() => { if (!document.hidden && !_viewer) { loadApprovals(); loadReplies(); loadMessages(); } }" in page
@@ -2212,7 +2256,7 @@ def test_hidden_always_hides():
     Drafted by the local model; reads the page as UTF-8."""
     import re
     from pathlib import Path
-    css = (Path(__file__).with_name("static") / "index.html").read_text(encoding="utf-8")
+    css = panel_text()
     assert re.search(r"^\s*\[hidden\]\s*\{[^}]*display\s*:\s*none\s*!important\s*;?[^}]*\}", css, re.MULTILINE)
 
 
@@ -2224,8 +2268,9 @@ def test_page_script_parses(tmp_path):
     import subprocess
     if shutil.which("node") is None:
         pytest.skip("node is not installed")
-    html = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
-    from check_page_js import inline_scripts
+    static = Path(__file__).parent / "static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    from check_page_js import file_problems, inline_scripts
     blocks = inline_scripts(html)
     assert blocks
     for i, js in enumerate(blocks):
@@ -2233,6 +2278,40 @@ def test_page_script_parses(tmp_path):
         f.write_text(js, encoding="utf-8")
         r = subprocess.run(["node", "--check", str(f)], capture_output=True, text=True, timeout=60)
         assert r.returncode == 0, f"script {i}: {r.stderr}"
+    assert file_problems(str(static)) == []  # the page's own script files (most of its code since 2026-10-28)
+
+
+def test_the_page_files_load_in_an_order_that_works_and_each_page_loads_its_own():
+    """index.html's one big script became a core, the Overview's file and a file per page group (2026-10-28), each
+    page's fetched the first time it opens (Pages in panel.js). js_tests/panel_files_test.js runs them in a stand-in
+    browser: in order, no file uses what isn't in yet, the core never calls into a page file before asking, and
+    every page opens, polls and closes without an error."""
+    import shutil
+    import subprocess
+    if shutil.which("node") is None:
+        pytest.skip("node is not installed")
+    r = subprocess.run(["node", str(Path(__file__).parent / "js_tests" / "panel_files_test.js")], capture_output=True,
+                       text=True, timeout=300)
+    assert r.returncode == 0 and " 0 failed" in r.stdout, r.stdout[-3000:] + r.stderr[-1000:]
+
+
+def test_every_file_the_page_loads_reaches_view_only_logins_and_is_rechecked(owner, viewer):
+    """The page's scripts and styles, and each page group's file the loader fetches later (panel.js's PAGE_PARTS):
+    re-checked on every load, so a redeploy never runs an old copy beside a new page, and a view-only login gets
+    every one of them (its pages load the same way; 2026-10-28)."""
+    import re
+    client, main = owner
+    friend, _, _ = viewer
+    static = Path(main.__file__).parent / "static"
+    page = (static / "index.html").read_text(encoding="utf-8")
+    files = set(re.findall(r'(?:src|href)="/([\w.-]+\.(?:js|css))"', page))
+    parts = (static / "panel.js").read_text(encoding="utf-8").split("const PAGE_PARTS = {")[1].split("};")[0]
+    files |= {n + ".js" for n in re.findall(r"'(pages-[\w-]+)'", parts)}
+    assert {"panel.js", "panel-start.js", "panel.css", "pages-overview.js", "pages-settings.js"} <= files
+    for f in sorted(files):
+        r = client.get("/" + f)
+        assert r.status_code == 200 and r.headers["cache-control"] == "no-cache", f
+        assert friend.get("/" + f).status_code == 200, f
 
 
 def test_login_length_follows_the_setting(owner):
@@ -2675,6 +2754,35 @@ def test_the_todo_page_relays_the_tools_and_says_when_its_pro_only(monkeypatch):
     assert seen[-1][1]["auto"] is True
     c.post("/api/todo/7", json={"auto": False})
     assert seen[-1] == ("todo.update", {"id": 7, "auto": False})
+    # code work a second session checks (2026-10-28): the flags and the check's fields pass through; only a real
+    # true overrides
+    c.post("/api/todo", json={"text": "Fix the parser", "assignee": "ops", "verify": True})
+    assert seen[-1][1]["verify"] is True
+    c.post("/api/todo/7", json={"status": "done", "comment": "Checked it myself", "override": True, "verify": False})
+    assert seen[-1] == ("todo.update", {"id": 7, "status": "done", "comment": "Checked it myself", "verify": False,
+                                        "override": True})
+    c.post("/api/todo/7", json={"status": "rejected", "reason": "stale", "comment": "old", "commit": "3f2a9c1",
+                                "evidence": "x", "override": "yes"})
+    assert seen[-1] == ("todo.update", {"id": 7, "status": "rejected", "comment": "old", "commit": "3f2a9c1",
+                                        "evidence": "x", "reason": "stale"})
+    # the verifier isn't the builder's model: the model and a second opinion pass through too
+    c.post("/api/todo/7", json={"status": "verified", "commit": "3f2a9c1", "evidence": "x", "model": "claude-opus-5-5",
+                                "second_opinion": "Looks right", "second_model": "qwen3-coder-30b"})
+    assert seen[-1] == ("todo.update", {"id": 7, "status": "verified", "commit": "3f2a9c1", "evidence": "x",
+                                        "model": "claude-opus-5-5", "second_opinion": "Looks right",
+                                        "second_model": "qwen3-coder-30b"})
+    check = {"commit": "3f2a9c1", "by": "builder", "state": "verified", "verdict_by": "checker", "evidence": "ok",
+             "family": "claude", "verdict_family": "claude", "second_model": "qwen3-coder-30b",
+             "second_family": "qwen", "second_opinion": "Looks right", "cross_family": True}
+    stats = {"submitted": 1, "verified": 1, "rejected": 0, "cross_family": 1,
+             "by_builder": {"builder": {"submitted": 1, "verified": 1, "rejected": 0, "cross_family": 1,
+                                        "reject_rate": 0.0}}}
+
+    async def checked(name, args, **_):
+        return {"items": [{"id": 7, "verify": True, "check": check}], "total": 1, "checks": stats}
+    monkeypatch.setattr(main, "_mcp_call_tool", checked)
+    d = c.get("/api/todo?status=all").json()
+    assert d["items"][0]["check"] == check and d["checks"] == stats  # the page reads them as the tool gave them
 
     async def free(name, args, **_):
         raise RuntimeError("Error executing tool list: The to-do list comes with HomeShed Pro: your agents work "
@@ -2726,7 +2834,7 @@ def test_a_view_only_login_gets_the_example_todo_list_never_the_real_one(viewer)
     assert friend.get("/api/todo/runner").status_code == 403
     assert friend.post("/api/todo", json={"text": "x"}).status_code == 403
     assert friend.post("/api/todo/1", json={"approve": True}).status_code == 403
-    page = (Path(main.__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
+    page = panel_text()
     assert "'todo'" in page[page.index("const VIEWER_TABS"):][:120]  # the page is there for them...
     body = page[page.index("async function loadTodo()"):][:1800]
     assert "if (!_viewer)" in body and body.index("if (!_viewer)") < body.index("/api/todo")  # ...but never asks
@@ -2811,7 +2919,7 @@ def test_the_plan_limits_switch_sits_beside_auto_compact():
     """The owner, 2026-10-02: "add a toggle for this weekly limit thing so i can turn it off. and a toggle next to auto
     compact. clearly labeled". It saves plan_limits_on on the PC, and stays hidden from view-only logins and while the
     PC's helper doesn't know the setting yet."""
-    page = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
+    page = panel_text()
     auto, limits = page.index('id="ctxAuto"'), page.index('id="ctxLimits"')
     assert 0 < limits - auto < 400  # the next control after the auto-compact switch
     assert 'aria-label="Plan limits: slow down and pause Claude near my limit"' in page
@@ -3050,7 +3158,7 @@ def test_a_printify_publish_waits_in_the_approvals_bar_and_is_decided_through_th
     assert c.post("/api/printify/waiting/ab12cd34/publish").status_code == 400
     assert calls == [("POST", "/printify/pending/ab12cd34/approve")]
     assert "/api/printify/waiting" not in main.VIEWER_ROUTES
-    page = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
+    page = panel_text()
     assert "printify: { label: 'Publish to Etsy'" in page
 
 
@@ -3149,3 +3257,147 @@ def test_viewers_see_the_money_line_too(owner, viewer, monkeypatch):
     for path in ("/api/tokens", "/api/savings"):
         money = friend.get(path).json()["money"]
         assert money["label"] == "Claude Opus 5.5" and money["in"] == 4.0 and money["out"] == 20.0
+
+
+# --- The 2026-10-27 perf pass (scripts/panel-perf-check.py): compressed reads, cache headers on the static files, and
+# routes that used to ask their upstreams one after another now asking them at once.
+def _perf_client(monkeypatch):
+    import main
+    monkeypatch.setattr(main, "DASHBOARD_PASSWORD", OWNER_PW)
+    return TestClient(main.app, headers=OWNER), main
+
+
+def _perf_raw(c, path, method="GET", **kw):
+    """The reply as sent (still compressed), with its headers."""
+    with c.stream(method, path, headers={**OWNER, "Accept-Encoding": "gzip", "Accept": "text/html"}, **kw) as r:
+        return r, b"".join(r.iter_raw())
+
+
+def test_the_page_goes_out_compressed_and_is_always_rechecked(monkeypatch):
+    c, main = _perf_client(monkeypatch)
+    r, body = _perf_raw(c, "/")
+    assert r.status_code == 200 and r.headers["content-encoding"] == "gzip"
+    assert r.headers["cache-control"] == "no-cache" and r.headers.get("etag")
+    page = gzip.decompress(body)
+    assert b"<html" in page.lower() and len(body) < len(page) / 2
+    again = c.get("/", headers={"If-None-Match": r.headers["etag"], "Accept": "text/html"})
+    assert again.status_code == 304  # unchanged: nothing re-sent
+
+
+def test_fonts_and_icons_are_kept_a_day(monkeypatch):
+    c, main = _perf_client(monkeypatch)
+    for path in ("/fonts/space-grotesk-latin-wght.woff2", "/favicon.ico", "/manifest.webmanifest"):
+        r = c.get(path)
+        assert r.status_code == 200 and r.headers["cache-control"] == "private, max-age=86400", path
+    assert "content-encoding" not in c.get("/fonts/space-grotesk-latin-wght.woff2").headers  # already compressed
+    assert main.static_cache_control("/index.html") == main.static_cache_control("/login.html") == "no-cache"
+
+
+def test_the_start_up_files_are_served_and_mounted(owner, viewer):
+    """boot.js and boot.css (the start-up over the page) are served like the page itself: to a signed-in owner and a
+    view-only login, re-checked on every load, never to someone signed out. The page links both and hands off to them."""
+    client, main = owner
+    friend, _, _ = viewer
+    for path, kind in (("/boot.js", "javascript"), ("/boot.css", "text/css")):
+        for who in (client, friend):
+            r = who.get(path)
+            assert r.status_code == 200 and kind in r.headers["content-type"], (path, r.status_code)
+            assert r.headers["cache-control"] == "no-cache"
+        assert TestClient(main.app).get(path).status_code == 401
+    page = panel_text()
+    assert '<link rel="stylesheet" href="/boot.css">' in page and '<div id="hsBoot"></div>\n<script src="/boot.js"></script>' in page
+    assert "HomeShedBoot.mount(" in page and "HomeShedBoot.loaded()" in page
+    boot = (Path(main.__file__).parent / "static" / "boot.js").read_text(encoding="utf-8")
+    assert "requestAnimationFrame" not in boot  # the start-up never leaves a frame loop behind
+
+
+def test_changes_and_the_vault_are_never_compressed(monkeypatch):
+    """BREACH: a reply holding a secret (a new key, a revealed value) must not let its size hint at what's in it."""
+    c, main = _perf_client(monkeypatch)
+    import main as m
+    assert m.gzip_allowed({"type": "http", "method": "GET", "path": "/api/health"})
+    assert not m.gzip_allowed({"type": "http", "method": "POST", "path": "/api/clients"})
+    assert not m.gzip_allowed({"type": "http", "method": "GET", "path": "/api/vault"})
+    assert not m.gzip_allowed({"type": "websocket", "path": "/api/term/ws"})
+    big = {"items": [{"name": f"key{i}", "set": True} for i in range(200)]}
+
+    async def fake_admin(method, path, body=None, timeout=10):
+        return m.JSONResponse(big)
+    monkeypatch.setattr(m, "_mcp_admin", fake_admin)
+    r, _ = _perf_raw(c, "/api/vault")
+    assert r.status_code == 200 and "content-encoding" not in r.headers
+
+
+def _perf_concurrency_probe():
+    state = {"now": 0, "most": 0}
+
+    async def slow(result):
+        state["now"] += 1
+        state["most"] = max(state["most"], state["now"])
+        await asyncio.sleep(0.05)
+        state["now"] -= 1
+        return result
+    return state, slow
+
+
+def test_approvals_ask_every_source_at_once_and_keep_their_order(monkeypatch):
+    c, main = _perf_client(monkeypatch)
+    state, slow = _perf_concurrency_probe()
+
+    async def fake_tool(name, args, **_):
+        return await slow({"items": [{"id": 1, "text": "ok?", "waiting_on_ok": True, "updated": 1.0}]})
+
+    async def fake_admin(method, path, body=None):
+        got = {"/memory/pending": {"items": [{"id": "m", "content": "fact", "at": 3.0}]},
+               "/proxmox/pending": None}.get(path, {"items": []})
+        return await slow(main.JSONResponse(got or {"error": "x"}, status_code=200 if got else 502))
+    monkeypatch.setattr(main, "_mcp_call_tool", fake_tool)
+    monkeypatch.setattr(main, "_mcp_admin", fake_admin)
+    d = c.get("/api/approvals").json()
+    assert state["most"] >= 8  # all nine sources were in flight together
+    assert [i["kind"] for i in d["items"]] == ["memory", "todo"] and d["unavailable"] == ["Proxmox"]
+
+
+def test_an_unreachable_todo_list_is_named_not_a_failed_bar(monkeypatch):
+    c, main = _perf_client(monkeypatch)
+
+    async def down(name, args, **_):
+        raise httpx.ConnectError("refused")
+
+    async def empty(method, path, body=None):
+        return main.JSONResponse({"items": []})
+    monkeypatch.setattr(main, "_mcp_call_tool", down)
+    monkeypatch.setattr(main, "_mcp_admin", empty)
+    r = c.get("/api/approvals")
+    assert r.status_code == 200 and r.json()["unavailable"] == ["to-do list"]
+
+
+def _perf_parallel_transport(monkeypatch, main, answers):
+    state, slow = _perf_concurrency_probe()
+    real = httpx.AsyncClient
+
+    async def handler(req):
+        return await slow(httpx.Response(200, json=answers(req)))
+    monkeypatch.setattr(main.httpx, "AsyncClient", lambda *a, **k: real(transport=httpx.MockTransport(handler)))
+    return state
+
+
+def test_health_checks_both_services_at_once(monkeypatch):
+    c, main = _perf_client(monkeypatch)
+    monkeypatch.setattr(main, "MEMORY_CORE_BASE_URL", "http://memory-core:8420")
+    state = _perf_parallel_transport(monkeypatch, main, lambda req: {})
+    h = c.get("/api/health").json()
+    assert h["mcp_server"] == "ok" and h["memory_core"] == "ok" and state["most"] == 2
+
+
+def test_savings_and_tokens_ask_their_sources_at_once(monkeypatch):
+    c, main = _perf_client(monkeypatch)
+    monkeypatch.setattr(main, "GPU_SERVICE_URL", "http://gpu:8000")
+    state = _perf_parallel_transport(monkeypatch, main, lambda req: {"path": req.url.path})
+    s = c.get("/api/savings").json()
+    assert state["most"] == 3
+    assert s["daily"] == {"path": "/stats/rtk/daily"} and s["discover"] == {"path": "/stats/rtk/discover"}
+    assert s["estimate"] == {"path": "/usage"} and "money" in s
+    state["most"] = 0
+    t = c.get("/api/tokens").json()
+    assert state["most"] == 2 and t["rtk"] == {"path": "/stats/rtk"} and t["estimate"] == {"path": "/usage"}

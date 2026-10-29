@@ -305,7 +305,7 @@ def read(result_id: str, client: str | None, fields: list[str] | None = None, qu
 def take_images(result) -> tuple[object, list[tuple[str, str]]]:
     """(the result without its base64 images, [(base64, mime)]): a top-level image_b64 and those in a top-level list
     of dicts, up to MAX_IMAGES; any more are left out with a note to fetch them one at a time."""
-    if not isinstance(result, dict):
+    if not isinstance(result, dict) or result.get("image_raw") is True:  # the caller asked for the bytes (image.fetch raw)
         return result, []
     images: list[tuple[str, str]] = []
     out = dict(result)

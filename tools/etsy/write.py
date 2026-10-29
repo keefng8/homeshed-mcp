@@ -222,7 +222,8 @@ def _queue(lid: str, title: str, summary: str, send: dict, wanted: dict, reapply
            thumbs: list | None = None, owner_approval: dict | None = None) -> dict:
     import printify_pending
     checks = {"listing_id": lid, "fields": sorted(send["fields"]), "attributes": [p["name"] for p in send["properties"]],
-              "images": len(send.get("images") or []), "reapply": reapply,
+              "images": len(send.get("images") or []), "photos_to_rank": len(send.get("images_rank") or []),
+              "reapply": reapply,
               "edited_last_24h": len(printify_pending.done_today("etsy")), "daily_max": edit_daily_max()}
     payload = {"listing_id": lid, "title": title, "send": send, "wanted": wanted, **({"thumbs": thumbs} if thumbs else {})}
     try:
@@ -238,7 +239,7 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
                    properties: dict | None = None, reapply: bool = False, images: list[dict] | None = None,
                    owner_approval: dict | None = None, shop_section_id: int = 0,
                    remove_images: list[int] | None = None, images_alt: list[dict] | None = None,
-                   swap: bool = False, hero_swap: bool = False) -> dict:
+                   swap: bool = False, hero_swap: bool = False, images_rank: list[dict] | None = None) -> dict:
     """Ask to set an Etsy listing's details that Printify doesn't manage: category, materials, production partners,
     delivery profile, attributes (colour, occasion, recipient, holiday...) and extra photos. It is NOT changed by this
     call: it's checked against the listing and Etsy's own lists, then waits for the owner's approval in the Control
@@ -279,10 +280,15 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
             call, the removed one is at rank 1, both alt texts read as a hero (ETSY_HERO_ALT, default "worn in"; never
             "artwork"), and a photo that isn't an AI scene (the mockup) stays on the listing. Same read-back, backup
             and daily maximum as swap.
+        images_rank: move photos already on the listing, [{"listing_image_id", "rank": 1..its photo count}], up to
+            10, each id and rank once; the photos not named keep their order in the slots left. Nothing is uploaded or
+            deleted (low risk), so it may be the only thing asked; not with images or remove_images. E.g. the mockup
+            to rank 1 makes the hero 2.
 
     Returns:
         {"pending": true, "id", "etsy": summary, "expires_in_h", "how"}: the approval request, not a change on the
-        shop; {"pending": false} when the listing is already as asked.
+        shop; {"pending": false} when the listing is already as asked. With images_rank, "photo_order": every photo's
+        final [{"listing_image_id", "rank"}].
     """
     lid = h.check_id(listing_id, "listing_id")
     h.require(et.SETTING, "Etsy")
@@ -296,16 +302,22 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
         fields = _check_fields(taxonomy_id, materials, production_partner_ids, shipping_profile_id, shop_section_id)
         if properties is not None and not isinstance(properties, dict):
             raise h.CommerceError('properties must be {"attribute name": "value" or ["values"]}')
-        if not fields and not properties and not images and not remove_images and not images_alt:
+        if not fields and not properties and not images and not remove_images and not images_alt and not images_rank:
             raise h.CommerceError("nothing to change: give a category, materials, production partners, a delivery "
-                                  "profile, a shop section, attributes, images, remove_images or images_alt")
+                                  "profile, a shop section, attributes, images, remove_images, images_alt or "
+                                  "images_rank")
         props = []
+    ranks = _check_ranks(images_rank) if images_rank and not reapply else []
+    if ranks and (images or remove_images):
+        raise h.CommerceError("images_rank moves the photos already on the listing: add or remove photos in a "
+                              "request of their own (a new photo's rank is set in images)")
     new_images = _check_images(images) if images and not reapply else []
     x = _own_listing(lid)
     thumbs = []
     removes, alts = ([], []) if reapply else (_check_photo_edits(remove_images, images_alt))
     have_ids = None
-    if removes or alts:
+    order, moved = [], []
+    if removes or alts or ranks:
         listed = (et.get(f"/v3/application/listings/{lid}/images") or {}).get("results") or []
         have_ids = {int(i["listing_image_id"]) for i in listed if isinstance(i, dict) and i.get("listing_image_id")}
         if missing := sorted({*removes, *(a["listing_image_id"] for a in alts)} - have_ids):
@@ -314,6 +326,8 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
             raise h.CommerceError("that would leave the listing with no photo: add the new one in the same call")
         if set(removes) & {a["listing_image_id"] for a in alts}:
             raise h.CommerceError("a photo can't be both removed and given new alt text")
+        if ranks:
+            order, moved = _photo_order(listed, ranks)
     if new_images:
         have_n = len(have_ids) if have_ids is not None else \
             (et.get(f"/v3/application/listings/{lid}/images") or {}).get("count") or 0
@@ -342,17 +356,20 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
                                        else have.get(p["property_id"]) != sorted(p["value_ids"]))]
     if gone := {p["property_id"] for p in props if p.get("remove")}:
         _forget_props(lid, gone)  # at once, even if Etsy already lacks it: a re-apply must never set it back
-    if not send_fields and not send_props and not new_images and not removes and not alts:
-        return {"listing_id": lid, "pending": False, "note": "already as asked: nothing queued"}
+    if not send_fields and not send_props and not new_images and not removes and not alts and not moved:
+        return {"listing_id": lid, "pending": False, "note": "already as asked: nothing queued",
+                **({"photo_order": order} if order else {})}
     title = h.trim(x.get("title"), 60) or "untitled"
     said = "; ".join(s for s in (_said(x, send_fields, send_props),
                                  ("photos: " + ", ".join(_short_ref(i["image"]) for i in new_images)) if new_images else "",
                                  f"delete photos {removes} (can't be undone)" if removes else "",
-                                 f"new alt text on photos {[a['listing_image_id'] for a in alts]}" if alts else "")
+                                 f"new alt text on photos {[a['listing_image_id'] for a in alts]}" if alts else "",
+                                 ("move photos (none deleted): " + ", ".join(f"{m['listing_image_id']} to {m['rank']}"
+                                                                             for m in moved)) if moved else "")
                      if s)
     summary = f'{"Re-apply" if reapply else "Set"} Etsy details on "{title}": {said}'
     send = {"fields": send_fields, "properties": send_props, "images": new_images, "remove_images": removes,
-            "images_alt": alts}
+            "images_alt": alts, **({"images_rank": ranks} if moved else {})}
     held = None
     if removes and _automatic(owner_approval):  # a machine never approves a delete outside a guarded swap
         held = (_hero_swap_problem(removes, new_images, listed, alts) if hero_swap and not swap
@@ -365,7 +382,9 @@ def listing_update(listing_id: str, taxonomy_id: int = 0, materials: list[str] |
             owner_approval = None
         else:
             send["swap"] = True  # execute() reads the replacement back and backs the old photo up first
+    # a reorder deletes nothing, so it isn't held like a delete: it takes the same approval path as alt text
     out = _queue(lid, title, summary, send, {"fields": fields, "properties": props}, reapply, thumbs, owner_approval)
+    out = {**out, "photo_order": order} if moved else out
     return {**out, "swap_held": held} if held else out
 
 
@@ -537,6 +556,45 @@ def _check_photo_edits(remove_images, images_alt) -> tuple[list[int], list[dict]
     return sorted(set(removes)), alts
 
 
+def _check_ranks(images_rank) -> list[dict]:
+    """images_rank's shape: up to 10 {"listing_image_id", "rank": 1-10}, no id or rank twice. Whether each id is the
+    listing's, and each rank within its photo count, is checked against Etsy (_photo_order)."""
+    if not isinstance(images_rank, list) or not 1 <= len(images_rank) <= MAX_LISTING_IMAGES:
+        raise h.CommerceError(f'images_rank: 1-{MAX_LISTING_IMAGES} of {{"listing_image_id": number, "rank": 1-10}}')
+    out, ids, ranks = [], set(), set()
+    for r in images_rank:
+        r = r if isinstance(r, dict) else {}
+        iid, rank = r.get("listing_image_id"), r.get("rank")
+        if isinstance(iid, bool) or not str(iid or "").isdigit():
+            raise h.CommerceError('images_rank: [{"listing_image_id": number, "rank": 1-10}] (etsy.listing.get lists them)')
+        if isinstance(rank, bool) or not isinstance(rank, int) or not 1 <= rank <= MAX_LISTING_IMAGES:
+            raise h.CommerceError(f"images_rank: each rank is a whole number 1-{MAX_LISTING_IMAGES}")
+        if int(iid) in ids or rank in ranks:
+            raise h.CommerceError("images_rank: each photo and each rank once")
+        ids.add(int(iid))
+        ranks.add(rank)
+        out.append({"listing_image_id": int(iid), "rank": rank})
+    return out
+
+
+def _photo_order(listed: list, ranks: list[dict]) -> tuple[list[dict], list[dict]]:
+    """(the final order [{"listing_image_id", "rank"}] for all the listing's photos, the ones whose rank changes).
+    Each asked photo takes its rank; the others keep their order in the slots left (2026-10-27: the mockup to rank 1
+    moves the hero to 2, and every photo stays)."""
+    photos = [p for p in listed if isinstance(p, dict) and p.get("listing_image_id")]
+    have = {int(p["listing_image_id"]) for p in photos}
+    if missing := sorted({r["listing_image_id"] for r in ranks} - have):
+        raise h.CommerceError(f"not photos of this listing: {missing} (etsy.listing.get lists its photos)")
+    if too_far := [r["rank"] for r in ranks if r["rank"] > len(photos)]:
+        raise h.CommerceError(f"images_rank: the listing has {len(photos)} photos, so no rank {max(too_far)}")
+    now = sorted(enumerate(photos), key=lambda ip: (ip[1]["rank"] if isinstance(ip[1].get("rank"), int) else 99, ip[0]))
+    pinned = {r["rank"]: r["listing_image_id"] for r in ranks}
+    rest = iter(int(p["listing_image_id"]) for _, p in now if int(p["listing_image_id"]) not in pinned.values())
+    order = [{"listing_image_id": pinned[n] if n in pinned else next(rest), "rank": n} for n in range(1, len(photos) + 1)]
+    was = {int(p["listing_image_id"]): p.get("rank") for p in photos}
+    return order, [o for o in order if was[o["listing_image_id"]] != o["rank"]]
+
+
 def _forget_props(lid: str, property_ids: set) -> None:
     """Drop attributes from what this tool re-applies to a listing (applied())."""
     with _lock:
@@ -608,6 +666,23 @@ def execute(payload: dict) -> dict:
         et.write("POST", f"/v3/application/shops/{shop}/listings/{lid}/images",
                  {"listing_image_id": a["listing_image_id"], "alt_text": a["alt_text"],
                   **({"rank": rank} if isinstance(rank, int) else {})}, et.WRITE_SETTING, LABEL)
+    order, moved = [], []
+    if send.get("images_rank"):
+        # a reorder (never with uploads or deletes): checked again against the listing's photos now, then each photo
+        # whose rank changes is re-saved with its alt text (Etsy blanks it otherwise, 2026-10-18)
+        listed = _photos(lid)
+        try:
+            order, moved = _photo_order(listed, send["images_rank"])
+        except h.CommerceError as exc:
+            raise h.CommerceError(f"the listing's photos changed since this was asked ({exc}): decline this and ask "
+                                  "again") from None
+        alt = {a["listing_image_id"]: a["alt_text"] for a in send.get("images_alt") or []}
+        alt_now = {p["listing_image_id"]: p.get("alt_text") for p in listed}
+        for m in moved:
+            text = alt.get(m["listing_image_id"]) or alt_now.get(m["listing_image_id"])
+            et.write("POST", f"/v3/application/shops/{shop}/listings/{lid}/images",
+                     {"listing_image_id": m["listing_image_id"], "rank": m["rank"],
+                      **({"alt_text": text} if text else {})}, et.WRITE_SETTING, LABEL)
     removed, backed_up = [], []
     if send.get("swap") and send.get("remove_images"):
         # an automatic swap (guards checked when it was asked): the replacement must be on the listing now, and the
@@ -633,9 +708,14 @@ def execute(payload: dict) -> dict:
         clients._audit(f"etsy photo {'delete by a bot' if kind == 'bot' else 'swap'}", None,
                        listing=lid, removed=removed)
     # any photo change also tidies the ranks: closes a deletion's gap, repairs a listing an earlier upload left doubled
-    reranked = _rerank(shop, lid, {i["listing_image_id"] for i in each if i["uploaded"] == "now"}) \
-        if send.get("images") or send.get("images_alt") or removed else []
-    wanted = payload.get("wanted") or {k: v for k, v in send.items() if k not in ("images", "remove_images", "images_alt")}
+    # (a reorder numbers every photo 1..n itself, so it is its own tidy). Alt text alone moves nothing (each re-save
+    # carries its photo's rank), so it skips the tidy: a read and up to n re-saves fewer (the station, 27 Oct: 188
+    # alt-only calls cost ~8.6 Etsy requests each)
+    reranked = moved if send.get("images_rank") else \
+        _rerank(shop, lid, {i["listing_image_id"] for i in each if i["uploaded"] == "now"}) \
+        if send.get("images") or removed else []
+    wanted = payload.get("wanted") or {k: v for k, v in send.items()
+                                       if k not in ("images", "remove_images", "images_alt", "images_rank")}
     with _lock:
         rows = applied()
         saved = rows.get(lid) or {}
@@ -652,7 +732,7 @@ def execute(payload: dict) -> dict:
     return {"listing_id": lid, "fields": sorted(fields), "attributes": [p["name"] for p in props], "photos": uploaded,
             "photos_asked": len(send.get("images") or []), "photos_landed": len(each), "photo_results": each,
             "photos_removed": removed, "alt_text_set": [a["listing_image_id"] for a in send.get("images_alt") or []],
-            "photos_reranked": reranked,
+            "photos_reranked": reranked, **({"photo_order": order} if send.get("images_rank") else {}),
             "note": "Set on Etsy. A Printify re-publish of this listing queues the details again for your approval."}
 
 

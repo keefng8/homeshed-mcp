@@ -1,0 +1,51 @@
+{
+  "id": "tts.synthesize",
+  "name": "Speak Text (Google Chirp 3 HD)",
+  "version": "1.0.0",
+  "description": "Speak up to 5,000 bytes of text as an MP3 with a Google Chirp 3 HD voice, saved on the tool server for tts.fetch. Counted against Google's free 1 million characters a month; a piece that would pass the month's cap is refused with TTS_CAP_REACHED (free only unless the owner allows paid characters).",
+  "category": "tts",
+  "risk": "write",
+  "requires": [
+    "GOOGLE_TTS_SERVICE_ACCOUNT in the vault (a Google Cloud service account key file)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "text to speech",
+    "read this aloud as an mp3",
+    "make an audiobook",
+    "narrate text",
+    "google tts",
+    "chirp voice"
+  ],
+  "inputs": {
+    "text": {
+      "type": "string",
+      "required": true
+    },
+    "voice": {
+      "type": "string",
+      "required": true
+    },
+    "speaking_rate": {
+      "type": "number",
+      "required": false,
+      "default": 1.0
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.tts.synthesize.synthesize"
+  },
+  "latency": {
+    "expected_ms": 15000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "tts.voices",
+    "tts.fetch",
+    "tts.usage"
+  ]
+}

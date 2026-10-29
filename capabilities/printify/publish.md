@@ -54,6 +54,11 @@ It's refused, and the request waits in the approvals bar as usual with `owner_ap
   (`approvals_trusted_auto_clients`; an app named there also counts for owner taps);
 - `at` isn't an ISO time within the last hour (5 minutes ahead allowed);
 - or the id was used before (kept 30 days, `usage/app_approvals.json`).
+**A sweep grant** (the owner, 2026-10-28: "approvals only for important things"): one approval for a batch's whole
+run. Add `sweep: {"id", "items", "until"}` to each request's `owner_approval`. Each request keeps its own one-use `id`.
+`at` is the grant's time, and instead of the last hour it counts until `until` (at most 7 days after `at`), for at most
+`items` requests (1-500). It covers words only: `printify.product.update_live` without prices or variants, and
+`etsy.listing.update`. Never a publish. The daily limits still apply.
 A request that passes but can't run (a daily limit, a re-check) waits too, with the reason. The tool server can't see
 the app's approval, so this trusts the app's word; the app must send it only when the owner's own login granted that
 request.

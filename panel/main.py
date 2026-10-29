@@ -26,6 +26,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 
 # ---------------------------------------------------------------------------
 # Config
@@ -579,12 +580,30 @@ def _plain(*keys: str) -> dict:
     return {k: True for k in keys}
 
 
+# The Overview's telemetry engine and cockpit (2026-10-27): plain files beside index.html, kept out of it so they merge
+# cleanly. They count as part of the page's version, and the browser re-checks them on every load (no stale copy).
+ENGINE_FILES = ("telemetry.js", "telemetry.css", "cockpit.js")
+# The Overview below the cockpit's top half (overview-lower, 2026-10-27): its own pair, served and re-checked the same way.
+OVERVIEW_LOWER_FILES = ("pages-ovlower.js", "pages-ovlower.css")
+# Page groups' own files (the whole-panel revamp, 2026-10-27): static/pages-<group>.js/.css, each group's pages in its
+# own files so several can be worked on at once. Found by name and served like the engine files: re-checked on every
+# load, part of the page's version, and reachable by view-only logins (To-do and Guide are on their pages).
+PAGE_FILES = tuple(sorted(p.name for p in (Path(__file__).parent / "static").glob("pages-*.*")
+                          if p.suffix in (".js", ".css") and p.name not in OVERVIEW_LOWER_FILES))
+# The panel's core (the split of index.html, 2026-10-28): the shared helpers, switchTab and the page-file loader, the
+# start-up, and the shared styles. Served like the files above, and every page needs them, a view-only login's too.
+CORE_FILES = ("panel.js", "panel-start.js", "panel.css")
+
+
 _RTK_TOTALS = _plain("available", "error", "total_commands", "total_input", "total_output", "total_saved",
                      "avg_savings_pct", "total_time_ms", "avg_time_ms")
 _USAGE = {**_plain("since", "estimated_tokens_saved", "images_generated", "calls", "chars_per_token"),
           "by_rule": {"*": True}, "rules": {"*": True},
           "capabilities": {"*": _plain("calls", "errors", "in_chars", "out_chars", "saved_chars", "rule", "last",
-                                       "saved_tokens")}}
+                                       "saved_tokens")},
+          # the Overview cockpit (2026-10-27): per-hour counts and the front door's totals, no app names in either
+          "hours": [_plain("t", "calls", "errors", "refused", "saved_chars", "fd_chars")],
+          "front_door_total": _plain("listings", "hidden_chars", "calls", "trimmed_chars")}
 _MODEL_ROW = _plain("name", "online", "prompt_tokens", "output_tokens")
 _MONEY = _plain("model", "label", "in", "out", "gbp_per_usd", "rate_from", "approximate")
 _LOCAL_AI_ROW = {**_plain("name", "label", "type", "online", "requests_processing", "requests_deferred", "requests_total",
@@ -630,6 +649,8 @@ VIEWER_ROUTES = {
     "/api/memory": _viewer_memory, "/api/context": _viewer_context, "/api/savings": _viewer_fields("/api/savings"),
     "/api/ui-settings": None, "/api/guides": None, "/api/installed": None,
     "/favicon.ico": None, "/manifest.webmanifest": None,
+    **{"/" + f: None for f in (*CORE_FILES, *ENGINE_FILES, *OVERVIEW_LOWER_FILES, *PAGE_FILES)},  # the Overview's engine and parts, and the page groups' files: viewers need them too
+    "/boot.js": None, "/boot.css": None,  # the page's start-up (static/boot.*): a view-only login starts the same way
 }
 VIEWER_PREFIXES = ("/api/guides/", "/fonts/", "/icons/", "/media/bg/")  # a guide; the heading font; icons; backgrounds
 # Routes the owner can hide from view-only logins on the Settings page (Sharing). /api/tokens carries the same
@@ -876,6 +897,30 @@ async def viewers_list():
     data, now = _load_viewers(), time.time()
     return {"viewers": [_viewer_row(n, v, now) for n, v in sorted(data["viewers"].items())],
             "unreadable": bool(data.get("unreadable"))}
+
+
+_client_errors: list[float] = []
+
+
+@app.post("/api/client-error")
+async def client_error(request: Request):
+    """A script error in someone's browser, written to the panel's log (index.html's first script sends it). Short
+    fields only and at most 30 a minute across everyone, so it can never flood the log."""
+    now = time.time()
+    _client_errors[:] = [t for t in _client_errors if now - t < 60]
+    if len(_client_errors) >= 30:
+        return JSONResponse({"ok": False}, status_code=429)
+    _client_errors.append(now)
+    try:
+        body = await request.json()
+    except ValueError:
+        body = {}
+    body = body if isinstance(body, dict) else {}
+    clip = lambda k, n: re.sub(r"[\r\n\t]+", " ", str(body.get(k) or ""))[:n]
+    ua = request.headers.get("user-agent", "")
+    _log.warning("client error: %s | %s:%s:%s | width %s %s | %s", clip("message", 300), clip("source", 80),
+                 clip("line", 8), clip("col", 8), clip("width", 6), clip("tab", 20), ua[:160])
+    return {"ok": True}
 
 
 @app.post("/api/viewers")
@@ -2670,8 +2715,9 @@ async def todo_list(status: str = "open"):
 async def todo_add(request: Request):
     body = await request.json()
     args = {k: str(body[k]) for k in ("text", "assignee", "priority", "repeat") if body.get(k)}
-    if body.get("auto") is True:  # run without asking: only a real true (the owner, 2026-09-30)
-        args["auto"] = True
+    for flag in ("auto", "verify"):  # run without asking; code work a second session checks: only a real true
+        if body.get(flag) is True:
+            args[flag] = True
     try:
         return await _mcp_call_tool("todo.add", args)
     except RuntimeError as exc:
@@ -2708,14 +2754,18 @@ async def todo_run_now():
 
 @app.post("/api/todo/{item_id}")
 async def todo_change(item_id: int, request: Request):
-    """Approve, reply, reassign, cancel, reprioritise or stop repeating a to-do (todo.update as the owner)."""
+    """Approve, reply, reassign, cancel, reprioritise or stop repeating a to-do (todo.update as the owner); for code
+    work, mark or unmark it as needing a second session's check, or mark it done without one (override, kept)."""
     body = await request.json()
-    args = {"id": item_id, **{k: str(body[k]) for k in ("status", "comment", "assignee", "repeat", "priority")
-                              if body.get(k)}}
-    if isinstance(body.get("auto"), bool):  # run without asking, on or off
-        args["auto"] = body["auto"]
-    if body.get("approve") is True:
-        args["approve"] = True
+    args = {"id": item_id, **{k: str(body[k]) for k in ("status", "comment", "assignee", "repeat", "priority",
+                                                        "commit", "evidence", "reason", "model", "second_opinion",
+                                                        "second_model") if body.get(k)}}
+    for flag in ("auto", "verify"):  # run without asking, or code work needing a check: on or off
+        if isinstance(body.get(flag), bool):
+            args[flag] = body[flag]
+    for flag in ("approve", "override"):  # only a real true
+        if body.get(flag) is True:
+            args[flag] = True
     try:
         return await _mcp_call_tool("todo.update", args)
     except RuntimeError as exc:
@@ -2857,7 +2907,8 @@ async def oauth_pending():
 
 @app.post("/api/oauth/pending/{item_id}/{action}")
 async def oauth_decide(item_id: str, action: str, request: Request):
-    """Approve a sign-in (body {"app": a new or existing app name, "preset": none|read|all}) or decline it."""
+    """Approve a sign-in (body {"app": a new or existing app name, "preset": none|read|all, "trust": true to trust the
+    browser that asked, 90 days}) or decline it."""
     if not _OAUTH_ID.fullmatch(item_id) or action not in ("approve", "decline"):
         return JSONResponse({"error": "bad request"}, status_code=400)
     if action == "decline":
@@ -2873,7 +2924,21 @@ async def oauth_decide(item_id: str, action: str, request: Request):
                             status_code=400)
     if preset not in _OAUTH_PRESETS:
         return JSONResponse({"error": "access must be none, read or all"}, status_code=400)
-    return await _mcp_admin("POST", f"/oauth/pending/{item_id}/approve", {"app": app_name, "preset": preset})
+    return await _mcp_admin("POST", f"/oauth/pending/{item_id}/approve",
+                            {"app": app_name, "preset": preset, "trust": body.get("trust") is True})
+
+
+@app.get("/api/oauth/trusted")
+async def oauth_trusted():
+    """Browsers the owner trusted to sign an app in without asking: app, where it returns to, days left. No cookie."""
+    return await _mcp_admin("GET", "/oauth/trusted")
+
+
+@app.post("/api/oauth/trusted/{tid}/remove")
+async def oauth_untrust(tid: str):
+    if not re.fullmatch(r"[0-9a-f]{16}", tid):
+        return JSONResponse({"error": "bad request"}, status_code=400)
+    return await _mcp_admin("POST", f"/oauth/trusted/{tid}/remove")
 
 
 async def _admin_items(path: str) -> list[dict] | None:
@@ -3142,29 +3207,35 @@ async def approvals():
     apps' writes to the shared memory, and queued Proxmox changes. A source that can't be read is named in
     "unavailable" rather than failing the rest. Owner only (not in VIEWER_ROUTES)."""
     items, unavailable = [], []
-    try:
-        todo = await _mcp_call_tool("todo.list", {"status": "open", "detail": "compact", "limit": 100}, quiet=True)
-        for t in todo.get("items") or []:
-            if t.get("waiting_on_ok"):
-                items.append({"kind": "todo", "id": str(t.get("id")), "title": str(t.get("text") or "")[:300],
-                              "from": t.get("assignee") or "", "at": t.get("updated")})
-    except RuntimeError as exc:
-        if TODO_PRO_ONLY not in str(exc) and not re.search(r"(?i)unknown tool", str(exc)):
-            unavailable.append("to-do list")
-    shared = await _admin_items("/memory/pending")
+
+    async def waiting_todos() -> list | None:  # None: the to-do list couldn't be read
+        try:
+            todo = await _mcp_call_tool("todo.list", {"status": "open", "detail": "compact", "limit": 100}, quiet=True)
+        except (RuntimeError, httpx.HTTPError, ValueError) as exc:  # unreachable: named, not a failed bar (was a 500)
+            return [] if TODO_PRO_ONLY in str(exc) or re.search(r"(?i)unknown tool", str(exc)) else None
+        return [t for t in todo.get("items") or [] if t.get("waiting_on_ok")]
+
+    # Every source at once (2026-10-27 perf pass: nine calls one after another made this 30 s poll as slow as their sum).
+    todos, shared, prox, pubs, bugs, roster, signs, oauth = await asyncio.gather(
+        waiting_todos(), *(_admin_items(p) for p in ("/memory/pending", "/proxmox/pending", "/printify/pending",
+                                                     "/bugs/suggested", "/agents/roster", "/publisher/sign")),
+        _mcp_admin("GET", "/oauth/pending"))
+    if todos is None:
+        unavailable.append("to-do list")
+    for t in todos or []:
+        items.append({"kind": "todo", "id": str(t.get("id")), "title": str(t.get("text") or "")[:300],
+                      "from": t.get("assignee") or "", "at": t.get("updated")})
     if shared is None:
         unavailable.append("shared memory")
     for i in shared or []:
         items.append({"kind": "memory", "id": str(i.get("id")), "title": str(i.get("content") or "")[:300],
                       "from": i.get("client") or "", "at": i.get("at")})
-    prox = await _admin_items("/proxmox/pending")
     if prox is None:
         unavailable.append("Proxmox")
     for i in prox or []:
         items.append({"kind": "proxmox", "id": str(i.get("id")), "title": str(i.get("summary") or "")[:300],
                       "from": i.get("client") or "", "at": i.get("at")})
-    pubs = await _admin_items("/printify/pending")  # to-do #59: a draft an app asks to publish to the shop
-    if pubs is None:
+    if pubs is None:  # to-do #59: a draft an app asks to publish to the shop
         unavailable.append("Printify")
     for i in pubs or []:
         pay = i.get("payload") if isinstance(i.get("payload"), dict) else {}
@@ -3184,7 +3255,7 @@ async def approvals():
                       **({"error": str(i["last_error"])[:300]} if i.get("last_error") else {})})
     # Failed tool calls seen in 2+ sessions (tools/bugs/seen.py, the owner 2026-10-24: bugs were only reported when
     # someone asked). Keep makes a known bug; dismiss stops that error being suggested. A tool server without it is skipped.
-    for i in await _admin_items("/bugs/suggested") or []:
+    for i in bugs or []:
         try:
             at = datetime.datetime.fromisoformat(str(i.get("last"))).timestamp()
         except ValueError:
@@ -3193,14 +3264,14 @@ async def approvals():
         items.append({"kind": "bug", "id": str(i.get("key")), "from": str(i.get("tool") or "")[:60], "at": at,
                       "title": f"{str(i.get('example') or '')[-300:]} ({seen_in})"})
     # The agent roster (agents_roster.py, the owner 2026-10-24: "a confirm list"): rows agents added or changed wait here.
-    for r in await _admin_items("/agents/roster") or []:
+    for r in roster or []:
         change = r.get("proposed") or r
         now = f" (now: {r.get('role')})" if r.get("proposed") else ""
         items.append({"kind": "roster", "id": str(r.get("name") or ""), "from": str(change.get("by") or "")[:60],
                       "at": r.get("updated") or 0,
                       "title": f"{r.get('name')}: {change.get('role')} [{change.get('reach')}]{now}"[:300]})
     # Library scripts an agent asked HomeShed to sign (library_signing.py, Homeshed-addon #58): Yes signs the code shown.
-    for s in await _admin_items("/publisher/sign") or []:
+    for s in signs or []:
         items.append({"kind": "sign", "id": str(s.get("id") or ""), "from": str(s.get("by") or "")[:60],
                       "at": s.get("at") or 0, "detail": str(s.get("body") or ""),
                       "title": (f"Sign {s.get('id')} v{s.get('version')} as read-only: {s.get('title') or ''} "
@@ -3208,9 +3279,8 @@ async def approvals():
     # Chat apps signing in with OAuth (oauth_server.py): each lasts 10 minutes, so it shows first, whatever its age. A
     # tool server without sign-in (or with it off) has none, and is skipped.
     signins = []
-    resp = await _mcp_admin("GET", "/oauth/pending")
     try:
-        rows = json.loads(resp.body).get("pending") if resp.status_code == 200 else None
+        rows = json.loads(oauth.body).get("pending") if oauth.status_code == 200 else None
     except (ValueError, AttributeError):
         rows = None
     for s in rows if isinstance(rows, list) else []:
@@ -3319,43 +3389,58 @@ async def savings():
     RTK's "missed savings" scan of Claude Code history (redacted on the GPU service), and
     mcp-server's sizes-only estimates. Each part fails independently."""
     out: dict = {"daily": None, "discover": None, "estimate": None}
-    async with httpx.AsyncClient(timeout=20) as client:
-        for key, url in (("daily", f"{GPU_SERVICE_URL}/stats/rtk/daily"), ("discover", f"{GPU_SERVICE_URL}/stats/rtk/discover")):
-            if not GPU_SERVICE_URL:  # RTK's numbers come from the helper PC: none set up, no numbers (never zeros)
-                out[key] = {"available": False, "not_set_up": True}
-                continue
-            try:
-                r = await client.get(url, timeout=100 if key == "discover" else 20)
-                out[key] = r.json() if r.status_code == 200 else {"available": False, "error": f"HTTP {r.status_code}"}
-            except (httpx.RequestError, ValueError):
-                out[key] = {"available": False, "error": "GPU service unreachable"}
+
+    async def rtk(client, key: str) -> None:
+        if not GPU_SERVICE_URL:  # RTK's numbers come from the helper PC: none set up, no numbers (never zeros)
+            out[key] = {"available": False, "not_set_up": True}
+            return
+        try:
+            r = await client.get(f"{GPU_SERVICE_URL}/stats/rtk/{key}", timeout=100 if key == "discover" else 20)
+            out[key] = r.json() if r.status_code == 200 else {"available": False, "error": f"HTTP {r.status_code}"}
+        except (httpx.RequestError, ValueError):
+            out[key] = {"available": False, "error": "GPU service unreachable"}
+
+    async def estimate(client) -> None:
         try:
             r = await client.get(f"{MCP_BASE_URL}/usage", headers=_MCP_HEADERS)
             out["estimate"] = r.json() if r.status_code == 200 else None
         except (httpx.RequestError, ValueError):
             pass
-    out["money"] = await _money()
+
+    async def money() -> None:
+        out["money"] = await _money()
+
+    # All four at once (2026-10-27 perf pass): the discover scan alone can take most of its 100 s, and the page waited
+    # for it before the other three even started.
+    async with httpx.AsyncClient(timeout=20) as client:
+        await asyncio.gather(rtk(client, "daily"), rtk(client, "discover"), estimate(client), money())
     return out
 
 
 @app.get("/api/tokens")
 async def tokens():
     out: dict = {"rtk": None, "estimate": None, "local_models": []}
-    async with httpx.AsyncClient(timeout=15) as client:
+
+    async def rtk(client) -> None:
         if not GPU_SERVICE_URL:
             out["rtk"] = {"available": False, "not_set_up": True}
-        else:
-            try:
-                r = await client.get(f"{GPU_SERVICE_URL}/stats/rtk")
-                out["rtk"] = r.json() if r.status_code == 200 else {"available": False}
-            except (httpx.RequestError, ValueError):
-                out["rtk"] = {"available": False}
+            return
+        try:
+            r = await client.get(f"{GPU_SERVICE_URL}/stats/rtk")
+            out["rtk"] = r.json() if r.status_code == 200 else {"available": False}
+        except (httpx.RequestError, ValueError):
+            out["rtk"] = {"available": False}
+
+    async def estimate(client) -> None:
         try:
             r = await client.get(f"{MCP_BASE_URL}/usage",
                                  headers={"Host": MCP_HOST_HEADER, "Authorization": f"Bearer {MCP_AUTH_TOKEN}"})
             out["estimate"] = r.json() if r.status_code == 200 else None
         except (httpx.RequestError, ValueError):
             out["estimate"] = None
+
+    async with httpx.AsyncClient(timeout=15) as client:  # both at once: this is polled every 30 s on every page
+        await asyncio.gather(rtk(client), estimate(client))
     out["cloud_models"] = []
     for server in LOCAL_AI_SERVERS:
         if server["type"] == "decider":
@@ -3391,10 +3476,11 @@ async def models_overview():
     return out
 
 
-# The page's own version: a hash of index.html as this server started. /api/health reports it, so a tab opened before a
+# The page's own version: a hash of index.html and every file it loads, as this server started. /api/health reports it, so a tab opened before a
 # redeploy notices (found 2026-10-01: an old tab showed "Busy" through a whole compact, until the owner refreshed).
 try:
-    PANEL_VERSION = hashlib.sha256((Path(__file__).parent / "static" / "index.html").read_bytes()).hexdigest()[:12]
+    PANEL_VERSION = hashlib.sha256(b"".join((Path(__file__).parent / "static" / f).read_bytes()
+                                            for f in ("index.html", *CORE_FILES, *ENGINE_FILES, *OVERVIEW_LOWER_FILES, *PAGE_FILES))).hexdigest()[:12]
 except OSError:
     PANEL_VERSION = ""
 
@@ -3403,19 +3489,20 @@ except OSError:
 async def health():
     out = {"mcp_server": "unknown", "memory_core": "unknown" if MEMORY_CORE_BASE_URL else BUILT_IN,
            "panel": PANEL_VERSION}
-    async with httpx.AsyncClient(timeout=5) as client:
+
+    async def check(client, key: str, url: str, headers: dict | None = None) -> None:
         try:
-            # /healthz is a cheap liveness route (2026-09-28); /capabilities did real work every 4 s.
-            r = await client.get(f"{MCP_BASE_URL}/healthz", headers=_MCP_HEADERS)
-            out["mcp_server"] = "ok" if r.status_code == 200 else f"http {r.status_code}"
+            r = await client.get(url, headers=headers)
+            out[key] = "ok" if r.status_code == 200 else f"http {r.status_code}"
         except httpx.RequestError:
-            out["mcp_server"] = "unreachable"
-        if MEMORY_CORE_BASE_URL:
-            try:
-                r = await client.get(f"{MEMORY_CORE_BASE_URL}/health")
-                out["memory_core"] = "ok" if r.status_code == 200 else f"http {r.status_code}"
-            except httpx.RequestError:
-                out["memory_core"] = "unreachable"
+            out[key] = "unreachable"
+
+    # Polled every 4 s on every page: both checks at once, so a slow memory store doesn't add to the tool server's time.
+    async with httpx.AsyncClient(timeout=5) as client:
+        # /healthz is a cheap liveness route (2026-09-28); /capabilities did real work every 4 s.
+        await asyncio.gather(check(client, "mcp_server", f"{MCP_BASE_URL}/healthz", _MCP_HEADERS),
+                             *([check(client, "memory_core", f"{MEMORY_CORE_BASE_URL}/health")]
+                               if MEMORY_CORE_BASE_URL else []))
     return out
 
 
@@ -3552,7 +3639,62 @@ else:
 import terminal  # noqa: E402 - the Terminal tab (terminal.py): SSH in the browser, owner only, off by default
 app.include_router(terminal.router)
 
+@app.middleware("http")
+async def engine_files_recheck(request: Request, call_next):
+    """The engine files are re-checked on every load (an ETag answer when unchanged): a cached old copy would run
+    against a new page after a redeploy."""
+    response = await call_next(request)
+    if request.url.path.lstrip("/") in (*CORE_FILES, *ENGINE_FILES, *OVERVIEW_LOWER_FILES, *PAGE_FILES) and response.status_code in (200, 304):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 mimetypes.add_type("application/manifest+json", ".webmanifest")  # the app manifest's own type (not in every OS's table)
-for _type, _ext in (("video/webm", ".webm"), ("video/mp4", ".mp4"), ("image/webp", ".webp")):  # the background art
+for _type, _ext in (("video/webm", ".webm"), ("video/mp4", ".mp4"), ("image/webp", ".webp"),  # the background art
+                     ("font/woff2", ".woff2"), ("font/ttf", ".ttf")):  # fonts: octet-stream (and re-gzipped) without
     mimetypes.add_type(_type, _ext)
-app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="static")
+
+# Perf pass, 2026-10-27 (scripts/panel-perf-check.py): index.html went out uncompressed (~880 KB on every load) and no
+# static file said how long to keep it, so the browser guessed. The page itself is always re-checked (a 304 when it's
+# unchanged, so a redeploy shows at once); fonts, icons, the terminal's script and the background art are kept a day.
+STATIC_LONG_PREFIXES = ("/fonts/", "/icons/", "/vendor/", "/media/")
+STATIC_LONG_FILES = ("/favicon.ico", "/manifest.webmanifest")
+
+
+def static_cache_control(path: str) -> str:
+    if path.startswith(STATIC_LONG_PREFIXES) or path in STATIC_LONG_FILES:
+        return "private, max-age=86400"
+    return "no-cache"
+
+
+class _CachedStatic(StaticFiles):
+    def file_response(self, full_path, stat_result, scope, status_code: int = 200):
+        resp = super().file_response(full_path, stat_result, scope, status_code)
+        resp.headers["Cache-Control"] = static_cache_control(scope["path"])
+        return resp
+
+
+# Compressed replies (gzip) for reads: the page and the JSON it polls. Never a change's reply (a new app key, a viewer's
+# password, a revealed secret come back from POSTs) and never the vault's: a reply holding a secret stays uncompressed,
+# so its size can't hint at what's in it (BREACH). Pictures, video and fonts are already compressed and GZipMiddleware
+# skips them itself, as it does the event stream.
+NO_GZIP_PREFIXES = ("/api/vault",)
+
+
+def gzip_allowed(scope) -> bool:
+    return (scope["type"] == "http" and scope.get("method") in ("GET", "HEAD")
+            and not scope["path"].startswith(NO_GZIP_PREFIXES))
+
+
+class _Compress:
+    def __init__(self, inner):
+        self.inner, self.gzip = inner, GZipMiddleware(inner, minimum_size=1024, compresslevel=6)
+
+    async def __call__(self, scope, receive, send):
+        if gzip_allowed(scope):
+            return await self.gzip(scope, receive, send)
+        return await self.inner(scope, receive, send)
+
+
+app.add_middleware(_Compress)  # added last, so it wraps every other middleware: it compresses what they send
+app.mount("/", _CachedStatic(directory=Path(__file__).parent / "static", html=True), name="static")

@@ -64,8 +64,8 @@ def test_etsy_unreadable_holds_it(fake, monkeypatch):
         ul.product_update_live("abc123", title="New title")
 
 
-@pytest.mark.parametrize("seen, pushed", [(["active", "inactive", "active", "active"], True),
-                                          (["active"] * 4, False), (["inactive"] * 4, False)])
+@pytest.mark.parametrize("seen, pushed", [(["inactive", "active"], True),
+                                          (["active"] * 2, False), (["inactive"] * 2, False)])
 def test_the_backstop_pushes_when_a_listing_turned_off_meanwhile_is_back_on(monkeypatch, seen, pushed):
     pushes = []
     monkeypatch.setattr(ul, "_etsy_state", lambda p: seen.pop(0))
@@ -75,6 +75,22 @@ def test_the_backstop_pushes_when_a_listing_turned_off_meanwhile_is_back_on(monk
     assert bool(pushes) is pushed
     if pushed:
         assert pushes[0][0] == "Etsy listing switched back on" and "was inactive" in pushes[0][1]
+
+
+def test_the_backstop_counts_its_etsy_reads_under_the_app_that_asked(monkeypatch):
+    import contextvars
+    import clients
+    seen = []
+    monkeypatch.setattr(ul, "_etsy_state", lambda p: seen.append((clients.current_client.get(), h._COUNT_AS.get())) or "active")
+    # a real thread starts with an empty context: run the target in one
+    monkeypatch.setattr(ul.threading, "Thread",
+                        lambda target, **kw: type("T", (), {"start": staticmethod(lambda: contextvars.Context().run(target))})())
+    token = clients.current_client.set("app-1")
+    try:
+        ul._recheck_later(dict(LIVE), "active", sleep=lambda s: None)
+    finally:
+        clients.current_client.reset(token)
+    assert seen == [("app-1", ("printify.update_live:recheck", True))] * 2
 
 
 def test_a_call_only_queues_and_approval_edits_then_publishes_the_changed_parts(fake):
@@ -169,3 +185,20 @@ def test_the_daily_cap_is_counted_at_approval(fake, monkeypatch):
 def test_already_as_asked_queues_nothing(fake):
     assert ul.product_update_live("abc123", title="Retro Frenchie Tee")["pending"] is False
     assert pp.list_pending() == []
+
+
+def test_a_boost_raises_the_daily_limit_until_its_end(monkeypatch):
+    import printify_pending
+    from datetime import datetime
+    end = datetime.fromisoformat("2026-11-01T00:00:00+00:00").timestamp()
+    monkeypatch.setenv("PRINTIFY_LIVE_UPDATE_DAILY_MAX", "50")
+    monkeypatch.setenv("PRINTIFY_LIVE_UPDATE_BOOST", "100 until 2026-11-01T00:00:00+00:00")
+    assert printify_pending.update_daily_max(now=end - 60) == 100
+    assert printify_pending.update_daily_max(now=end) == 50  # it ends by itself
+    monkeypatch.setenv("PRINTIFY_LIVE_UPDATE_BOOST", "500 until 2026-11-01T00:00:00+00:00")
+    assert printify_pending.update_daily_max(now=end - 60) == 100  # never above 100
+    monkeypatch.setenv("PRINTIFY_LIVE_UPDATE_BOOST", "100 until someday")
+    assert printify_pending.update_daily_max(now=end - 60) == 50  # a bad date changes nothing
+    monkeypatch.delenv("PRINTIFY_LIVE_UPDATE_BOOST")
+    monkeypatch.setenv("PRINTIFY_LIVE_UPDATE_DAILY_MAX", "90")
+    assert printify_pending.update_daily_max() == 50  # the plain setting keeps its ceiling

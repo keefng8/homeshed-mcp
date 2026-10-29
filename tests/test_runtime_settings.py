@@ -23,6 +23,11 @@ try:  # the image provider switches come with the image tools
     PRIVATE = {**PRIVATE, **{key: spec["default"] for key, spec in _IMAGE_SETTINGS.items()}}
 except ImportError:
     pass
+try:  # Google text to speech's paid allowance comes with the tts tools
+    from tools.tts import SETTINGS as _TTS_SETTINGS
+    PRIVATE = {**PRIVATE, **{key: spec["default"] for key, spec in _TTS_SETTINGS.items()}}
+except ImportError:
+    pass
 try:  # the language-model relay switches come with the llm tools
     from tools.llm.providers import SETTINGS as _LLM_SETTINGS
     PRIVATE = {**PRIVATE, **{key: spec["default"] for key, spec in _LLM_SETTINGS.items()}}

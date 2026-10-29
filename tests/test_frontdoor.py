@@ -202,6 +202,13 @@ def test_inline_apps_and_the_owner_keep_base64(server):
     assert _json(_call(server, _ctx("Bearer owner-secret"), "test.picture"))["image_b64"] == "QUJD"
 
 
+def test_a_raw_reply_keeps_its_bytes_for_a_pictures_app():
+    # image.fetch raw=true: a script saving the file needs the base64 even when the app's images come as pictures
+    value = {"image_b64": "QUJD", "image_mime": "image/png", "image_raw": True}
+    out, images = frontdoor.take_images(value)
+    assert images == [] and out["image_b64"] == "QUJD"
+
+
 def test_a_list_of_pictures_is_capped():
     value = {"items": [{"image_b64": f"I{i}", "n": i} for i in range(6)]}
     out, images = frontdoor.take_images(value)

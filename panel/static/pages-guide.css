@@ -1,0 +1,24 @@
+/* The Guide page's styles (static/pages-guide.css). Linked by index.html right after panel.css. */
+/* ---- Guide page ---- */
+.guide-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+/* The guide grows with the screen (the owner, 2026-09-28: "let it be dynamic with the screen size"): type and
+   spacing scale with the window, and wide screens get an "On this page" list beside the text. Lines stop
+   at 110 characters so they stay readable. */
+.guide-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
+.guide-toc { display: none; }
+@media (min-width: 1100px) {
+  .guide-layout { grid-template-columns: clamp(190px, 15vw, 270px) minmax(0, 1fr); }
+  .guide-toc { display: block; position: sticky; top: 14px; max-height: calc(100vh - 28px); overflow: auto; padding: 12px 8px; }
+}
+.guide-layout.no-toc { grid-template-columns: minmax(0, 1fr); }
+.guide-layout.no-toc .guide-toc { display: none; }
+.guide-toc .toc-title { font-size: 12px; font-weight: 600; color: var(--text-3); padding: 0 10px 6px; }
+.guide-toc button { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 6px 10px; border-radius: 8px;
+  color: var(--text-2); font: inherit; font-size: 13px; line-height: 1.35; cursor: pointer; }
+.guide-toc button:hover, .guide-toc button:focus-visible { background: var(--fill); color: var(--text); }
+.guide-body { padding: clamp(16px, 2.4vw, 44px); line-height: 1.65; font-size: clamp(14px, .3vw + 10.5px, 17px); }
+.guide-body > * { max-width: 110ch; }
+.guide-body h1 { font-size: 1.65em; margin: 0 0 10px; } .guide-body h2 { font-size: 1.28em; margin: 1.8em 0 .5em; scroll-margin-top: 14px; } .guide-body h3 { font-size: 1.07em; margin: 1.3em 0 .4em; }
+.guide-body p, .guide-body ul { margin: 0 0 10px; } .guide-body ul { padding-left: 20px; } .guide-body li { margin: 3px 0; }
+.guide-body code { font-family: var(--mono); font-size: .9em; background: var(--fill); padding: 1px 5px; border-radius: 5px; }
+@media (max-width: 640px) { .guide-body { padding: 16px; } }

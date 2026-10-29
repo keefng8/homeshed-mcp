@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-29
+
+### Added
+- **Text to speech** (`tts.voices`, `tts.synthesize`, `tts.fetch`, `tts.usage`) with Google's Chirp 3 HD voices. It signs in as a Google service account you create (guide: Control Panel > Guide > Google text to speech). It stays inside Google's free 1,000,000 characters a month unless you allow paid characters in Settings > Text to speech; characters are counted before each request, on Google's US Pacific month.
+- **Trusted browsers for sign-in**: when you approve a sign-in, you can tick "Trust this app on the browser that asked", so that app's later sign-ins from that browser, to the same return address, don't wait for you (90 days, up to 50; not while the app is suspended). The API page lists them, each with Remove.
+- HomeShed Pro: **checked code work in the to-do list**. An item marked for checking is done only when a different session verifies its commit, and a verdict from the builder's own model family also needs a second opinion from another family. The To-do page shows each check (commit, verified or rejected, by whom).
+- Approvals: one owner approval can cover a batch of wording-only shop updates (up to 500 requests, for up to 7 days); never a publish, and each request keeps its own one-use id and the daily limits.
+- `image.fetch` takes `raw=true` to keep the image bytes for a script that saves the file, even for an app set to receive pictures.
+- `image.compare` can compare against an Etsy listing photo; tools that reuse an image still refuse Etsy photos.
+
+### Changed
+- Control Panel: faster to open and lighter when idle. Each page's code loads the first time you open it; Settings asks for the plan once; costly style rules were replaced.
+- Control Panel: the third theme is named **Neon**.
+- Control Panel: script errors in the browser reach the panel's log (short fields, at most 30 a minute), to help find display problems.
+- GitHub Actions update: setup-uv 10.3.2.
+- The plugin runs 0.7.1.
+
 ## [0.7.0] - 2026-10-27
 
 ### Added

@@ -1,0 +1,30 @@
+{
+  "id": "tts.usage",
+  "name": "Text-to-Speech Usage This Month",
+  "version": "1.0.0",
+  "description": "This month's text-to-speech characters against Google's free 1 million and the owner's paid allowance, characters left, the reset date (Pacific time) and each app's calls.",
+  "category": "tts",
+  "risk": "read",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "tts usage",
+    "how many free characters are left",
+    "text to speech allowance"
+  ],
+  "inputs": {},
+  "execution": {
+    "type": "python",
+    "handler": "tools.tts.usage.usage"
+  },
+  "latency": {
+    "expected_ms": 20
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "tts.synthesize"
+  ]
+}

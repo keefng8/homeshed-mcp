@@ -415,7 +415,7 @@ def halved_backslashes(command: str) -> str:
 
 def matches(guard: dict, tool: str, tool_input: dict, here: bool = True) -> bool:
     """Whether the guard fires on this call. here=False ignores `when` (validation checks examples everywhere)."""
-    if guard.get("kind") != "command" or tool not in (guard.get("tools") or []):
+    if guard.get("kind") != "command" or not any(_same_tool(tool, t) for t in guard.get("tools") or []):
         return False
     flags = re.I if guard.get("ignore_case") else 0
     hit = lambda patterns, text: any(re.search(p, text, flags) for p in patterns or [])  # noqa: E731
@@ -621,6 +621,32 @@ def _epoch(stamp) -> float | None:
         return datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp()
     except ValueError:
         return None
+
+
+FRONT_DOOR_INNER = re.compile(r"[a-z0-9_.]{1,80}")
+
+
+def front_door(tool: str, tool_input: dict) -> tuple[str, dict]:
+    """A front-door call, mcp__<server>__tools_call {"name": "git.push", "arguments": {...}}, as the tool it runs:
+    mcp__<server>__git_push with those arguments. A claude.ai connector reaches HomeShed this way, so without it a
+    guard on a tool's name never saw that tool (2026-10-28). Any other call comes back as it was."""
+    if MCP_TOOL.match(tool) and tool.endswith("__tools_call") and isinstance(tool_input, dict):
+        inner, args = tool_input.get("name"), tool_input.get("arguments")
+        if isinstance(inner, str) and FRONT_DOOR_INNER.fullmatch(inner):
+            return tool[: -len("tools_call")] + inner.replace(".", "_"), args if isinstance(args, dict) else {}
+    return tool, tool_input
+
+
+CONNECTOR_TOOL = re.compile(r"^mcp__claude_ai_[A-Za-z0-9_-]+?__[A-Za-z0-9_-]+$")
+
+
+def _same_tool(tool: str, listed: str) -> bool:
+    """A pack lists a tool-server tool under the server name it was written for (mcp__homeshed__git_push). Through a
+    claude.ai connector the same tool is mcp__claude_ai_<the name the user typed>__git_push: the same tool."""
+    if tool == listed:
+        return True
+    return bool(CONNECTOR_TOOL.match(tool) and MCP_TOOL.match(listed)
+                and tool.rsplit("__", 1)[-1] == listed.rsplit("__", 1)[-1])
 
 
 def _named(tool: str, names) -> bool:
@@ -1809,9 +1835,10 @@ def ask_reason(guard: dict) -> str:
 
 def _decide_tool(event: dict, packs: list[dict], modes: dict) -> str | None:
     """Before a tool call: block, ask the user, or let it run with notes for Claude."""
-    tool, tool_input = str(event.get("tool_name") or ""), event.get("tool_input") or {}
+    tool, tool_input = front_door(str(event.get("tool_name") or ""), event.get("tool_input") or {})
     if (tool not in TOOLS and not MCP_TOOL.match(tool)) or not isinstance(tool_input, dict):
         return None
+    event = {**event, "tool_name": tool, "tool_input": tool_input}  # the built-in checks see the tool that runs
     stopping, noted = evaluate(tool, tool_input, packs, modes)
     call = Call(event) if _has_builtins(packs) else None
     found = run_builtins(call, packs, modes) if call else []

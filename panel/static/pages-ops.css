@@ -1,0 +1,270 @@
+/* The "ops" pages (2026-10-27 revamp): Savings, Models, Reasoning, Terminal, Proxmox, Containers, Uptime,
+   Tools and Run, in the Overview cockpit's grammar (telemetry.css): instruments on a faint precision grid with corner
+   marks, figures in tabular mono, fine tick scales instead of bars, green = measured, orange = estimated, cyan = live,
+   hatched = no reading. Tables stay clean; only the instruments carry the framing. Classes start sx-. */
+
+:root { --tm-warn: var(--warn); }
+
+/* ---- the page: a calm column, the same rhythm as the Overview ---- */
+.sx-page { gap: 14px !important; }
+.sx-bar { margin-top: -6px; }
+.sx-bar .ck-mode { height: 30px; }
+/* a page with its own live state and Refresh: the shared header's pair steps aside (as on the API page). A class on
+   <html>, set by pages-ops.js when one of these views opens: a :has() over .main re-checked on every Overview update */
+html.sx-own-bar :is(#liveBadge, .top-right > button[onclick^="loadAll("]) { display: none; }
+html.sx-tight-head .page-head { margin-bottom: 14px; }
+.sx-mono { font-family: var(--tm-mono); font-variant-numeric: tabular-nums slashed-zero; }
+.sx-strong { font-weight: 600; }
+.sx-clip { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sx-pad { padding: 10px 14px; margin: 0; }
+
+/* ---- the metrics strip: each figure in mono, its kind beside it, a fine scale where it's a share ---- */
+.sx-strip { position: relative; }
+.sx-metric { flex-direction: column; align-items: stretch !important; gap: 2px !important; padding: 10px 16px 11px !important; }
+.sx-metric-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.sx-metric .ui-metric-num { font: 600 22px/1.15 var(--tm-mono); letter-spacing: -0.03em; font-variant-numeric: tabular-nums slashed-zero; color: var(--tm-ink); white-space: nowrap; }
+.sx-metric .ui-metric-num small { font-size: 13px; font-weight: 500; color: var(--tm-ink-3); margin-left: 1px; }
+.sx-metric .prov { margin-left: auto; font-size: 10px; color: var(--tm-ink-3); }
+.sx-metric.warn .ui-metric-num { color: var(--warn); } .sx-metric.bad .ui-metric-num { color: var(--bad); }
+.sx-metric .sx-ticks { margin-top: 5px; }
+button.sx-metric[aria-pressed="true"] { box-shadow: inset 0 -2px 0 var(--accent); }
+
+/* ---- the fine tick scale: 2px marks, a share of them lit (a reading, not a bar); hatched with no reading ---- */
+.sx-ticks { --k: var(--tm-measured); display: block; width: 100%; max-width: 132px; height: 7px;
+  background: linear-gradient(90deg, var(--k) calc(var(--f, 0) * 100%), var(--tm-line-2) 0);
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 2px, transparent 2px 4px); mask: repeating-linear-gradient(90deg, #000 0 2px, transparent 2px 4px); }
+.sx-ticks[data-tone="warn"] { --k: var(--warn); } .sx-ticks[data-tone="bad"] { --k: var(--bad); }
+.sx-ticks.none { background: repeating-linear-gradient(135deg, var(--tm-ink-3) 0 1px, transparent 1px 4px); opacity: 0.45; -webkit-mask: none; mask: none; }
+[data-theme="mavis"] .sx-ticks:not(.none) { filter: drop-shadow(0 0 2px color-mix(in srgb, var(--k) 55%, transparent)); }
+.sx-meter { display: inline-flex; flex-direction: column; gap: 3px; min-width: 64px; width: 100%; max-width: 120px; }
+.sx-meter b { font: 600 12.5px/1.1 var(--tm-mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--tm-ink); }
+.sx-meter b.warn { color: var(--warn); } .sx-meter b.bad { color: var(--bad); }
+.sx-meter .sx-ticks { height: 6px; }
+.sx-meter-s { flex-direction: row; align-items: center; gap: 8px; max-width: 170px; font-size: 11.5px; }
+.sx-meter-s + .sx-meter-s { margin-top: 4px; }
+.sx-meter-s .sx-ticks { max-width: 70px; }
+.ui-table td .sx-meter + .ui-sec { margin-top: 2px; }
+
+/* ---- instrument windows outside the Overview's board (the same .tw/.tw.inst framing, a fixed height from first paint) ---- */
+.sx-page .tw { min-height: 0; }
+.sx-hero { height: 300px; }
+.sx-hero .tw-body { min-height: 0; }
+.sx-two { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 14px; }
+.sx-two > .tw { height: 312px; }
+.sx-pulse { flex: 1; min-height: 0; display: flex; }
+.sx-pulse .tm-pulse, .sx-pulse.tm-pulse { flex: 1; }
+.tw-body.sx-col { flex-direction: column; min-height: 0; }
+.sx-winbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.sx-winbar .ck-note { margin-left: auto; }
+
+/* the savings calendar: one square a day, twelve weeks, Monday first; a single green from light to full */
+.sx-heat { --c: 19px; --g: 4px; display: grid; grid-template-columns: 30px minmax(0, 1fr); grid-template-rows: 16px auto; gap: 6px 6px; align-content: start; }
+.sx-heat-months { grid-column: 2; display: grid; grid-template-columns: repeat(12, calc(var(--c) + var(--g))); column-gap: 0; font: 500 10.5px var(--tm-mono); color: var(--tm-ink-3); }
+.sx-heat-months span { white-space: nowrap; grid-row: 1; }
+.sx-heat-days { grid-row: 2; display: grid; grid-template-rows: repeat(7, var(--c)); row-gap: var(--g); font: 500 10px/var(--c) var(--tm-mono); color: var(--tm-ink-3); }
+.sx-heat-grid { grid-row: 2; grid-column: 2; display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, var(--c)); grid-auto-columns: var(--c); gap: var(--g); }
+.sx-heat-grid i { width: var(--c); height: var(--c); border-radius: 4px; background: var(--tm-grid-2); box-shadow: inset 0 0 0 1px var(--tm-line); }
+.sx-heat-grid i.gap { background: transparent; }
+.sx-heat-grid i.l1 { background: color-mix(in srgb, var(--tm-measured) 28%, transparent); box-shadow: none; }
+.sx-heat-grid i.l2 { background: color-mix(in srgb, var(--tm-measured) 52%, transparent); box-shadow: none; }
+.sx-heat-grid i.l3 { background: color-mix(in srgb, var(--tm-measured) 76%, transparent); box-shadow: none; }
+.sx-heat-grid i.l4 { background: var(--tm-measured); box-shadow: none; }
+.sx-heat-grid i.today { outline: 1.5px solid var(--tm-ink-2); outline-offset: 1px; }
+.sx-heat-legend { display: flex; align-items: center; gap: 4px; justify-content: flex-end; font-size: 11.5px; color: var(--tm-ink-3); margin-top: auto; padding-top: 10px; }
+.sx-heat-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+.sx-heat-legend .gap { background: transparent; box-shadow: inset 0 0 0 1px var(--tm-line-2); }
+.sx-heat-legend i:nth-of-type(2) { background: color-mix(in srgb, var(--tm-measured) 28%, transparent); }
+.sx-heat-legend i:nth-of-type(3) { background: color-mix(in srgb, var(--tm-measured) 52%, transparent); }
+.sx-heat-legend i:nth-of-type(4) { background: color-mix(in srgb, var(--tm-measured) 76%, transparent); }
+.sx-heat-legend i:nth-of-type(5) { background: var(--tm-measured); }
+.sx-heat-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow-x: auto; }
+
+/* coverage of the history scan, and the missed-savings table */
+.sx-cover { display: flex; align-items: center; gap: 12px; }
+.sx-cover-num { font: 600 18px var(--tm-mono); color: var(--tm-measured-text); font-variant-numeric: tabular-nums; }
+.sx-cover .sx-ticks { max-width: 240px; height: 8px; }
+.sx-work-head { display: flex; align-items: baseline; gap: 10px; padding: 12px 16px 4px; flex-wrap: wrap; }
+.sx-work-head h2 { margin: 0; font: 600 15px/1.2 var(--head-font); letter-spacing: -0.01em; }
+.sx-work-head .ui-sub { margin-left: auto; }
+.sx-work-sub { padding: 0 16px 10px; border-bottom: 1px solid var(--separator); }
+.sx-work-sub .hint { margin: 4px 0 0; }
+.sx-miss code { font: 12px var(--tm-mono); }
+.sx-miss th .prov { margin-left: 6px; font-size: 10px; }
+
+/* ---- tables on these pages ---- */
+.ui-table td.sx-c-sw { width: 58px; }
+.ui-table td.sx-c-wide { width: auto; white-space: nowrap; }
+.ui-table tbody tr.sx-off td:not(.sx-c-sw):not(.ui-c-act) { opacity: 0.62; }
+.ui-table .ui-chip + .ui-sec { margin-top: 1px; }
+.sx-tools th:nth-child(1) { width: 58px; } .sx-tools th:nth-child(2) { width: 34%; }
+.sx-tools .ui-name-cell .ui-sec { max-width: 440px; }
+.sx-pve th:first-child, .sx-docker th:first-child { width: 22%; }
+.sx-docker td .sx-clip { max-width: 320px; }
+.sx-uptime td:last-child .sx-clip { max-width: 520px; }
+@media (max-width: 860px) {
+  .ui-table td.sx-c-sw { grid-column: 2; grid-row: 1; width: auto; }
+  .sx-tools tbody tr { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .sx-tools td.ui-c-act { grid-column: 3; }
+  .sx-meter { max-width: 160px; }
+}
+
+/* ---- the drawer's instruments ---- */
+.sx-drawer-inst { display: grid; grid-template-columns: 188px minmax(0, 1fr); gap: 16px; align-items: center; }
+.sx-rx-slot .tm-reactor { --tm-reactor-max: 188px; }
+.sx-drawer-inst .ui-nums > div { flex-basis: 120px; }
+.sx-pulse-h { height: 180px; }
+.sx-feed .ui-feed-row:first-child { border-top: 0; }
+.sx-log { margin: 10px 0 0; max-height: 62vh; min-height: 220px; overflow: auto; padding: 10px 12px; border-radius: 8px; background: var(--tm-panel-2);
+  border: 1px solid var(--tm-line); font: 11.5px/1.5 var(--tm-mono); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--tm-ink); }
+.sx-log:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sx-graph-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 0 10px; }
+.sx-graph-grid { display: grid; gap: 10px; padding-bottom: 8px; }
+.sx-graph { height: 196px; padding: 8px 12px 10px !important; border-radius: 10px !important; }
+.sx-graph .tw-head { min-height: 22px; margin-bottom: 2px; }
+.sx-graph .tw-title { font-size: 13px; }
+.sx-graph-plot { flex: 1; min-height: 0; display: flex; }
+.sx-graph-plot .tm-pulse { flex: 1; }
+.sx-readings { display: grid; gap: 8px; }
+.sx-readings > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 4px 12px; align-items: start; font-size: 12.5px; }
+.sx-readings > div > span:first-child { color: var(--tm-ink-2); padding-top: 1px; }
+.sx-readings .sx-meter { max-width: 220px; }
+@media (max-width: 520px) { .sx-drawer-inst { grid-template-columns: 1fr; justify-items: center; } }
+
+/* ---- Proxmox: the cluster's reactors beside its alarms ---- */
+.sx-pve-top { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 14px; }
+.sx-pve-top > .tw { height: 288px; }
+.sx-rx3 { flex: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-items: center; min-height: 0; }
+.sx-rx3 .ck-rx .tm-reactor { height: min(222px, 100%); }
+.sx-rx3 .ck-rx:nth-child(2) { --rx-k: var(--tm-measured); }
+.sx-alarms { flex: 1; min-height: 0; overflow: auto; }
+.sx-alarms .ui-feed-row { grid-template-columns: 78px minmax(0, 1fr) 0; }
+.sx-alarms .ui-feed-row .ui-sec { white-space: normal; }
+.sx-allclear { margin: 8px 0; }
+.tw-head .ck-link, .tw-head .ghost { margin-left: auto; }
+.tw-head .ghost { height: 28px; padding: 0 10px; font-size: 12.5px; }
+
+/* ---- Models: the GPU readings as reactors, then the tables ---- */
+.sx-gauges { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; flex: 1; min-height: 0; align-items: center; }
+.sx-gauge { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; height: 100%; justify-content: center; }
+.sx-gauge .tm-reactor { --tm-reactor-max: 200px; height: min(200px, calc(100% - 34px)); width: auto; }
+.sx-gauge-note { margin: 0; font-size: 11.5px; color: var(--tm-ink-3); text-align: center; max-width: 30ch; min-height: 2.6em; }
+.sx-gauges > .loading, .sx-gauges > .empty { grid-column: 1 / -1; }
+#modelsView .sx-res { height: 300px; }
+.sx-win { padding: 12px 16px 14px; }
+.sx-win > .tw-head { margin-bottom: 8px; }
+.sx-win .ui-table { margin: 0 -16px; width: calc(100% + 32px); }
+.sx-win .ui-table th:first-child, .sx-win .ui-table td:first-child { padding-left: 16px; }
+.sx-order th:first-child { width: 64px; }
+.sx-dec.new { animation: uiNew 3s ease; }
+.sx-dec .ui-feed-main .ui-dim { display: block; font-size: 11.5px; margin-top: 1px; }
+#mdlDecPulse { height: 150px; display: flex; margin-bottom: 8px; }
+#mdlDecPulse .sx-pulse-h { flex: 1; height: auto; }
+#modelsView .bench { margin: 0; }
+#mdlStatus:empty { display: none; }
+
+/* ---- Run: the tool table beside the form ---- */
+.sx-run { display: grid; grid-template-columns: minmax(300px, 420px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.sx-run-side { display: flex; flex-direction: column; gap: 14px; min-width: 0; position: sticky; top: 12px; }
+.sx-run-side .ui-work { max-height: calc(100vh - 120px); display: flex; flex-direction: column; }
+.sx-run-side .ui-table-wrap { overflow-y: auto; min-height: 0; flex: 1; }
+.sx-run-side .ui-work .ui-table thead th { top: 0; }
+#runSavedCard .ui-table td { height: 40px; }
+#runToolsCard .ui-table td { height: 42px; }
+#runToolsCard .ui-table tr[data-key] { outline-offset: -2px; }
+.sx-run-side .ui-toolbar { padding: 10px 12px; }
+.sx-run-side .ui-toolbar input[type=search] { flex-basis: 100%; max-width: none; }
+.sx-run-side .ui-toolbar select { flex: 1 1 120px; }
+.sx-run-main { min-height: 420px; }
+.sx-run-main .tw-head { flex-wrap: wrap; }
+.sx-run-main .tw-title { white-space: normal; overflow-wrap: anywhere; }
+.sx-desc { margin: 0 0 8px; max-width: 80ch; }
+.sx-req { color: var(--warn); }
+.sx-confirm { margin: 4px 0 8px; }
+.sx-run-main .run-actions input { max-width: 220px; height: 32px; }
+.sx-run-msg { min-height: 1.3em; margin-top: 6px; display: block !important; }
+.sx-run-main .run-out { margin: 8px 0; padding: 10px 12px; border-radius: 8px; background: var(--tm-panel-2); border: 1px solid var(--tm-line); max-height: 60vh; overflow: auto; }
+.sx-run-main .ui-adv { margin-top: 4px; }
+.sx-run-empty { display: grid; place-items: center; align-content: center; text-align: center; color: var(--tm-ink-2); min-height: 340px; gap: 8px; }
+.sx-run-empty b { color: var(--tm-ink); font: 600 15px var(--head-font); }
+@media (max-width: 1100px) { .sx-run { grid-template-columns: minmax(0, 1fr); } .sx-run-side { position: static; } .sx-run-side .ui-work { max-height: 440px; } }
+
+/* ---- Reasoning: each tool a window on the precision grid ---- */
+#reasoningView .reasoning-cols { gap: 14px; }
+#reasoningView .reasoning-panel { position: relative; border-radius: 14px; border: 1px solid var(--tm-line); background-color: var(--tm-panel); box-shadow: none; padding: 14px 16px;
+  background-image: linear-gradient(var(--tm-grid-2) 1px, transparent 1px), linear-gradient(90deg, var(--tm-grid-2) 1px, transparent 1px); background-size: 24px 24px; background-position: -1px -1px; }
+#reasoningView .reasoning-panel::before, #reasoningView .reasoning-panel::after { content: ''; position: absolute; width: 9px; height: 9px; pointer-events: none; border-color: var(--tm-ink-3); opacity: 0.7; }
+#reasoningView .reasoning-panel::before { top: 6px; left: 6px; border-top: 1px solid; border-left: 1px solid; }
+#reasoningView .reasoning-panel::after { bottom: 6px; right: 6px; border-bottom: 1px solid; border-right: 1px solid; }
+#reasoningView .panel-title { font: 600 15px/1.2 var(--head-font); color: var(--tm-ink); margin: 0; }
+#reasoningView .panel-title .count { display: block; width: 100%; margin-top: 3px; font: 400 12px/1.4 var(--font); color: var(--tm-ink-3); }
+#reasoningView .reasoning-input, #reasoningView .decide-criteria-row input, #reasoningView .route-context-row input { background: var(--tm-panel-2); border-color: var(--tm-line-2); font-family: var(--tm-mono); }
+#reasoningView .reasoning-output:not(:empty) { padding: 8px 10px 8px 12px; border-left: 2px solid var(--tm-live); background: color-mix(in srgb, var(--tm-live) 5%, transparent); border-radius: 0 8px 8px 0;
+  font-family: var(--tm-mono); font-size: 12.5px; white-space: pre-wrap; }
+#reasoningView .reasoning-panel > button.ghost, #reasoningView .reasoning-panel div > button.ghost { height: 30px; }
+[data-theme="dark"] #reasoningView .reasoning-panel, [data-theme="mavis"] #reasoningView .reasoning-panel { background-color: var(--tm-panel) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+
+/* ---- Terminal: only the frame and chrome; the screen itself is untouched ---- */
+#terminalView .term-side { border-radius: 14px; border: 1px solid var(--tm-line); background: var(--tm-panel); box-shadow: none; padding: 14px; }
+#terminalView .term-host { border: 1px solid var(--tm-line); background: var(--tm-panel-2); }
+#terminalView .term-host b { font-family: var(--tm-mono); font-size: 13px; }
+#terminalView .term-host .hint { font-family: var(--tm-mono); font-size: 11.5px; }
+#terminalView .term-more > summary { font-weight: 600; font-size: 13px; }
+#terminalView .term-main { position: relative; border-radius: 14px; border: 1px solid var(--tm-line); box-shadow: none; background: #0b0f17; }
+#terminalView .term-main::before, #terminalView .term-main::after { content: ''; position: absolute; z-index: 2; width: 9px; height: 9px; pointer-events: none; border-color: #5b6b7f; opacity: 0.8; }
+#terminalView .term-main::before { top: 5px; left: 5px; border-top: 1px solid; border-left: 1px solid; }
+#terminalView .term-main::after { bottom: 5px; right: 5px; border-bottom: 1px solid; border-right: 1px solid; }
+#terminalView .term-tabs { gap: 4px; padding: 6px 8px 0 18px; background: #0e131c; border-bottom: 1px solid #1d2633; }
+#terminalView .term-tab { font: 500 12px var(--tm-mono); color: #9aa8b8; border: 1px solid transparent; border-bottom: 0; background: transparent; }
+#terminalView .term-tab.on { background: #0b0f17; color: #e2e8f0; border-color: #1d2633; }
+#terminalView .term-tab i { box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.15); }
+#terminalView .term-tab.gone i { box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.15); }
+#terminalView .term-empty { color: #8b98a8; font-family: var(--tm-mono); }
+
+
+/* ---- Uptime and Containers: their notes ---- */
+.sx-note { font-size: 12.5px; color: var(--tm-ink-3); margin: 0; }
+
+/* ---- the narrower screens ---- */
+@media (max-width: 1180px) {
+  .sx-two, .sx-pve-top { grid-template-columns: minmax(0, 1fr); }
+  .sx-gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #modelsView .sx-res { height: 520px; }
+}
+@media (max-width: 760px) {
+  .sx-hero { height: 470px; }
+  .sx-hero .ck-sav { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: 200px auto; }
+  .sx-hero .ck-ledger { grid-column: 1 / -1; }
+  .sx-pve-top > .tw:first-child { height: 250px; }
+  .sx-pve-top > .tw:last-child { height: auto; max-height: 320px; }
+  .sx-rx3 .ck-rx .tm-reactor { height: min(150px, 100%); }
+  .sx-metric .ui-metric-num { font-size: 19px; }
+}
+@media (max-width: 520px) {
+  #modelsView .sx-res { height: 470px; }
+  .sx-gauge .tm-reactor { height: min(150px, calc(100% - 34px)); }
+  .sx-two > .tw { height: 300px; }
+}
+
+/* ---- Cockpit off: the same figures as plain numbers; nothing moves, no grid, no dials ---- */
+.sx-classic .tw.inst { background-image: none; }
+.sx-classic .tw.inst::before, .sx-classic .tw.inst::after { display: none; }
+.sx-classic .tw { --tm-glow: 0; }
+.sx-classic .tm-pulse-head.ping { animation: none; }
+.sx-classic .ck-rx { background: none !important; }
+.sx-classic .tm-reactor { aspect-ratio: auto; height: auto !important; width: 100% !important; max-width: none; container-type: normal; }
+.sx-classic .tm-reactor-svg { display: none; }
+.sx-classic .tm-reactor-mid { position: static; inset: auto; align-items: flex-start; text-align: left; gap: 2px; }
+.sx-classic .tm-r-label { font-size: 12.5px; }
+.sx-classic .tm-r-value { font-size: 27px; }
+.sx-classic .tm-r-unit, .sx-classic .tm-r-period { font-size: 11.5px; }
+.sx-classic .ck-rx { align-items: flex-start; justify-content: center; }
+.sx-classic .sx-hero { height: auto; }
+.sx-classic .sx-hero .ck-sav { grid-template-columns: minmax(150px, 0.6fr) minmax(150px, 0.6fr) minmax(0, 2fr); }
+.sx-classic .sx-rx3 { align-items: start; }
+.sx-classic .sx-pve-top > .tw { height: auto; min-height: 180px; }
+.sx-classic .sx-gauges { align-items: start; }
+.sx-classic .sx-gauge { align-items: flex-start; height: auto; }
+.sx-classic .sx-gauge-note { text-align: left; }
+.sx-classic#modelsView .sx-res { height: auto; }
+.sx-classic .sx-ticks { filter: none !important; }
+@media (max-width: 520px) { .sx-heat { --c: 15px; --g: 3px; } }

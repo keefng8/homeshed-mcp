@@ -1,0 +1,38 @@
+{
+  "id": "tts.voices",
+  "name": "Text-to-Speech Voices",
+  "version": "1.0.0",
+  "description": "Google's Chirp 3 HD voices for tts.synthesize: name, gender and language, optionally for one language. Asked of Google at most once a day per language.",
+  "category": "tts",
+  "risk": "read",
+  "requires": [
+    "GOOGLE_TTS_SERVICE_ACCOUNT in the vault (a Google Cloud service account key file)"
+  ],
+  "transport": "mcp",
+  "aliases": [
+    "tts voices",
+    "which voices can read my book",
+    "list google voices"
+  ],
+  "inputs": {
+    "language": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.tts.voices.voices"
+  },
+  "latency": {
+    "expected_ms": 1000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "tts.synthesize"
+  ]
+}

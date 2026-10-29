@@ -319,3 +319,68 @@ def test_pending_says_whether_the_app_is_verified(http):
     _authorize(http, client_id, challenge)
     [row] = oauth_server.pending()
     assert row["verified"] is False and row["client_host"] is None
+
+
+def _trusted_sign_in(http):
+    """A sign-in the owner approves with trust ticked; returns (app, client_id, cookie name, cookie value)."""
+    client_id = _register(http)
+    _, challenge = _pkce()
+    pid = _authorize(http, client_id, challenge)
+    out = oauth_server.decide(pid, True, trust=True)
+    assert out["trusted"]
+    r = http.get(f"/oauth/consent/{pid}/status")
+    assert "_trust_cookie" not in r.json() and "redirect" in r.json()  # the cookie is never in the page's JSON
+    name = oauth_server.trust_cookie_name(client_id)
+    set_cookie = r.headers["set-cookie"]
+    assert set_cookie.startswith(name + "=") and "HttpOnly" in set_cookie and "Secure" in set_cookie
+    assert "Path=/oauth/consent" in set_cookie
+    return out["app"], client_id, name, set_cookie.split(";", 1)[0].split("=", 1)[1]
+
+
+def test_a_trusted_browser_signs_the_same_app_in_without_asking(http, monkeypatch):
+    told = []
+    monkeypatch.setattr(oauth_server, "_tell_owner", lambda item: told.append(item))
+    app, client_id, name, value = _trusted_sign_in(http)
+    _, challenge = _pkce()
+    pid = _authorize(http, client_id, challenge, state="s2")
+    page = http.get(f"/oauth/consent/{pid}", headers={"Cookie": f"{name}={value}"})
+    assert page.status_code == 200
+    status = http.get(f"/oauth/consent/{pid}/status").json()
+    assert status["status"] == "approved" and parse_qs(urlsplit(status["redirect"]).query)["state"] == ["s2"]
+    assert told == []  # the trusted browser never alerts the owner
+    assert [r["app"] for r in oauth_server.trusted()] == [app]
+
+
+def test_trust_needs_the_browser_not_just_the_app(http, monkeypatch):
+    told = []
+    monkeypatch.setattr(oauth_server, "_tell_owner", lambda item: told.append(item))
+    app, client_id, name, value = _trusted_sign_in(http)
+    _, challenge = _pkce()
+    pid = _authorize(http, client_id, challenge, state="s3")  # same app, a browser with no cookie
+    http.get(f"/oauth/consent/{pid}")
+    assert http.get(f"/oauth/consent/{pid}/status").json()["status"] == "waiting" and len(told) == 1
+    pid2 = _authorize(http, client_id, challenge, state="s4")  # a made-up cookie
+    http.get(f"/oauth/consent/{pid2}", headers={"Cookie": f"{name}=not-the-real-one"})
+    assert http.get(f"/oauth/consent/{pid2}/status").json()["status"] == "waiting"
+    other = _register(http)  # the real cookie, but for a different app
+    pid3 = _authorize(http, other, challenge, state="s5")
+    http.get(f"/oauth/consent/{pid3}", headers={"Cookie": f"{oauth_server.trust_cookie_name(other)}={value}"})
+    assert http.get(f"/oauth/consent/{pid3}/status").json()["status"] == "waiting"
+
+
+def test_removing_trust_or_the_app_asks_the_owner_again(http):
+    app, client_id, name, value = _trusted_sign_in(http)
+    [row] = oauth_server.trusted()
+    headers = {"Authorization": "Bearer owner-secret"}
+    assert http.post(f"/oauth/trusted/{row['id']}/remove", headers=headers).status_code == 200
+    assert oauth_server.trusted() == []
+    assert http.post(f"/oauth/trusted/{row['id']}/remove", headers=headers).status_code == 404
+    _, challenge = _pkce()
+    pid = _authorize(http, client_id, challenge, state="s6")
+    http.get(f"/oauth/consent/{pid}", headers={"Cookie": f"{name}={value}"})
+    assert http.get(f"/oauth/consent/{pid}/status").json()["status"] == "waiting"
+    oauth_server.decide(pid, True, app=app, trust=True)
+    assert len(oauth_server.trusted()) == 1
+    oauth_server.end_app(app)  # deleting the app (or rotating its key) forgets its trusted browsers too
+    assert oauth_server.trusted() == []
+    assert http.get("/oauth/trusted").status_code in (401, 403)  # the owner's list needs the owner

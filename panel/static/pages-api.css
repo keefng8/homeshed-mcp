@@ -1,0 +1,44 @@
+/* The API access page's styles (static/pages-api.css). Linked by index.html right after panel.css. */
+/* ---- API access page (client identities, grants, tokens) ---- */
+.api-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.api-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.api-form label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--text-2); }
+.api-form .full { grid-column: 1 / -1; }
+.token-box { display: none; margin-top: 12px; padding: 14px; border-radius: 12px; background: var(--ok-soft); }
+.token-box.show { display: block; animation: riseIn .4s cubic-bezier(.32,.72,0,1); }
+.token-box code { display: block; font-family: var(--mono); font-size: 13px; word-break: break-all; padding: 10px; margin: 8px 0;
+  border-radius: 8px; background: var(--field); border: 1px solid var(--separator); user-select: all; }
+.token-box pre { font-family: var(--mono); font-size: 11.5px; white-space: pre-wrap; margin: 6px 0; padding: 10px; border-radius: 8px; background: var(--field); border: 1px solid var(--separator); }
+.client-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.client-view { display: flex; flex-wrap: wrap; gap: 12px 24px; }
+.client-view > div { flex: 1 1 220px; } .client-view .vlabel { font-size: 12.5px; font-weight: 600; margin-bottom: 4px; }
+.client-view .hint { display: block; margin-top: 4px; }
+.client-toolset { margin-top: 16px; } .client-toolset .vlabel { font-size: 12.5px; font-weight: 600; margin-bottom: 4px; }
+.client-toolset .ts-groups { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-top: 6px; }
+.client-toolset .ts-groups label { display: inline-flex; gap: 5px; align-items: center; font-size: 13px; font-family: var(--mono); }
+.fd-savings { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+.fd-savings th, .fd-savings td { padding: 6px 10px; text-align: left; border-top: 1px solid var(--separator); }
+.fd-savings td:nth-child(n+2), .fd-savings th:nth-child(n+2) { text-align: right; }
+.shared-item { padding: 10px 0; }
+.shared-item + .shared-item { border-top: 1px solid var(--separator); }
+.shared-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; margin: 6px 0 0; }
+.grant-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 12.5px; border-top: 1px solid var(--separator); cursor: pointer; }
+.grant-row input { accent-color: var(--ok); width: 16px; height: 16px; flex: 0 0 auto; margin: 0; }
+.grant-row .tid { font-family: var(--mono); overflow-wrap: anywhere; min-width: 0; }
+.grant-row .scope { margin-left: auto; } .grant-row .off-all { color: var(--bad); font-size: 11.5px; }
+@media (max-width: 860px) { .api-grid, .api-form { grid-template-columns: minmax(0,1fr); } }
+.api-secondary { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.api-secondary #apSavings { grid-column: 1 / -1; }
+@media (min-width: 1700px) { .api-secondary { grid-template-columns: repeat(3, minmax(0, 1fr)); } .api-secondary #apSavings { grid-column: auto; } }
+@media (max-width: 1100px) { .api-secondary { grid-template-columns: minmax(0, 1fr); } }
+.api-table .ui-name-cell .ui-sec { max-width: 280px; }
+.api-table th:nth-child(1) { width: 26%; } .api-table th:nth-child(2) { width: 13%; } .api-table th:nth-child(3) { width: 15%; }
+.api-table th:nth-child(4) { width: 19%; } .api-table th:is(:nth-child(5), :nth-child(6), :nth-child(7)) { width: 9%; } .api-table th:nth-child(8) { width: 48px; }
+html[data-tab="api"] .page-desc { max-width: none; }
+#apToken.show { background: var(--surface); border: 1px solid var(--separator); border-left: 3px solid var(--ok); }
+#apToken .hint code { display: inline; padding: 1px 6px; margin: 0; font-size: 12px; user-select: all; }
+.ui-field [aria-invalid="true"], .ui-field [aria-invalid="true"]:focus { border-color: var(--bad); }
+.ui-field:has(.ui-err:not(:empty)) > .hint { display: none; }
+/* The page bar has the API page's own live state and Refresh, so the shared header's pair steps aside here. */
+html[data-tab="api"] .page-head { margin-bottom: 14px; }
+html[data-tab="api"] :is(#liveBadge, .top-right > button[onclick="loadAll()"]) { display: none; }

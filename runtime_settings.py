@@ -119,6 +119,12 @@ try:  # the image provider switches (paid providers start off) live with the ima
 except ImportError:
     pass
 
+try:  # Google text to speech's paid allowance (none: free characters only) lives with the tts tools
+    from tools.tts import SETTINGS as _TTS_SETTINGS
+    SCHEMA.update(_TTS_SETTINGS)
+except ImportError:
+    pass
+
 try:  # the language-model relay switches (llm.chat; every paid provider starts off) live with the llm tools
     from tools.llm.providers import SETTINGS as _LLM_SETTINGS
     SCHEMA.update(_LLM_SETTINGS)

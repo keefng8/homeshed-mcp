@@ -18,7 +18,7 @@ DEFAULT_MB, MAX_MB = 1.0, MAX_BYTES / 1024 / 1024  # base64 lands in the caller'
 
 
 @tool(name="fetch", category="image", doc="image/fetch.md")
-def fetch(job_id: str, max_mb: float = DEFAULT_MB) -> dict:
+def fetch(job_id: str, max_mb: float = DEFAULT_MB, raw: bool = False) -> dict:
     """Download a finished image job's full-size original, byte for byte (image.status only gives a <=1024 px JPEG
     preview for big images). Paid-provider jobs keep the provider's own format; local jobs are PNG.
 
@@ -26,6 +26,9 @@ def fetch(job_id: str, max_mb: float = DEFAULT_MB) -> dict:
         job_id: the 12-hex-char id image.generate returned; the job must be done.
         max_mb: the largest file returned (default 1 MB; up to 25). The bytes come back as base64 text (a third
             bigger), so a big file fills the caller's context: ask for more only to save the file, not to look at it.
+        raw: keep the bytes as image_b64 text even for an app whose images come as pictures (API page, Images: "As
+            pictures"), for a script that saves the file. Otherwise such an app gets an image block it can see but
+            not save.
 
     Returns:
         {"job_id", "name", "image_b64", "image_mime", "bytes"}. A file over max_mb is refused with its size, so the
@@ -62,7 +65,7 @@ def fetch(job_id: str, max_mb: float = DEFAULT_MB) -> dict:
         _check_size(len(data), limit)
     mime = prov.sniff_mime(data) or "application/octet-stream"
     return {"job_id": job_id, "name": name, "image_b64": base64.b64encode(data).decode(), "image_mime": mime,
-            "bytes": len(data)}
+            "bytes": len(data), **({"image_raw": True} if raw is True else {})}
 
 
 def _check_size(size: int, limit: int) -> None:

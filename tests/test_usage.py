@@ -80,3 +80,42 @@ def test_a_get_to_a_listed_write_tool_counts_as_a_read(monkeypatch):
     assert u.ledger_id("svc.call", {"method": "post"}) == "svc.call"
     assert u.ledger_id("svc.call", None) == "svc.call"
     assert u.ledger_id("git.commit", {"method": "GET"}) == "git.commit"  # only tools listed
+
+def test_calls_errors_refusals_and_savings_land_in_their_hour(monkeypatch):
+    """The Control Panel's Pulse chart: per-hour counts, since the totals keep no history."""
+    now = [7200.0 + 5]
+    monkeypatch.setattr(usage.time, "time", lambda: now[0])
+    usage.record("local_ai.ask", {}, {"text": "y" * 400}, ok=True)          # hour 7200: a call that saved 400 chars
+    usage.record("local_ai.ask", {}, None, ok=False)                        # hour 7200: an error
+    now[0] = 7200.0 + 3700
+    usage.record_refusal("app1")                                          # hour 10800
+    usage.record_front_door("app1", hidden_chars=40_000)                    # hour 10800
+    usage.record_front_door("app1", trimmed_chars=8_000)
+    hours = usage.summary()["hours"]
+    assert hours == [{"t": 7200, "calls": 2, "errors": 1, "refused": 0, "saved_chars": 400, "fd_chars": 0},
+                     {"t": 10800, "calls": 0, "errors": 0, "refused": 1, "saved_chars": 0, "fd_chars": 48_000}]
+
+
+def test_hour_buckets_stay_bounded(monkeypatch):
+    monkeypatch.setattr(usage, "MAX_HOURS", 3)
+    now = [0.0]
+    monkeypatch.setattr(usage.time, "time", lambda: now[0])
+    for h in range(10):
+        now[0] = h * 3600.0
+        usage.record("docker.container.list", {}, [], ok=True)
+    assert [h["t"] for h in usage.summary()["hours"]] == [7 * 3600, 8 * 3600, 9 * 3600]  # the newest three
+
+
+def test_front_door_totals_add_every_app_and_name_none():
+    usage.record_front_door("app1", hidden_chars=40_000)
+    usage.record_front_door("app2", hidden_chars=4_000)
+    usage.record_front_door("app2", trimmed_chars=1_000)
+    assert usage.summary()["front_door_total"] == {"listings": 2, "hidden_chars": 44_000, "calls": 1,
+                                                   "trimmed_chars": 1_000}
+    assert "app1" not in json.dumps(usage.summary()["front_door_total"])
+
+
+def test_an_old_usage_file_without_hours_still_summarises(usage_file):
+    usage_file.write_text(json.dumps({"since": 1, "capabilities": {}}))
+    s = usage.summary()
+    assert s["hours"] == [] and s["front_door_total"] == {"listings": 0, "hidden_chars": 0, "calls": 0, "trimmed_chars": 0}

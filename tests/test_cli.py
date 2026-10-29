@@ -26,7 +26,7 @@ def data_dir(tmp_path, monkeypatch):
     # One pytest session at the public repo's root also loads panel/conftest.py, which sets these for the whole
     # process: doctor then saw an unreachable memory-core (the prepper, 2026-10-01).
     for var in ("MEMORY_CORE_BASE_URL", "MEMORY_CORE_BEARER", "MEMORY_SERVICE_ID", "MEMORY_USER_KEY", "MEMORY_TEAM_ID",
-                "MEMORY_USER_ID", "MEMORY_AGENT_ID", "MCP_BASE_URL", "MCP_AUTH_TOKEN", "MCP_HOST_HEADER"):
+                "MEMORY_USER_ID", "MEMORY_AGENT_ID", "MCP_BASE_URL", "MCP_AUTH_TOKEN", "MCP_HOST_HEADER", "MCP_PUBLIC_URL"):
         monkeypatch.delenv(var, raising=False)
     return tmp_path / "data"
 
@@ -215,6 +215,83 @@ def test_doctor_json_carries_the_same_report(manifests, capsys):
     report = json.loads(capsys.readouterr().out)
     assert report["tools_total"] == 3 and report["tools_ready"] == 1 and report["write_tools_off"] == ["git.commit"]
     assert [g["name"] for g in report["groups"]] == ["Notifications"] and report["broken"] == 0
+
+
+PUBLIC = "https://homeshed.example.test"
+META = {"issuer": PUBLIC + "/", "authorization_endpoint": PUBLIC + "/authorize", "token_endpoint": PUBLIC + "/token",
+        "registration_endpoint": PUBLIC + "/register", "client_id_metadata_document_supported": True}
+
+
+@pytest.fixture
+def oauth_store(monkeypatch, tmp_path):
+    """A sign-in store in the test's temp folder: two signed-in apps (one twice), an expired one, one waiting sign-in."""
+    import time as _time
+    cli._prepare()
+    import clients
+    import oauth_server
+    store = tmp_path / "oauth.json"
+    monkeypatch.setattr(oauth_server, "STORE_FILE", store)
+    monkeypatch.setattr(clients, "_load", lambda: {"clients": {}})
+    now = _time.time()
+    live = {"expires_at": now + 3600, "client_id": "c", "scopes": [], "grant": "g"}
+    store.write_text(json.dumps({
+        "refresh": {"h1": {**live, "app": "claude-ai"}, "h2": {**live, "app": "claude-ai"},
+                    "h3": {**live, "app": "chatgpt"}, "h4": {**live, "app": "gone", "expires_at": now - 5}},
+        "access": {"h5": {**live, "app": "claude-ai"}},
+        "pending": {"p1": {"client_id": "https://claude.ai/oauth/x", "client_name": "Claude", "redirect_uri":
+                           "https://claude.ai/cb", "status": "waiting", "at": now, "match": "123456"}}}),
+        encoding="utf-8")
+    return store
+
+
+def test_doctor_says_oauth_is_off_and_gives_the_connector_steps(manifests, capsys):
+    assert cli.main(["doctor"]) == 0
+    out = capsys.readouterr().out
+    assert "Sign-in (OAuth) off (MCP_PUBLIC_URL not set)" in out
+    assert "Add custom connector" in out and "MCP_PUBLIC_URL=https://" in out and "/mcp" in out
+
+
+def test_doctor_reports_oauth_on_with_metadata_apps_and_pending_names_only(manifests, monkeypatch, capsys,
+                                                                          oauth_store):
+    monkeypatch.setenv("MCP_PUBLIC_URL", PUBLIC + "/")
+    asked = []
+    monkeypatch.setattr(cli, "_get", lambda url, timeout=3.0: (asked.append(url) or True, ""))
+    monkeypatch.setattr(cli, "_get_json", lambda url, timeout=5.0: META if url.endswith("authorization-server") else
+                        {"resource": PUBLIC + "/mcp"} if "protected-resource" in url else None)
+    assert cli.main(["doctor"]) == 0
+    out = capsys.readouterr().out
+    assert PUBLIC + "/healthz" in asked
+    assert f"on at {PUBLIC}/mcp, answers, sign-in metadata served" in out
+    assert f"authorize {PUBLIC}/authorize" in out and f"resource {PUBLIC}/mcp" in out
+    assert "2 app(s) signed in this way: chatgpt, claude-ai; 1 sign-in(s) waiting" in out
+    assert "gone" not in out and "h1" not in out and "hso_" not in out and "123456" not in out  # no tokens, no codes
+    assert cli.main(["doctor", "--json"]) == 0
+    oauth = json.loads(capsys.readouterr().out)["oauth"]
+    assert oauth["apps"] == ["chatgpt", "claude-ai"] and oauth["pending"] == 1 and oauth["state"] == "ready"
+    assert "h1" not in json.dumps(oauth) and "expires_at" not in json.dumps(oauth)
+
+
+def test_doctor_calls_oauth_broken_when_the_public_address_or_metadata_is_missing(manifests, monkeypatch, capsys):
+    monkeypatch.setenv("MCP_PUBLIC_URL", PUBLIC)
+    monkeypatch.setattr(cli, "_get_json", lambda url, timeout=5.0: None)
+    monkeypatch.setattr(cli, "_get", lambda url, timeout=3.0: (False, ""))
+    assert cli.main(["doctor"]) == 1
+    assert f"on, but {PUBLIC} didn't answer" in capsys.readouterr().out
+    monkeypatch.setattr(cli, "_get", lambda url, timeout=3.0: (True, ""))
+    assert cli.main(["doctor"]) == 1
+    assert "serves no sign-in metadata" in capsys.readouterr().out
+    monkeypatch.setenv("MCP_PUBLIC_URL", "http://192.168.1.5:8765")
+    assert cli.main(["doctor"]) == 1
+    assert "isn't an https address" in capsys.readouterr().out
+
+
+def test_doctor_reads_mcp_public_url_from_the_env_file(manifests, monkeypatch, tmp_path, capsys):
+    (tmp_path / ".env").write_text(f"MCP_AUTH_TOKEN=not-printed\nMCP_PUBLIC_URL={PUBLIC}\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "_get", lambda url, timeout=3.0: (True, ""))
+    monkeypatch.setattr(cli, "_get_json", lambda url, timeout=5.0: META)
+    assert cli.main(["doctor"]) == 0
+    out = capsys.readouterr().out
+    assert f"on at {PUBLIC}/mcp" in out and "not-printed" not in out
 
 
 def test_doctor_uses_plain_markers_where_emoji_cannot_print(monkeypatch):

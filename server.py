@@ -644,10 +644,25 @@ async def oauth_decide(request: Request) -> JSONResponse:
     try:
         body = await _body(request) if action == "approve" else {}
         out = oauth_server.decide(request.path_params["pid"], action == "approve", str(body.get("app") or ""),
-                                  str(body.get("preset") or "read"))
+                                  str(body.get("preset") or "read"), trust=body.get("trust") is True)
     except (oauth_server.OAuthError, clients.ClientError, ValueError, TypeError) as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     return JSONResponse(out)
+
+
+@mcp.custom_route("/oauth/trusted", methods=["GET"])
+async def oauth_trusted(request: Request) -> JSONResponse:
+    """Browsers the owner trusted to sign an app in without asking (oauth_server.trusted)."""
+    import oauth_server
+    return JSONResponse({"trusted": oauth_server.trusted()})
+
+
+@mcp.custom_route("/oauth/trusted/{tid}/remove", methods=["POST"])
+async def oauth_untrust(request: Request) -> JSONResponse:
+    import oauth_server
+    if not oauth_server.untrust(request.path_params["tid"]):
+        return JSONResponse({"error": "no trusted browser with that id"}, status_code=404)
+    return JSONResponse({"removed": request.path_params["tid"]})
 
 
 @mcp.custom_route("/memory/pending", methods=["GET"])
@@ -1304,12 +1319,22 @@ def _oauth_app() -> ASGIApp | None:
         return JSONResponse(meta, headers={"Access-Control-Allow-Origin": "*"})
 
     async def consent_page(request: Request) -> HTMLResponse:
+        import asyncio
+        pid = request.path_params["pid"]
+        item = oauth_server._load()["pending"].get(pid)
+        cookie = request.cookies.get(oauth_server.trust_cookie_name(item["client_id"])) if item else None
+        await asyncio.to_thread(oauth_server.consent_view, pid, cookie)
         return HTMLResponse(oauth_server.CONSENT_HTML, headers={"Cache-Control": "no-store",
                                                                 "X-Frame-Options": "DENY"})
 
     async def consent_status(request: Request) -> JSONResponse:
-        return JSONResponse(oauth_server.consent_status(request.path_params["pid"]),
-                            headers={"Cache-Control": "no-store"})
+        out = oauth_server.consent_status(request.path_params["pid"])
+        trust = out.pop("_trust_cookie", None)
+        resp = JSONResponse(out, headers={"Cache-Control": "no-store"})
+        if trust:  # only this browser can sign the app in again without asking; scripts can't read it
+            resp.set_cookie(trust[0], trust[1], max_age=oauth_server.TRUST_TTL_S, path="/oauth/consent",
+                            secure=True, httponly=True, samesite="lax")
+        return resp
 
     routes += [Route("/.well-known/oauth-authorization-server", as_meta, methods=["GET", "OPTIONS"]),
                Route("/oauth/consent/{pid}", consent_page, methods=["GET"]),

@@ -17,7 +17,8 @@ def compare(image: str, reference: str, region: str = "print") -> dict:
     lifestyle scene an image model made from the real mockup. Free, on the image service's CPU, about 2-4 s.
 
     Args:
-        image: the scene: an image name (saved_as), "folder/name.png", or a Printify mockup address.
+        image: the scene: an image name (saved_as), "folder/name.png", a Printify mockup address, or an Etsy listing
+            photo's address (url_fullxfull on i.etsystatic.com, from etsy.listing.get): is the live photo the mockup?
         reference: what the print must look like: the mockup the scene was made from, the print file or the design
             (same forms as image).
         region: "print" (default): only the print on the reference counts; "all": the whole reference.
@@ -32,7 +33,7 @@ def compare(image: str, reference: str, region: str = "print") -> dict:
     from tools.commerce._http import CommerceError
     from tools.image.refs import image_bytes
     try:
-        scene, ref = image_bytes(image, MAX_BYTES), image_bytes(reference, MAX_BYTES)
+        scene, ref = image_bytes(image, MAX_BYTES, etsy_photos=True), image_bytes(reference, MAX_BYTES)
     except CommerceError as exc:
         raise ImageError(str(exc)) from None
     body = {"image_b64": base64.b64encode(scene).decode(), "reference_b64": base64.b64encode(ref).decode(),
