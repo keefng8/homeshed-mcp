@@ -56,6 +56,9 @@ TRUST_TTL_S = 90 * 86400
 MAX_TRUSTED = 50
 PRESETS = ("none", "read", "all")
 _lock = threading.Lock()
+# What the waiting browser is handed once (its redirect, which carries the sign-in code, and a trust cookie): held in
+# memory only, never in the store file, so no raw secret sits on disk (code scanning, 0.7.1). The store keeps hashes.
+_handoff: dict[str, dict] = {}
 _cimd_cache: dict[str, tuple[float, dict]] = {}
 _alerts: list[float] = []
 _logger = logging.getLogger(__name__)
@@ -405,8 +408,8 @@ def decide(pid: str, approve: bool, app: str = "", preset: str = "read", trust: 
             raise OAuthError("that sign-in isn't waiting any more (they last 10 minutes): ask for a new one")
         if not approve:
             item["status"] = "declined"
-            item["redirect"] = construct_redirect_uri(item["redirect_uri"], error="access_denied",
-                                                      error_description="the owner declined", state=item["state"])
+            _hand(pid, construct_redirect_uri(item["redirect_uri"], error="access_denied",
+                                              error_description="the owner declined", state=item["state"]))
             _save(data)
             return {"id": pid, "status": "declined"}
         if preset not in PRESETS:
@@ -420,8 +423,8 @@ def decide(pid: str, approve: bool, app: str = "", preset: str = "read", trust: 
                                    "code_challenge": item["code_challenge"], "redirect_uri": item["redirect_uri"],
                                    "explicit": item["explicit"], "resource": item["resource"],
                                    "expires_at": time.time() + CODE_TTL_S}
-        item.update(status="approved", app=name,
-                    redirect=construct_redirect_uri(item["redirect_uri"], code=code, state=item["state"]))
+        item.update(status="approved", app=name)
+        cookie = None
         if trust:
             if len(data["trusted"]) >= MAX_TRUSTED:
                 raise OAuthError(f"{MAX_TRUSTED} trusted apps already: remove one on the API page first")
@@ -429,10 +432,19 @@ def decide(pid: str, approve: bool, app: str = "", preset: str = "read", trust: 
             data["trusted"][_h(cookie)] = {"app": name, "client_id": item["client_id"],
                                            "client_name": item["client_name"], "redirect_uri": item["redirect_uri"],
                                            "at": time.time(), "expires_at": time.time() + TRUST_TTL_S}
-            item["trust_cookie"] = cookie  # handed to the asking browser once, with its redirect
+        _hand(pid, construct_redirect_uri(item["redirect_uri"], code=code, state=item["state"]), cookie)
         _save(data)
-    clients._audit("oauth sign-in approved", name, oauth_client=item["client_id"][:120], trusted=bool(trust))
+    clients._audit("oauth sign-in approved", name, oauth_client=item["client_id"][:120],
+                   trusted="yes" if trust else "no")
     return {"id": pid, "status": "approved", "app": name, **({"trusted": True} if trust else {})}
+
+
+def _hand(pid: str, redirect: str, cookie: str | None = None) -> None:
+    """Keep what the waiting browser gets once, in memory (call under _lock); stale ones are dropped."""
+    now = time.time()
+    for k in [k for k, v in _handoff.items() if now - v["at"] >= PENDING_TTL_S]:
+        del _handoff[k]
+    _handoff[pid] = {"at": now, "redirect": redirect, "cookie": cookie}
 
 
 def trust_cookie_name(client_id: str) -> str:
@@ -500,10 +512,11 @@ def consent_status(pid: str) -> dict:
         if item["status"] == "waiting" and time.time() - item["at"] >= PENDING_TTL_S:
             return {"status": "expired"}
         out = {"status": item["status"], "app_name": item["client_name"], "match": item["match"]}
-        if item.get("redirect"):
-            out["redirect"] = item.pop("redirect")  # handed out once
-            if item.get("trust_cookie"):  # the route turns this into a cookie; never in the page's JSON
-                out["_trust_cookie"] = (trust_cookie_name(item["client_id"]), item.pop("trust_cookie"))
+        hand = _handoff.pop(pid, None) if item["status"] in ("approved", "declined") else None
+        if hand and time.time() - hand["at"] < PENDING_TTL_S:
+            out["redirect"] = hand["redirect"]  # handed out once
+            if hand["cookie"]:  # the route turns this into a cookie; never in the page's JSON
+                out["_trust_cookie"] = (trust_cookie_name(item["client_id"]), hand["cookie"])
             item["status"] = "done-" + item["status"]
             _save(data)
         return out

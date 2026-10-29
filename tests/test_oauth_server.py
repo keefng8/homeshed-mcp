@@ -328,6 +328,9 @@ def _trusted_sign_in(http):
     pid = _authorize(http, client_id, challenge)
     out = oauth_server.decide(pid, True, trust=True)
     assert out["trusted"]
+    on_disk = oauth_server.STORE_FILE.read_text(encoding="utf-8")
+    hand = oauth_server._handoff[pid]
+    assert hand["cookie"] not in on_disk and hand["redirect"] not in on_disk  # raw secrets live in memory only
     r = http.get(f"/oauth/consent/{pid}/status")
     assert "_trust_cookie" not in r.json() and "redirect" in r.json()  # the cookie is never in the page's JSON
     name = oauth_server.trust_cookie_name(client_id)

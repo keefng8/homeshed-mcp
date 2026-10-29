@@ -384,7 +384,7 @@ def oauth_state(env_file: str = ".env") -> dict:
     """Sign-in with OAuth (oauth_server.py): on when MCP_PUBLIC_URL is set (the environment, else the .env serve --http
     reads); whether the public address answers and serves the sign-in metadata; the apps signed in that way (names
     only) and sign-ins waiting for the owner. Tokens are never read out of the store, only who they belong to."""
-    raw = (os.environ.get("MCP_PUBLIC_URL") or _env_values(Path(env_file)).get("MCP_PUBLIC_URL") or "").strip()
+    raw = (os.environ.get("MCP_PUBLIC_URL") or _env_value(Path(env_file), "MCP_PUBLIC_URL")).strip()
     url = raw.rstrip("/")
     base = {"public_url": url or None, "apps": [], "pending": 0}
     if not url:
@@ -499,6 +499,18 @@ def _env_values(path: Path) -> dict:
     pairs = (ln.split("=", 1) for ln in path.read_text(encoding="utf-8").splitlines()
              if "=" in ln and not ln.lstrip().startswith("#"))
     return {k.strip(): v.strip() for k, v in pairs}
+
+
+def _env_value(path: Path, key: str) -> str:
+    """One key's value from an env file, or "": nothing else in the file is read into the caller (the doctor report
+    prints what oauth_state returns, so it must never hold the rest of .env)."""
+    if not path.is_file():
+        return ""
+    for ln in path.read_text(encoding="utf-8").splitlines():
+        k, sep, v = ln.partition("=")
+        if sep and not ln.lstrip().startswith("#") and k.strip() == key:
+            return v.strip()
+    return ""
 
 
 def cmd_panel(args) -> int:
