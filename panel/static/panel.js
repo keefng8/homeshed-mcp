@@ -270,7 +270,7 @@ const PAGE_PARTS = {
   savings: ['pages-ops'], tools: ['pages-ops'], run: ['pages-ops'], docker: ['pages-ops'], monitors: ['pages-ops'],
   proxmox: ['pages-ops'], terminal: ['pages-servers'], api: ['pages-api'], guide: ['pages-guide'],
   todo: ['pages-work-admin', 'pages-todo'], rules: ['pages-work-admin', 'pages-rules'],
-  settings: ['pages-work-admin', 'pages-settings'], observations: ['pages-work-admin'], projects: ['pages-work-admin'],
+  settings: ['pages-work-admin', 'pages-settings', 'pages-setup'], observations: ['pages-work-admin'], projects: ['pages-work-admin'],
 };
 const Pages = window.Pages = (() => {
   const files = {}, hooks = {};

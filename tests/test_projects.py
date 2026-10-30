@@ -72,6 +72,15 @@ def test_register_validates_replaces_and_persists(store):
     assert projects.list_projects() == {"projects": [], "unreadable": False}
 
 
+def test_memory_core_ignores_a_built_in_folder_link_and_reads_claude_project_dir(monkeypatch):
+    projects.register("D:/Linked", "linked", "dir:D:/Elsewhere")  # the built-in store's kind of link
+    assert projects.agent_for("D:/Linked") == "dir:d:/elsewhere" and projects.agent_for("D:/Linked", core=True) is None
+    register_both()
+    from tools.memory import capture as cap
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", "D:/My App")  # a stdio Claude Code session, no project_dir given
+    assert cap._config()["agent_id"] == PREP
+
+
 def test_an_unreadable_file_means_shared_memory_and_no_changes(store):
     (store / "projects.json").write_text("{not json", encoding="utf-8")
     assert projects.agent_for("D:/My App") is None

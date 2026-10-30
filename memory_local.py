@@ -71,6 +71,17 @@ def query(agent: str, session: str, limit: int) -> list[dict]:
     return [{"id": i, "role": r, "content": c, "timestamp": _stamp(at)} for i, r, c, at in rows]
 
 
+def agents() -> list[dict]:
+    """Each memory kept here (the shared one, each folder's dir:..., each app's) and how many facts it holds, for the
+    panel's project picker. [] before the first message."""
+    if not os.path.exists(db_path()):
+        return []
+    with closing(_connect()) as con:
+        rows = con.execute("SELECT agent, SUM(session = 'facts' OR session LIKE 'facts:%') FROM messages "
+                           "GROUP BY agent").fetchall()
+    return [{"agent": a, "facts": int(n or 0)} for a, n in rows]
+
+
 def count() -> int:
     """Every message saved here, for `homeshed-mcp doctor`. 0 before the first one (the file may not exist yet)."""
     if not os.path.exists(db_path()):

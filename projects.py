@@ -60,6 +60,13 @@ def norm(path: str) -> str:
     return p.casefold() if re.match(r"^([A-Za-z]:/|/)", p) else ""
 
 
+def _agent_ok(agent) -> bool:
+    """memory-core's agt-... id, or a built-in store folder's memory (dir:<folder>): another PC's folder registered
+    with dir:<this PC's folder> shares this project's memory (2026-10-30, the second-PC setup)."""
+    agent = str(agent or "")
+    return bool(clients.AGENT_RE.match(agent) or (agent.startswith("dir:") and norm(agent[4:])))
+
+
 def _read() -> tuple[list[dict], bool]:
     """(valid rows, readable). A missing file is readable and empty."""
     global _cache
@@ -74,8 +81,7 @@ def _read() -> tuple[list[dict], bool]:
         return _cache[1], True
     try:
         data = json.loads(PROJECTS_FILE.read_text(encoding="utf-8"))
-        rows = [r for r in data["projects"] if isinstance(r, dict) and norm(r.get("path"))
-                and clients.AGENT_RE.match(str(r.get("agent", "")))]
+        rows = [r for r in data["projects"] if isinstance(r, dict) and norm(r.get("path")) and _agent_ok(r.get("agent"))]
     except (OSError, ValueError, KeyError, TypeError):
         return [], False  # unreadable: every session keeps the shared agent, as before this module
     _cache = (sig, rows)
@@ -96,9 +102,12 @@ def find(project_dir: str) -> dict | None:
     return best
 
 
-def agent_for(project_dir: str) -> str | None:
+def agent_for(project_dir: str, core: bool = False) -> str | None:
+    """The folder's memory agent. core=True (memory-core): only an agt-... id, as a dir: one is the built-in store's."""
     row = find(project_dir)
-    return row["agent"] if row else None
+    if not row or (core and not clients.AGENT_RE.match(row["agent"])):
+        return None
+    return row["agent"]
 
 
 @contextlib.contextmanager
@@ -142,8 +151,12 @@ def register(path: str, name: str, agent: str) -> dict:
         raise ProjectError("path must be an absolute folder, like C:/Users/you/my-app")
     if not NAME_RE.match(str(name or "")):
         raise ProjectError("name: 1-40 lowercase letters, digits or hyphens, like my-app")
-    if not clients.AGENT_RE.match(str(agent or "")):
-        raise ProjectError("a memory agent id looks like agt-xxxxxxxxxx (bootstrap-new-project.ps1 prints it)")
+    agent = str(agent or "").strip()
+    if agent.startswith("dir:"):
+        agent = "dir:" + norm(agent[4:])
+    if not _agent_ok(agent):
+        raise ProjectError("agent: memory-core's agent id (agt-xxxxxxxxxx), or, on the built-in store, dir: and the "
+                           "folder whose memory to share, like dir:C:/Users/you/my-app")
     row = {"path": shown, "name": name, "agent": agent}
     with _lock:
         _save([r for r in _editable() if norm(r["path"]) != norm(shown)] + [row])

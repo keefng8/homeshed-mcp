@@ -122,6 +122,24 @@ def test_busy_locals_overflow_to_cloud_with_key_and_thinking_off(monkeypatch):
     assert calls[0]["json"]["chat_template_kwargs"] == {"enable_thinking": False}
 
 
+def test_a_provider_that_refuses_chat_template_kwargs_is_asked_again_without_it(monkeypatch):
+    """Groq answers HTTP 400 to the field (2026-10-30): its backup was skipped on every question."""
+    monkeypatch.setattr(module, "_no_template_kwargs", set())
+    monkeypatch.setattr(module, "_is_busy", lambda base_url: True)
+    sent = []
+    refused = MagicMock(status_code=400, text='{"error":{"message":"property \'chat_template_kwargs\' is unsupported"}}')
+
+    def fake(url, json=None, headers=None, timeout=None):
+        sent.append(dict(json))
+        return refused if "chat_template_kwargs" in json else _ok("groq")
+
+    monkeypatch.setattr(module.httpx, "post", fake)
+    assert module.ask("hi")["text"] == "groq"
+    assert ["chat_template_kwargs" in s for s in sent] == [True, False]
+    module.ask("hi")  # remembered: straight to the plain request
+    assert "chat_template_kwargs" not in sent[-1] and len(sent) == 3
+
+
 def test_failed_backend_is_benched_then_retried_after_bench_window(monkeypatch):
     t = [1000.0]
     monkeypatch.setattr(module.time, "time", lambda: t[0])

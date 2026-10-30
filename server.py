@@ -511,13 +511,35 @@ async def projects_register(request: Request) -> JSONResponse:
 MEMORY_PANEL_MAX = 100
 
 
-def _panel_facts(category: str, limit: int, max_chars: int) -> dict:
-    """One category of the shared memory's facts, straight from the configured store (the built-in one or
-    memory-core). A direct call: only calls through the served capability are logged, so the panel's polling never
-    shows up as tool calls."""
+def _panel_facts(category: str, limit: int, max_chars: int, project: str = "") -> dict:
+    """One category of the shared memory's facts (or, with a folder, that project's), straight from the configured
+    store (the built-in one or memory-core). A direct call: only calls through the served capability are logged, so
+    the panel's polling never shows up as tool calls."""
     from tools.memory.capture import facts_session_id
     from tools.memory.recall import recall
-    return recall(facts_session_id(category), limit=limit, max_chars=max_chars)
+    return recall(facts_session_id(category), limit=limit, max_chars=max_chars, project_dir=project)
+
+
+@mcp.custom_route("/memory/projects", methods=["GET"])
+async def memory_projects_route(request: Request) -> JSONResponse:
+    """The built-in store's memories for the panel's picker (2026-10-30: each project's own memory was invisible
+    there): the shared one and each folder's, with fact counts; an app's own memory stays out. memory-core: [], as
+    the panel reads memory-core itself. Owner only: client tokens stop at /mcp."""
+    import vault
+    from tools.memory.capture import LOCAL_SHARED
+    if vault.secret("MEMORY_CORE_BASE_URL"):
+        return JSONResponse({"projects": []})
+    import memory_local
+    names = {projects.norm(r["path"]): r["name"] for r in projects.list_projects()["projects"]}
+    rows = []
+    for m in await asyncio.to_thread(memory_local.agents):
+        if m["agent"] == LOCAL_SHARED:
+            rows.append({"project": "", "name": "Shared", "facts": m["facts"]})
+        elif m["agent"].startswith("dir:"):
+            folder = m["agent"][4:]
+            rows.append({"project": folder, "name": names.get(folder) or folder.rstrip("/").rsplit("/", 1)[-1] or folder,
+                         "facts": m["facts"]})
+    return JSONResponse({"projects": sorted(rows, key=lambda r: (r["project"] != "", -r["facts"], r["name"]))})
 
 
 @mcp.custom_route("/memory/facts", methods=["GET"])
@@ -533,10 +555,13 @@ async def memory_facts_route(request: Request) -> JSONResponse:
             raise ValueError("category: lower-case letters, digits and dashes")
         limit = max(1, min(int(q.get("limit", "50")), MEMORY_PANEL_MAX))
         max_chars = max(0, min(int(q.get("max_chars", "300")), 2000))
+        project = str(q.get("project", ""))
+        if project and not projects.norm(project):
+            raise ValueError("project: an absolute folder, as /memory/projects lists it")
     except (ValueError, TypeError) as exc:
         return _client_error(exc)
     try:
-        return JSONResponse(await asyncio.to_thread(_panel_facts, category, limit, max_chars))
+        return JSONResponse(await asyncio.to_thread(_panel_facts, category, limit, max_chars, project))
     except MemoryError as exc:
         return JSONResponse({"error": str(exc)}, status_code=502)
 

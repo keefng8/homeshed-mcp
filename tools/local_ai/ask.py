@@ -174,6 +174,7 @@ def _ordered(pool: list[dict]) -> list[dict]:
 
 PROPS_TTL_S = 60.0
 _props_cache: dict[str, tuple[float, str]] = {}
+_no_template_kwargs: set[str] = set()  # providers that refused chat_template_kwargs (see _call)
 
 
 def _served_model(base_url: str) -> str:
@@ -204,14 +205,21 @@ def _same_model(asked: str, served: str) -> bool:
 def _call(b: dict, prompt: str, max_tokens: int, temperature: float, enable_thinking: bool) -> dict:
     # enable_thinking goes to EVERY backend: Nemotron 3 reasons too, and without
     # enable_thinking=false it spent a whole 20-token budget deliberating (verified 2026-09-25).
+    # A strict provider (Groq, 2026-10-30, a Pro user's friend) refuses the field with HTTP 400: that one is asked
+    # again without it, and remembered, so a cloud backup isn't skipped for a setting it doesn't need.
+    url = f"{b['base_url'].rstrip('/')}/chat/completions"
     body = {"model": b["model"], "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": max_tokens, "temperature": temperature,
-            "chat_template_kwargs": {"enable_thinking": enable_thinking}}
+            "max_tokens": max_tokens, "temperature": temperature}
+    if url not in _no_template_kwargs:
+        body["chat_template_kwargs"] = {"enable_thinking": enable_thinking}
     headers = {"Authorization": f"Bearer {b['key']}"} if b["key"] else None
+    timeout = max(CLOUD_MIN_TIMEOUT_S if b["cloud"] else MIN_TIMEOUT_S, max_tokens / TOKENS_PER_SECOND_FLOOR)
     try:
-        response = httpx.post(f"{b['base_url'].rstrip('/')}/chat/completions", json=body, headers=headers,
-                              timeout=max(CLOUD_MIN_TIMEOUT_S if b["cloud"] else MIN_TIMEOUT_S,
-                                          max_tokens / TOKENS_PER_SECOND_FLOOR))
+        response = httpx.post(url, json=body, headers=headers, timeout=timeout)
+        if response.status_code == 400 and "chat_template_kwargs" in body and "chat_template_kwargs" in response.text:
+            _no_template_kwargs.add(url)
+            body.pop("chat_template_kwargs")
+            response = httpx.post(url, json=body, headers=headers, timeout=timeout)
     except httpx.TimeoutException:
         raise _BackendFailed("timed out") from None
     except httpx.RequestError:

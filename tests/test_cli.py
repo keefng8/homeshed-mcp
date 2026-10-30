@@ -340,19 +340,25 @@ def panel(tmp_path, monkeypatch):
     runs = []
     monkeypatch.setattr(uvicorn, "run", lambda app, **kw: runs.append((app, kw)))
     monkeypatch.setattr(cli, "_get", lambda url, timeout=3.0: (True, ""))
+    import os
+    saved = dict(os.environ)  # the panel loads its settings file into the environment
     yield runs
+    os.environ.clear()
+    os.environ.update(saved)
     sys.path[:] = [p for p in sys.path if p != str(folder)]
     sys.modules.pop("main", None)
 
 
 def test_panel_runs_on_this_machine_with_the_token_init_wrote(panel, tmp_path, data_dir, capsys):
     env = tmp_path / ".env"
-    env.write_text("# made by init\nMCP_AUTH_TOKEN=tok-123\nVAULT_KEY=k\n", encoding="utf-8")
+    env.write_text("# made by init\nMCP_AUTH_TOKEN=tok-123\nVAULT_KEY=k\nGPU_SERVICE_URL=http://gpu:9000\n", encoding="utf-8")
     assert cli.main(["panel", "--env-file", str(env), "--port", "9191", "--server", "http://127.0.0.1:8765/"]) == 0
     assert panel == [("the panel app", {"host": "127.0.0.1", "port": 9191, "log_level": "warning"})]
     import os
     assert os.environ["MCP_BASE_URL"] == "http://127.0.0.1:8765" and os.environ["MCP_HOST_HEADER"] == "127.0.0.1:8765"
     assert os.environ["MCP_AUTH_TOKEN"] == "tok-123" and os.environ["PANEL_DATA_DIR"] == str(data_dir / "panel")
+    # the settings file reaches the panel (GPU_SERVICE_URL, MEMORY_CORE_*), but not the vault key
+    assert os.environ["GPU_SERVICE_URL"] == "http://gpu:9000" and "VAULT_KEY" not in os.environ
     assert (data_dir / "panel").is_dir() and "http://127.0.0.1:9191" in capsys.readouterr().out
 
 

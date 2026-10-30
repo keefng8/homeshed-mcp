@@ -8,7 +8,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --root-user-action=ignore -r requirements.txt \
  && useradd --uid 10001 --create-home --shell /usr/sbin/nologin app \
  && mkdir -p /data && chown app:app /data
-COPY main.py terminal.py ./
+COPY main.py terminal.py setup_routes.py ./
 COPY static ./static
 COPY guides ./guides
 USER app

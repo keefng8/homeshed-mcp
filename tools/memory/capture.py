@@ -84,7 +84,9 @@ def _config(scope: str = "project", project_dir: str = "") -> dict:
         if client is not None:  # naming a folder mustn't reach another project's memory
             agent = clients.memory_agent_for(client) or _own_core_agent(client, values)
         else:
-            agent = projects.agent_for(project_dir or projects.current_dir.get())
+            # CLAUDE_PROJECT_DIR as on the built-in store: Claude Code sets it for a stdio server (the audit, 30 Oct)
+            agent = projects.agent_for(project_dir or projects.current_dir.get()
+                                       or os.environ.get("CLAUDE_PROJECT_DIR", ""), core=True)
     if agent:
         values["agent_id"] = agent
     return values

@@ -124,3 +124,11 @@ body.no-anim *, body.no-anim *::before, body.no-anim *::after { animation-durati
 .cred-keep { background: var(--fill); border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
 .cred-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--separator); }
 .cred-form [data-kinds][hidden] { display: none; }
+/* Settings > System > Set up (pages-setup.js) */
+.conn-dot.off { background: var(--separator); }
+.setup-prompt { margin-top: 8px; }
+.setup-prompt summary { cursor: pointer; font-size: 13px; }
+.setup-prompt textarea { width: 100%; box-sizing: border-box; margin: 6px 0; font: 12px/1.45 var(--mono, monospace); resize: vertical; }
+.setup-link { margin-top: 10px; }
+.setup-link-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+.setup-link-row input { flex: 1 1 220px; min-width: 0; }

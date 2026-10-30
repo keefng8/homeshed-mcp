@@ -1025,6 +1025,9 @@ def test_with_no_memory_core_memory_is_read_through_homeshed(monkeypatch):
         if req.url.path == "/memory/facts":
             got = [{"content": "a fact", "timestamp": "t"}] * (3 if req.url.params["category"] == "platform" else 0)
             return httpx.Response(200, json={"messages": got, "total": len(got)})
+        if req.url.path == "/memory/projects":
+            return httpx.Response(200, json={"projects": [{"project": "", "name": "Shared", "facts": 3},
+                                                          {"project": "d:/work/app", "name": "app", "facts": 1}]})
         return httpx.Response(200, json={})
 
     _patch_mcp_client(monkeypatch, main, httpx.MockTransport(handler))
@@ -1033,8 +1036,13 @@ def test_with_no_memory_core_memory_is_read_through_homeshed(monkeypatch):
     assert cats["platform"]["count"] == 3 and cats["platform"]["latest"][0]["content"] == "a fact"
     assert cats["general"]["count"] == 0 and len(cats) == len(main.FACT_CATEGORIES)
     one = client.get("/api/memory/platform?limit=5").json()
-    assert one["count"] == 3 and seen[-1] == ("/memory/facts", {"category": "platform", "limit": "5", "max_chars": "0"})
-    assert client.get("/api/memory/projects").json() == {"projects": []}
+    assert one["count"] == 3 and seen[-1] == ("/memory/facts", {"category": "platform", "limit": "5", "max_chars": "0",
+                                                                "project": ""})
+    # each project folder's own memory is in the picker too (2026-10-30), and picking one reads that folder's
+    assert client.get("/api/memory/projects").json() == {"projects": [
+        {"id": "", "name": "Shared", "mine": True, "facts": 3}, {"id": "d:/work/app", "name": "app", "mine": False, "facts": 1}]}
+    client.get("/api/memory/platform?agent=d:/work/app")
+    assert seen[-1][1]["project"] == "d:/work/app"
     assert client.get("/api/health").json()["memory_core"] == main.BUILT_IN
 
 

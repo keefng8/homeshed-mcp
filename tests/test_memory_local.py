@@ -87,6 +87,20 @@ def test_a_registered_project_uses_its_agent(monkeypatch):
     assert cap._config(project_dir=r"D:\Work\Foo")["agent_id"] == "agt-registered"
 
 
+def test_another_pcs_folder_shares_this_projects_memory(tmp_path, monkeypatch):
+    """The second-PC setup (2026-10-30): PC 2's folder registered with dir:<PC 1's folder> reads and writes PC 1's
+    project memory, and the panel's picker lists each folder's memory with its count."""
+    monkeypatch.setattr(projects, "PROJECTS_FILE", tmp_path / "projects.json")
+    monkeypatch.setattr(projects, "_cache", (None, []))
+    projects.register("/home/me/my-app", "my-app", r"dir:D:\Work\MyApp")
+    remember_fact("written on PC 2", category="tasks", project_dir="/home/me/my-app/src")
+    got = recall_facts(category="tasks", project_dir=r"D:\Work\MyApp")["messages"]
+    assert [m["content"] for m in got] == ["written on PC 2"]
+    assert {"agent": f"dir:{projects.norm(r'D:/Work/MyApp')}", "facts": 1} in memory_local.agents()
+    with pytest.raises(projects.ProjectError, match="dir:"):
+        projects.register("/home/me/x", "x", "dir:relative")
+
+
 def test_a_client_never_reaches_a_folders_memory(monkeypatch):
     monkeypatch.setattr(clients, "memory_agent_for", lambda client: "agt-own" if client == "kit" else None)
     for client, expected in (("kit", "agt-own"), ("other", "app:other")):  # its own memory, never shared (2026-10-01)

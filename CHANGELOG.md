@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-10-30
+
+### Added
+- **Set up, in the Control Panel** (Settings > System > Set up): checks memory, your AI apps, another PC, a local model and the helper PC, and marks each Ready, Needs fixing or Optional. Where the panel can't do a step itself, it gives you a prompt to paste into your own AI app (a prompt never holds a token). It can also link another PC's project folder to a project's memory.
+- The Memory panel lists each project folder's memory on the built-in store, not only the shared one.
+
+### Fixed
+- `local_ai.ask`: Groq and other strict OpenAI-compatible providers no longer fail with HTTP 400 (`chat_template_kwargs`), so the backup provider is used again.
+- The panel reads its whole settings file (`GPU_SERVICE_URL`, `MEMORY_CORE_*`), except the vault key.
+- With memory-core, a Claude Code session's folder (`CLAUDE_PROJECT_DIR`) picks its registered project.
+- Registering a project no longer points you to a script that only the owner has.
+
+### Changed
+- The plugin runs 0.7.3.
+
 ## [0.7.2] - 2026-10-30
 
 ### Added

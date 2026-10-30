@@ -39,7 +39,7 @@ def test_the_page_links_the_styles_after_the_engine_and_loads_the_script_first_f
     assert page.index('<link rel="stylesheet" href="/telemetry.css">') < page.index('<link rel="stylesheet" href="/pages-work-admin.css">')
     assert '<script src="/pages-work-admin.js">' not in page
     parts = (STATIC / "panel.js").read_text(encoding="utf-8").split("const PAGE_PARTS = {")[1].split("};")[0]
-    for tab, own in (("todo", ", 'pages-todo'"), ("rules", ", 'pages-rules'"), ("settings", ", 'pages-settings'"),
+    for tab, own in (("todo", ", 'pages-todo'"), ("rules", ", 'pages-rules'"), ("settings", ", 'pages-settings', 'pages-setup'"),
                      ("observations", ""), ("projects", "")):
         assert f"{tab}: ['pages-work-admin'{own}]" in parts, tab
 

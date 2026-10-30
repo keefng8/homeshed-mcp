@@ -562,7 +562,13 @@ def cmd_panel(args) -> int:
             panel_start.sign_in_command(__name__, __file__), answers,
             has_token=lambda env: bool(os.environ.get("MCP_AUTH_TOKEN") or _env_values(env).get("MCP_AUTH_TOKEN")),
             init=lambda env: cmd_init(argparse.Namespace(env_file=str(env))))
-    token = os.environ.get("MCP_AUTH_TOKEN") or _env_values(Path(args.env_file)).get("MCP_AUTH_TOKEN", "")
+    # The rest of the settings file too (memory-core, the helper PC, the panel's own): before, only the token was read,
+    # so a GPU_SERVICE_URL or MEMORY_CORE_* there never reached the panel (the audit, 2026-10-30). The environment wins;
+    # the vault key stays with the tool server, which is the only one that needs it.
+    for key, value in _env_values(Path(args.env_file)).items():
+        if key != "VAULT_KEY":
+            os.environ.setdefault(key, value)
+    token = os.environ.get("MCP_AUTH_TOKEN", "")
     if not token:
         print(f"There's no MCP_AUTH_TOKEN in {args.env_file} or the environment. Run  {NAME} init  first, then start "
               f"HomeShed with  {NAME} serve --http.")

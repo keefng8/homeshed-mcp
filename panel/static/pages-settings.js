@@ -31,6 +31,7 @@ const SET_INTRO = {
   'Known bugs': "Claude checks known fixes before debugging, so the same problem is never solved twice. Pro members also get the shared feed of fixes.",
   'APIs you can use': "Every API HomeShed knows how to use: what it costs, and whether it runs on your own machines. What's set up on this install shows on the Overview. Add a key under Keys and passwords.",
   'Connections': 'The services this Control Panel talks to, and whether each one is answering.',
+  'Set up': "What this install has, and what's left: shared memory, your AI apps, another PC, a local model. For a step this page can't do, copy its prompt into your own AI app, which does it for you.",
   'Storage on your PC': "Where your PC keeps the platform's own files.",
   'Pro membership': "Pro adds every curated rule pack, their updates and the known-bugs feed. Connect with a key made on the Pro website: HomeShed never asks for your Pro password.",
 };
@@ -54,9 +55,10 @@ const SET_SECTIONS = [
   ['Keys and passwords', ['Credentials']],
   ['Alerts', ['Notifications', 'Proxmox alarms']],
   ['Account and sharing', ['Pro membership', 'Sharing', 'API access']],
-  ['System', ['Control Panel', 'Connections', 'Storage on your PC']],
+  ['System', ['Set up', 'Control Panel', 'Connections', 'Storage on your PC']],
 ];
 const SET_LABEL = { 'Credentials': 'Keys and passwords' };  // shown names
+const SET_LOADERS = [];  // a card another file draws adds its loader here (pages-setup.js: Set up)
 // Numbers that fine-tune a choice go under "Advanced", so the choices come first; so do the shops' vault entry names.
 const _vaultName = it => /_name$/.test(it.key || '');
 const SET_ADVANCED = { 'Rules and monitoring': it => it.type === 'int', 'Etsy': _vaultName, 'Printify': _vaultName,
@@ -139,7 +141,7 @@ async function loadSettings() {
   (d.info || []).forEach(it => (groups[it.group] = groups[it.group] || []).push({ ...it, type: 'info' }));
   groups['Capabilities'] = groups['Capabilities'] || [];
   groups['Connections'] = groups['Connections'] || [];
-  if (!_viewer) { groups['Credentials'] = []; groups['APIs you can use'] = []; groups['Pro membership'] = []; }  // owner only
+  if (!_viewer) { groups['Credentials'] = []; groups['APIs you can use'] = []; groups['Pro membership'] = []; groups['Set up'] = []; }  // owner only
   await _installedReady;  // a group for a part this setup doesn't have (no coding agent, no voice) isn't shown
   Object.keys(groups).forEach(g => { if (_installed[INSTALL_GROUPS[g]] === false) delete groups[g]; });
   if (groups['Voice']) groups['Voice'] = joinQuietHours(groups['Voice']);
@@ -169,6 +171,7 @@ async function loadSettings() {
   loadViewers();
   loadCapabilitySwitches();
   loadConnections();
+  SET_LOADERS.forEach(load => load());  // cards drawn by other files (pages-setup.js)
   loadCredentials();
   loadProKey();
   loadPlanBadge();

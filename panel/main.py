@@ -1368,22 +1368,23 @@ async def _fact_messages(client, agent_id: str, category: str, limit: int) -> li
         return None
 
 
-async def _store_facts(client: httpx.AsyncClient, category: str, limit: int, max_chars: int = 300) -> list | None:
+async def _store_facts(client: httpx.AsyncClient, category: str, limit: int, max_chars: int = 300,
+                       project: str = "") -> list | None:
     """One category's facts from HomeShed's own memory (the tool server's /memory/facts), newest first; None when it
-    doesn't answer."""
+    doesn't answer. project: a folder, for that project's memory; empty, the shared one."""
     try:
         r = await client.get(f"{MCP_BASE_URL}/memory/facts", headers=_MCP_HEADERS,
-                             params={"category": category, "limit": limit, "max_chars": max_chars})
+                             params={"category": category, "limit": limit, "max_chars": max_chars, "project": project})
         return (r.json().get("messages") or []) if r.status_code == 200 else None
     except (httpx.RequestError, ValueError, AttributeError):
         return None
 
 
-async def _store_summary():
+async def _store_summary(project: str = ""):
     """The Memory card from HomeShed's own memory: each category's count (up to 50) and its latest four."""
     async with httpx.AsyncClient(timeout=10) as client:
-        cats = _with_found(await _store_facts(client, FACT_INDEX, 100, 60))
-        got = await asyncio.gather(*(_store_facts(client, c["id"], 50) for c in cats))
+        cats = _with_found(await _store_facts(client, FACT_INDEX, 100, 60, project))
+        got = await asyncio.gather(*(_store_facts(client, c["id"], 50, project=project) for c in cats))
     if all(m is None for m in got):
         return JSONResponse({"error": "HomeShed's memory didn't answer."}, status_code=502)
     return {"categories": [{"id": c["id"], "label": c["label"], "legacy": c.get("legacy", False),
@@ -1395,9 +1396,17 @@ async def _store_summary():
 @app.get("/api/memory/projects")
 async def memory_projects():
     """Every project's memory agent and how many facts it holds (counts only), for the Memory panel's picker.
-    Counting is 11 queries per agent, so totals are kept for two minutes. HomeShed's own memory has no picker."""
+    Counting is 11 queries per agent, so totals are kept for two minutes. HomeShed's own memory: its shared memory and
+    each project folder's, from the tool server (2026-10-30: before, only the shared one showed)."""
     if not MEMORY_CORE_BASE_URL:
-        return {"projects": []}
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                r = await client.get(f"{MCP_BASE_URL}/memory/projects", headers=_MCP_HEADERS)
+            rows = (r.json().get("projects") or []) if r.status_code == 200 else []
+        except (httpx.RequestError, ValueError, AttributeError):
+            rows = []
+        return {"projects": [{"id": p["project"], "name": p["name"], "mine": not p["project"], "facts": p["facts"]}
+                             for p in rows]}
     async with httpx.AsyncClient(timeout=10) as client:
         agents = await _memory_agents(client)
         if time.time() - _agents_cache["totals_at"] > 120:
@@ -1415,8 +1424,8 @@ async def memory_projects():
 
 @app.get("/api/memory")
 async def memory_summary(request: Request, agent: str = ""):
-    if not MEMORY_CORE_BASE_URL:
-        return await _store_summary()
+    if not MEMORY_CORE_BASE_URL:  # a viewer sees the shared memory only, as with memory-core
+        return await _store_summary("" if getattr(request.state, "role", None) == "viewer" else agent)
     results = []
     async with httpx.AsyncClient(timeout=10) as client:
         agent_id = await _chosen_agent(request, agent, client)
@@ -1480,7 +1489,8 @@ async def memory_category(category: str, request: Request, limit: int = 50, agen
     limit = max(1, min(limit, MEMORY_QUERY_MAX))
     if not MEMORY_CORE_BASE_URL:
         async with httpx.AsyncClient(timeout=10) as client:
-            facts = await _store_facts(client, category, limit, 0)
+            facts = await _store_facts(client, category, limit, 0,
+                                       "" if getattr(request.state, "role", None) == "viewer" else agent)
         if facts is None:
             return JSONResponse({"error": "HomeShed's memory didn't answer."}, status_code=502)
         return {"id": category, "count": len(facts),
@@ -3638,6 +3648,8 @@ else:
 
 import terminal  # noqa: E402 - the Terminal tab (terminal.py): SSH in the browser, owner only, off by default
 app.include_router(terminal.router)
+import setup_routes  # noqa: E402 - Settings > System > Set up (setup_routes.py): what's set up, and prompts for the rest
+app.include_router(setup_routes.router)
 
 @app.middleware("http")
 async def engine_files_recheck(request: Request, call_next):
