@@ -2,7 +2,7 @@
   "id": "image.generate",
   "name": "Generate Image",
   "version": "1.2.0",
-  "description": "Start an image generation job; returns a job_id immediately. Default: free local GPU (stable-diffusion.cpp), whose default model Qwen-Image-2.1 is NON-COMMERCIAL. Opt-in PAID providers (openai, stability, replicate, fal, together, xai) via provider=..., IMAGE_DEFAULT_PROVIDER, or require_commercial=true, which refuses models whose outputs can't be sold.",
+  "description": "Start an image generation job; returns a job_id immediately. Default: free local GPU (stable-diffusion.cpp), whose default model FLUX.1-schnell is commercial-safe (Qwen-Image-2.1, only when named, is NON-COMMERCIAL). Opt-in PAID providers (openai, stability, replicate, fal, together, xai) via provider=..., IMAGE_DEFAULT_PROVIDER, or require_commercial=true, which refuses models whose outputs can't be sold.",
   "category": "image",
   "risk": "write",
   "requires": [

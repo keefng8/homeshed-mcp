@@ -75,9 +75,11 @@ def _media(name: str) -> bytes:
     if paid.is_file():
         data = paid.read_bytes()
     else:
+        from tools._helper_auth import helper_headers
         from tools.image.generate import base_url
         try:
-            r = httpx.get(f"{base_url()}/image/files/{name}/thumb", params={"px": LOCAL_PX}, timeout=60)
+            r = httpx.get(f"{base_url()}/image/files/{name}/thumb", params={"px": LOCAL_PX}, timeout=60,
+                          headers=helper_headers())
         except httpx.HTTPError as exc:
             raise h.CommerceError(f"the image service didn't answer ({type(exc).__name__})") from None
         if r.status_code == 404:

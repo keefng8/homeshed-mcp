@@ -4,16 +4,16 @@
 `image.providers.list` (read). Selection and licence rules for `image.generate` / `image.status`.
 
 ## Purpose
-The default local model (Qwen-Image-2.1) is NON-COMMERCIAL. So that you can sell images,
-`image.generate` can also use commercially licensed models: a free local FLUX.1-schnell (Apache-2.0, once its weights
-are installed) and paid HTTP providers. Added 2026-10-03. `image.providers.list` says what exists, what's configured,
+The default local model is FLUX.1-schnell (Apache-2.0: its images may be sold; it needs its weights installed). The
+other local model, Qwen-Image-2.1, is NON-COMMERCIAL and used only when named. `image.generate` can also use paid HTTP
+providers. Added 2026-10-03. `image.providers.list` says what exists, what's configured,
 what each costs and whether its outputs may be sold.
 
 ## Providers
 | Provider | Key name (vault) | Models | Licence of outputs | commercial_use | Cost (approx., 2026-10) |
 |---|---|---|---|---|---|
-| `local-sdcpp` | none | `qwen-image-2.1` (default) | Qwen Research License | **false** | free |
-| `local-sdcpp` | none | `flux.1-schnell` (not installed yet) | Apache-2.0 | true | free |
+| `local-sdcpp` | none | `flux.1-schnell` (default; needs its weights) | Apache-2.0 | true | free |
+| `local-sdcpp` | none | `qwen-image-2.1` (only when named) | Qwen Research License | **false** | free |
 | `openai` | `OPENAI_API_KEY` | `gpt-image-1-mini` (default), `gpt-image-2` | OpenAI Terms of Use: you own the output | true | token-based, see pricing |
 | `stability` | `STABILITY_API_KEY` | `core` (default), `ultra` | Stability AI API Terms | **check** | ~$0.03 / ~$0.08 |
 | `replicate` | `REPLICATE_API_TOKEN` | `black-forest-labs/flux-schnell` | Apache-2.0 | true | ~$0.003 |

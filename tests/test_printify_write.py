@@ -31,7 +31,7 @@ def api(monkeypatch, tmp_path):
 
     class F:
         status_code, content = 200, b"PNGBYTES"
-    monkeypatch.setattr(w.httpx, "get", lambda url, timeout=None: F())
+    monkeypatch.setattr(w.httpx, "get", lambda url, timeout=None, headers=None: F())
     return w, calls, switches
 
 

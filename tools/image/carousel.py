@@ -7,6 +7,7 @@ import httpx
 
 from registry import tool
 from tools.image import providers as prov
+from tools._helper_auth import helper_headers
 from tools.image.generate import ImageError, base_url, raise_for_backend
 from tools.image.print_file import MAX_BYTES, NAME_RE
 
@@ -79,7 +80,7 @@ def carousel(image_names: list[str], shape: str = "4:5", background: str = "", w
         else:
             items.append({"name": n})
     try:
-        resp = httpx.post(f"{base_url()}/image/promo-slides", timeout=120,
+        resp = httpx.post(f"{base_url()}/image/promo-slides", timeout=120, headers=helper_headers(),
                           json={"items": items, "size": SIZES[shape], "background": background or "",
                                 "watermark": watermark or "", "watermark_style": style,
                                 **({"caption": caption} if caption else {}),

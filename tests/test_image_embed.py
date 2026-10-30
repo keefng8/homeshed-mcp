@@ -19,7 +19,7 @@ def svc(monkeypatch):
     monkeypatch.setattr(ie, "base_url", lambda: "http://gpu:8082")
     monkeypatch.setattr(refs, "image_bytes", lambda ref, max_bytes: {DESIGN: b"png"}[ref])
 
-    def fake(url, json=None, timeout=None):
+    def fake(url, json=None, timeout=None, headers=None):
         sent.append((url, json, timeout))
         return httpx.Response(state["code"], json=state["body"], request=httpx.Request("POST", url))
     monkeypatch.setattr(ie.httpx, "post", fake)

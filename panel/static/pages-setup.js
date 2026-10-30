@@ -3,7 +3,7 @@ another PC sharing the memory, a local model, the helper PC), each ready, needin
 can't do itself has a prompt to copy into your own AI app, with this PC's details filled in and never a token. The one
 change made here: linking another PC's project folder to a project's memory. setup_routes.py is the server side. */
 const SETUP_MARK = { ready: ['ok', 'Ready'], broken: ['bad', 'Needs fixing'], optional: ['', 'Optional'],
-  unavailable: ['', 'Not available yet'] };
+  unavailable: ['', 'Not available yet'], pro: ['', 'With Pro'] };
 async function loadSetup() {
   const box = document.getElementById('set-set-up-rows');
   if (!box || _viewer) return;

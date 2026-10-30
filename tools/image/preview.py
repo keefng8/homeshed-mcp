@@ -7,6 +7,7 @@ import re
 import httpx
 
 from registry import tool
+from tools._helper_auth import helper_headers
 from tools.image.generate import ImageError, base_url, raise_for_backend
 
 PRINT_NAME = re.compile(r"^\d{8}-\d{6}-\d+\.png$")
@@ -41,7 +42,7 @@ def preview(image: str, garment: str = "sand", print_area: str = "front", show_a
         raise ImageError('print_area is "front" or "back"')
     body = {"name": image, "garment": garment, "print_area": print_area, "show_area": show_area}
     try:
-        resp = httpx.post(f"{base_url()}/image/garment-preview", json=body, timeout=60)
+        resp = httpx.post(f"{base_url()}/image/garment-preview", json=body, timeout=60, headers=helper_headers())
     except httpx.HTTPError as exc:
         raise ImageError(f"image backend unreachable ({type(exc).__name__})") from None
     raise_for_backend(resp)

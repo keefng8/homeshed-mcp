@@ -6,6 +6,7 @@ import base64
 import httpx
 
 from registry import tool
+from tools._helper_auth import helper_headers
 from tools.image.generate import ImageError, base_url, raise_for_backend
 
 MAX_BYTES = 20 * 1024 * 1024
@@ -39,7 +40,7 @@ def compare(image: str, reference: str, region: str = "print") -> dict:
     body = {"image_b64": base64.b64encode(scene).decode(), "reference_b64": base64.b64encode(ref).decode(),
             "region": region}
     try:
-        resp = httpx.post(f"{base_url()}/image/compare", json=body, timeout=90)
+        resp = httpx.post(f"{base_url()}/image/compare", json=body, timeout=90, headers=helper_headers())
     except httpx.HTTPError as exc:
         raise ImageError(f"image backend unreachable ({type(exc).__name__})") from None
     raise_for_backend(resp)

@@ -25,6 +25,7 @@ NAME_REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,100}\.(?:png|jpg|jpeg|webp)
 def image_bytes(ref: str, max_bytes: int = MAX_IMAGE_BYTES, etsy_photos: bool = False) -> bytes:
     """The image's bytes, or a CommerceError saying why not. etsy_photos: also an Etsy listing photo's address."""
     from tools.image import providers as prov
+    from tools._helper_auth import helper_headers
     from tools.image.generate import base_url
     from tools.printify.mockup import MOCKUP_HOSTS
     ref = (ref or "").strip()
@@ -37,14 +38,14 @@ def image_bytes(ref: str, max_bytes: int = MAX_IMAGE_BYTES, etsy_photos: bool = 
                                   + (" or Etsy listing photos (etsy.listing.get)" if etsy_photos else ""))
         url, headers = ref, {"User-Agent": "HomeShed-mcp-server"}
     elif m := FOLDER_REF.match(ref):
-        url = f"{base_url()}/image/folder-files/{quote(m[1])}/{m[2]}"
+        url, headers = f"{base_url()}/image/folder-files/{quote(m[1])}/{m[2]}", helper_headers()
     elif NAME_REF.match(ref):
         kept = prov.output_dir() / ref
         if kept.is_file():
             if kept.stat().st_size > max_bytes:
                 raise h.CommerceError(f"{ref} is over {max_bytes // 2**20} MB")
             return kept.read_bytes()
-        url = f"{base_url()}/image/files/{ref}"
+        url, headers = f"{base_url()}/image/files/{ref}", helper_headers()
     else:
         raise h.CommerceError(f'{h.trim(ref, 80)!r}: give an image name, "folder/name.png" or a Printify mockup address')
     try:

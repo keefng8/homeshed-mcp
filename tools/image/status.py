@@ -6,6 +6,7 @@ import re
 import httpx
 
 from registry import tool
+from tools._helper_auth import helper_headers
 from tools.image import providers as prov
 from tools.image.generate import ImageError, base_url, raise_for_backend
 
@@ -30,7 +31,7 @@ def status(job_id: str, include_image: bool = False) -> dict:
     base = base_url()
     try:
         resp = httpx.get(f"{base}/image/jobs/{job_id}", params={"include_image": include_image},
-                         timeout=30)
+                         timeout=30, headers=helper_headers())
     except httpx.HTTPError as exc:
         raise ImageError(f"image backend unreachable ({type(exc).__name__})") from None
     if resp.status_code == 404:

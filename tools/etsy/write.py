@@ -171,10 +171,11 @@ def _image(ref: str) -> bytes:
 def _thumb(data: bytes) -> str | None:
     """A small JPEG (base64) for the owner's approval card, made by the image service; None when it can't (the card
     then lists the images by name)."""
+    from tools._helper_auth import helper_headers
     from tools.image.generate import base_url
     try:
         r = httpx.post(f"{base_url()}/image/thumb", json={"image_b64": base64.b64encode(data).decode(), "px": 240},
-                       timeout=30)
+                       timeout=30, headers=helper_headers())
         return r.json().get("image_b64") if r.status_code == 200 else None
     except (httpx.HTTPError, ValueError):
         return None

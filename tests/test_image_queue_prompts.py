@@ -51,7 +51,7 @@ def test_prompts_bad_action_and_missing_id_make_no_call(monkeypatch):
 def test_prompts_routes_and_bodies(monkeypatch):
     seen = []
 
-    def fake(method, url, json=None, timeout=None):
+    def fake(method, url, json=None, timeout=None, headers=None):
         seen.append((method, url.split("/image", 1)[1], json))
         return R(200, {"ok": True})
     monkeypatch.setattr(prompts_mod.httpx, "request", fake)

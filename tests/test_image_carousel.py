@@ -11,7 +11,7 @@ def test_carousel_sends_local_names_and_paid_bytes(monkeypatch, tmp_path):
     (tmp_path / "20261007-1-xai-abc.jpg").write_bytes(b"\xff\xd8\xffjpeg")
     seen = {}
 
-    def fake(url, json, timeout):
+    def fake(url, json, timeout, headers=None):
         seen.update(url=url, body=json)
         return httpx.Response(200, json={"slides": [{"name": "a.png"}, {"name": "b.png"}], "folder": "promo"})
     monkeypatch.setattr(ic.httpx, "post", fake)

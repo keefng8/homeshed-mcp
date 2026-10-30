@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 PW = "test-owner-pw"
+PLAN = []  # what the fake tool server answers to /pro/helper-plan
 OWNER = {"Authorization": "Basic " + base64.b64encode(f"x:{PW}".encode()).decode()}
 
 
@@ -22,6 +23,8 @@ def panel(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "MEMORY_CORE_BASE_URL", "")
     monkeypatch.setattr(main, "GPU_SERVICE_URL", "")
     sent = []
+    plan = PLAN
+    plan[:] = [{"pro": False, "reason": "The helper PC plan comes with HomeShed Pro."}]  # a test may set the Pro answer
 
     def handler(req):
         sent.append((req.method, req.url.path, req.content))
@@ -29,6 +32,8 @@ def panel(tmp_path, monkeypatch):
             return httpx.Response(200, json={"path": "/home/me/app", "name": "app", "agent": "dir:d:/work/app"})
         if req.url.path == "/projects":
             return httpx.Response(200, json={"projects": []})
+        if req.url.path == "/pro/helper-plan":
+            return httpx.Response(200, json=plan[0])
         if req.url.path == "/local-ai/backends":
             return httpx.Response(200, json={"backends": [{"name": "nvidia", "cloud": True, "configured": True}]})
         return httpx.Response(200, json={})
@@ -42,12 +47,22 @@ def test_the_checks_say_what_is_ready_and_give_prompts_without_a_token(panel):
     client, _, main = panel
     steps = {s["id"]: s for s in client.get("/api/setup").json()["steps"]}
     assert steps["memory"]["status"] == "ready" and "built-in" in steps["memory"]["detail"]
-    assert steps["model"]["status"] == "optional" and "ollama.com" in steps["model"]["prompt"]  # a cloud model isn't local
-    assert steps["helper"]["status"] == "unavailable" and "prompt" not in steps["helper"]
+    assert steps["model"]["status"] == "optional" and "Install Ollama from https://ollama.com (ask me" in steps["model"]["prompt"]  # a cloud model isn't local
+    # the helper plan is Pro's (the owner, 2026-10-30): on the free plan, no prompt, and it says so
+    assert steps["helper"]["status"] == "pro" and "prompt" not in steps["helper"]
+    assert "comes with HomeShed Pro" in steps["helper"]["detail"]
     other = steps["other-pc"]
     assert other["link"] and [p["label"] for p in other["prompts"]] == ["1. On this PC", "2. On the other PC"]
     every = " ".join([s.get("prompt", "") for s in steps.values()] + [p["text"] for p in other["prompts"]])
     assert main.MCP_AUTH_TOKEN not in every and "HOMESHED_TOKEN" in every and "never" in every.lower()
+
+
+def test_a_pro_member_gets_the_plan_as_a_prompt_for_their_own_ai(panel):
+    client, _, main = panel
+    PLAN[0] = {"pro": True, "plan": "# The helper plan\nGET /health ...\n"}
+    helper = {s["id"]: s for s in client.get("/api/setup").json()["steps"]}["helper"]
+    assert helper["status"] == "optional" and helper["prompt"].endswith("# The helper plan\nGET /health ...\n")
+    assert "Ask me before installing anything" in helper["prompt"]
 
 
 def test_linking_another_pcs_folder_registers_it_on_the_tool_server(panel):

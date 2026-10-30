@@ -12,6 +12,7 @@ import httpx
 
 from registry import tool
 from tools.image import providers as prov
+from tools._helper_auth import helper_headers
 from tools.image.generate import ImageError, _caller, base_url
 
 DONE = ("done", "failed", "cancelled")
@@ -34,7 +35,7 @@ def cancel(job_id: str) -> dict:
         raise ImageError("job_id is the 12-character id image.generate returned")
     me = _caller()
     try:
-        r = httpx.get(f"{base_url()}/image/jobs/{job_id}", timeout=15)
+        r = httpx.get(f"{base_url()}/image/jobs/{job_id}", timeout=15, headers=helper_headers())
     except httpx.HTTPError as exc:
         raise ImageError(f"image backend unreachable ({type(exc).__name__})") from None
     if r.status_code == 404:  # not a local job: perhaps a paid provider's
@@ -53,7 +54,7 @@ def cancel(job_id: str) -> dict:
     if job.get("status") in DONE:
         return {"ok": True, "job_id": job_id, "status": "already done", "was": job.get("status")}
     try:
-        c = httpx.post(f"{base_url()}/image/jobs/{job_id}/cancel", timeout=15)
+        c = httpx.post(f"{base_url()}/image/jobs/{job_id}/cancel", timeout=15, headers=helper_headers())
     except httpx.HTTPError as exc:
         raise ImageError(f"image backend unreachable ({type(exc).__name__})") from None
     if c.status_code == 409:  # it finished between the two calls

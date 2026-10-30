@@ -19,7 +19,7 @@ def svc(monkeypatch):
     monkeypatch.setattr(ic, "base_url", lambda: "http://gpu:8082")
     monkeypatch.setattr(refs, "image_bytes", lambda ref, max_bytes, **kw: {SCENE: b"scene", MOCKUP: b"mock"}[ref])
 
-    def fake(url, json=None, timeout=None):
+    def fake(url, json=None, timeout=None, headers=None):
         sent.append((url, json, timeout))
         body = {"ok": True, "found": True} if state["code"] == 200 else {"detail": "that isn't an image"}
         return httpx.Response(state["code"], json=body, request=httpx.Request("POST", url))
@@ -77,7 +77,7 @@ def test_compare_lets_its_scene_be_an_etsy_photo_but_not_its_reference(monkeypat
     seen = []
     monkeypatch.setattr(refs, "image_bytes", lambda ref, max_bytes, **kw: seen.append((ref, kw)) or b"x")
     monkeypatch.setattr(ic, "base_url", lambda: "http://gpu:8082")
-    monkeypatch.setattr(ic.httpx, "post", lambda url, json=None, timeout=None: httpx.Response(
+    monkeypatch.setattr(ic.httpx, "post", lambda url, json=None, timeout=None, headers=None: httpx.Response(
         200, json={"ok": True}, request=httpx.Request("POST", url)))
     ic.compare(ETSY_PHOTO, MOCKUP, region="all")
     assert seen == [(ETSY_PHOTO, {"etsy_photos": True}), (MOCKUP, {})]

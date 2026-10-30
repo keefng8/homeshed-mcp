@@ -7,6 +7,7 @@ import httpx
 
 import usage
 from registry import tool
+from tools._helper_auth import helper_headers
 
 # USD per million input tokens: a saved token is one an AI never had to read. The same prices the Control Panel's
 # "Show tokens saved as money" setting uses (dashboard/main.py MONEY_MODELS); keep the two in step.
@@ -27,7 +28,7 @@ def _rtk_daily() -> list[dict] | None:
     if not base:
         return None
     try:
-        r = httpx.get(f"{base}/stats/rtk/daily", timeout=10)
+        r = httpx.get(f"{base}/stats/rtk/daily", timeout=10, headers=helper_headers())
         data = r.json() if r.status_code == 200 else {}
     except (httpx.HTTPError, ValueError):
         return None

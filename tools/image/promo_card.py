@@ -8,6 +8,7 @@ import httpx
 
 from registry import tool
 from tools.image import providers as prov
+from tools._helper_auth import helper_headers
 from tools.image.generate import ImageError, base_url, raise_for_backend
 from tools.image.print_file import MAX_BYTES, NAME_RE
 
@@ -83,7 +84,7 @@ def promo_card(product_image: str, headline: str, price_gbp: float, template: st
     else:
         product = {"name": name}
     try:
-        resp = httpx.post(f"{base_url()}/image/promo-card", timeout=120, json={
+        resp = httpx.post(f"{base_url()}/image/promo-card", timeout=120, headers=helper_headers(), json={
             "product": product, "headline": headline or "", "price_gbp": price_gbp, "template": template,
             "size": SHAPES[shape], "benefit": benefit or "", "link_text": link_text or "", "kicker": kicker or "",
             "frame": frame, "cutout": bool(cutout), "watermark": watermark or "", "watermark_style": watermark_style,

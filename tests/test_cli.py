@@ -140,7 +140,10 @@ def test_setup_asks_then_adds_it_to_claude_code_with_its_own_command(monkeypatch
     fake = FakeClaude()
     asked = _setup_with(monkeypatch, fake, tty=True, answer="")  # Enter = yes
     assert cli.main(["setup"]) == 0
-    assert asked == [cli.GROUPS_QUESTION, "Add homeshed-mcp to Claude Code now? [Y/n] "]  # tool groups come first
+    # tool groups first, then memory and where it runs (Enter: this PC), Claude Code, and a helper PC (Enter: no)
+    assert asked[:4] == [cli.GROUPS_QUESTION, "Pick 1-2 (Enter: 1): ", "Pick 1-2 (Enter: 1): ",
+                         "Add homeshed-mcp to Claude Code now? [Y/n] "]
+    assert len(asked) == 5 and "helper PC" in asked[4]
     assert fake.calls == [["C:/bin/claude.exe", "mcp", "add", "homeshed-mcp", "-s", "user",
                            "-e", "LOCAL_AI_BASE_URL=http://localhost:11434/v1", "-e", "LOCAL_AI_MODEL=llama3.2",
                            "--", "uvx", "homeshed-mcp"]]
@@ -154,8 +157,46 @@ def test_setup_changes_nothing_on_no_with_no_one_there_or_with_no(monkeypatch, c
     fake = FakeClaude()
     asked = _setup_with(monkeypatch, fake, tty=tty, answer=answer)
     assert cli.main(argv) == 0 and fake.calls == []
-    assert len(asked) == (2 if answer == "n" else 0)  # the tool groups, then Claude Code; a script or --no: never asked
+    assert len(asked) == (5 if answer == "n" else 0)  # groups, memory, where, Claude Code, helper; a script or --no: none
     assert "claude mcp add homeshed-mcp -s user" in capsys.readouterr().out  # the line to run by hand
+
+
+def test_setup_can_share_another_pcs_memory_over_http_without_showing_the_token(monkeypatch, capsys):
+    """The install's choices (the owner, 2026-10-30): memory shared with HomeShed on another PC."""
+    import install_choice
+    fake = FakeClaude()
+    answers = iter(["", "2", "other-pc:8765", "", ""])  # groups, memory: shared, its address, Claude Code: yes, helper: no
+    _setup_with(monkeypatch, fake, tty=True)
+    monkeypatch.setattr("builtins.input", lambda q: next(answers))
+    monkeypatch.setattr(install_choice, "_healthy", lambda base, seconds=0: base == "http://other-pc:8765")
+    monkeypatch.setattr(install_choice.getpass, "getpass", lambda q: "tok-secret")  # typed hidden
+    assert cli.main(["setup"]) == 0
+    assert fake.calls == [["C:/bin/claude.exe", "mcp", "add", "--transport", "http", "-s", "user", "homeshed-mcp",
+                           "http://other-pc:8765/mcp", "--header", "Authorization: Bearer tok-secret"]]
+    out = capsys.readouterr().out
+    assert "tok-secret" not in out and '"type": "http"' in out and "Bearer <token>" in out
+
+
+def test_the_helper_question_gives_a_pro_member_the_prompt_and_others_the_pro_note(monkeypatch, tmp_path, capsys):
+    import install_choice
+    import pro_routes
+    args = SimpleNamespace(yes=False, no=False)
+    monkeypatch.setattr(install_choice.sys, "stdin", SimpleNamespace(isatty=lambda: True))
+    monkeypatch.setattr(pro_routes, "_helper_plan", lambda: {"pro": False, "reason": "The helper PC plan comes with HomeShed Pro."})
+    install_choice.helper(args, tmp_path, answer=lambda q: "y")
+    assert "comes with HomeShed Pro" in capsys.readouterr().out and not (tmp_path / "helper-pc-prompt.md").exists()
+    monkeypatch.setattr(pro_routes, "_helper_plan", lambda: {"pro": True, "plan": "# plan\n"})
+    install_choice.helper(args, tmp_path, answer=lambda q: "y")
+    assert (tmp_path / "helper-pc-prompt.md").read_text(encoding="utf-8").endswith("# plan\n")
+    install_choice.helper(args, tmp_path / "x", answer=lambda q: "")  # Enter: no helper, nothing written
+    assert not (tmp_path / "x").exists()
+
+
+def test_docker_says_what_to_install_when_docker_or_git_is_missing(monkeypatch, capsys):
+    import install_choice
+    monkeypatch.setattr(install_choice.shutil, "which", lambda name: None if name == "docker" else "/bin/" + name)
+    assert install_choice.docker(lambda env: 0, lambda p: {}, answer=lambda q: "") == {"where": "stop"}
+    assert "Docker Desktop" in capsys.readouterr().out
 
 
 def test_setup_yes_adds_without_asking_and_a_failure_says_so(monkeypatch, capsys):

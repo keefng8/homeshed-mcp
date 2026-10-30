@@ -11,7 +11,7 @@ def svc(monkeypatch, tmp_path):
     monkeypatch.setattr(tc.prov, "output_dir", lambda: tmp_path)
     seen = {}
 
-    def fake(url, json, timeout):
+    def fake(url, json, timeout, headers=None):
         seen.update(url=url, body=json)
         return httpx.Response(200, json={"ok": False, "text_found": True, "regions": [{"corner": "br", "text": True}]})
     monkeypatch.setattr(tc.httpx, "post", fake)

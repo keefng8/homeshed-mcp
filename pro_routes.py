@@ -7,6 +7,7 @@
 - DELETE /pro: forget the key.
 - GET /pro/packs: the rule packs on offer. GET /pro/packs/{slug}: one pack's content.
 - POST /pro/bugs/sync: fetch the known-bugs feed into bugs.find (tools/bugs/pro_sync.py).
+- GET /pro/helper-plan: the helper PC build plan from the signed Pro package, while Pro is active.
 """
 from __future__ import annotations
 
@@ -76,7 +77,31 @@ async def tools_route(request: Request) -> JSONResponse:
         return JSONResponse({"error": str(exc)}, status_code=400)
 
 
+HELPER_PLAN = "helper-plan.md"  # inside the Pro package: the plan a member's own AI builds a helper PC to
+
+
+def _helper_plan() -> dict:
+    import pro_plugin
+    on_pro, why = pro.check()
+    if not on_pro:
+        return {"pro": False, "reason": why or "The helper PC plan comes with HomeShed Pro."}
+    if not pro_plugin.load().get("loaded"):  # only a package the release key signed (pro_plugin.trusted)
+        return {"pro": True, "plan": "", "reason": "Get the Pro tools package first:  homeshed-mcp pro update"}
+    path = pro_plugin.pro_dir() / pro_plugin.installed()["version"] / pro_plugin.PACKAGE / HELPER_PLAN
+    try:
+        return {"pro": True, "plan": path.read_text(encoding="utf-8")}
+    except OSError:
+        return {"pro": True, "plan": "", "reason": "This Pro package has no helper PC plan yet: homeshed-mcp pro update"}
+
+
+async def helper_plan_route(request: Request) -> JSONResponse:
+    """The helper PC plan (the owner, 2026-10-30: "only pro"): from the signed Pro package, while Pro is active. The
+    helper itself isn't shipped; the member's own AI builds one to this plan (the panel's Settings > System > Set up)."""
+    return JSONResponse(await asyncio.to_thread(_helper_plan))
+
+
 ROUTES = [
+    ("/pro/helper-plan", ["GET"], helper_plan_route),
     ("/pro", ["GET"], status_route),
     ("/pro/connect", ["POST"], connect_route),
     ("/pro", ["DELETE"], disconnect_route),

@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-10-30
+
+### Added
+- **Setup asks three things**: where memory lives (this PC, or shared with HomeShed on another PC on your home network), where HomeShed runs (straight on this PC, or in Docker, each step asked first), and whether you want a helper PC. A token is never printed: it's typed hidden or read from the settings file.
+- **HomeShed Pro: a helper PC plan.** A Pro member's own AI app builds a helper service (images, document search, file summaries) on a PC with a graphics card, step by step. It's in Settings > System > Set up and in `setup`.
+
+### Changed
+- The local image model is FLUX.1-schnell by default (Apache-2.0: what you make with it may be sold). Qwen-Image (non-commercial) is still used when a request names it.
+- The plugin runs 0.7.4.
+
+### Fixed
+- Every call to a helper service sends its token (`X-GPU-Token`) when `GPU_SERVICE_TOKEN` is set, so a helper can require it on every route.
+
 ## [0.7.3] - 2026-10-30
 
 ### Added

@@ -63,7 +63,7 @@ PROVIDERS: dict[str, dict] = {
     LOCAL: {
         "label": "This PC's GPU (stable-diffusion.cpp)", "key": None, "paid": False,
         "cost_note": "free: runs on your own GPU", "pricing_url": None,
-        "default_model": "qwen-image-2.1",
+        "default_model": "flux.1-schnell",  # commercial-safe by default (the owner, 2026-10-30); qwen only when named
         "models": {
             "qwen-image-2.1": {"license": {"name": "Qwen Research License", "commercial_use": False,
                                            "terms_url": "https://huggingface.co/Qwen"},
@@ -333,8 +333,9 @@ def is_commercial(provider: str, model: str) -> bool:
 def local_ready(fetch=None) -> dict[str, bool] | None:
     """Which local models the GPU service says are ready (its GET /image/models), or None if it can't be asked."""
     try:
+        from tools._helper_auth import helper_headers
         from tools.image.generate import base_url
-        resp = (fetch or httpx.get)(f"{base_url()}/image/models", timeout=5)
+        resp = (fetch or httpx.get)(f"{base_url()}/image/models", timeout=5, headers=helper_headers())
         if resp.status_code != 200:
             return None
         return {k: bool(v.get("ready")) for k, v in (resp.json().get("models") or {}).items()}
@@ -750,11 +751,12 @@ def remote_status(job_id: str, include_image: bool = False) -> dict | None:
 
 def _preview(data: bytes) -> str | None:
     """A 1024 px JPEG copy (base64) from the image service's /image/thumb; None when it can't make one."""
+    from tools._helper_auth import helper_headers
     from tools.image.generate import base_url
     try:
         with _http() as c:
             r = c.post(f"{base_url()}/image/thumb", json={"image_b64": base64.b64encode(data).decode(), "px": 1024},
-                       timeout=60)
+                       timeout=60, headers=helper_headers())
         return r.json().get("image_b64") if r.status_code == 200 else None
     except (httpx.HTTPError, ValueError, ProviderError):
         return None

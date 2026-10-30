@@ -7,6 +7,7 @@ import httpx
 
 from registry import tool
 from tools.image import providers as prov
+from tools._helper_auth import helper_headers
 from tools.image.generate import ImageError, base_url, raise_for_backend
 from tools.image.print_file import MAX_BYTES, NAME_RE
 
@@ -50,7 +51,7 @@ def text_check(job_id: str = "", image_name: str = "", image_b64: str = "") -> d
             raise ImageError("image_b64 is over 25 MB")
         body = {"image_b64": image_b64}
     try:
-        resp = httpx.post(f"{base_url()}/image/text-check", json=body, timeout=60)
+        resp = httpx.post(f"{base_url()}/image/text-check", json=body, timeout=60, headers=helper_headers())
     except httpx.HTTPError as exc:
         raise ImageError(f"image backend unreachable ({type(exc).__name__})") from None
     raise_for_backend(resp)

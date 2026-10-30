@@ -14,11 +14,11 @@ class Fake:
     def __init__(self, job=None):
         self.job, self.posts = job, []
 
-    def get(self, url, timeout=None):
+    def get(self, url, timeout=None, headers=None):
         return httpx.Response(200 if self.job else 404, json=self.job or {"detail": "unknown job id"},
                               request=httpx.Request("GET", url))
 
-    def post(self, url, timeout=None):
+    def post(self, url, timeout=None, headers=None):
         self.posts.append(url)
         return httpx.Response(200, json={**self.job, "status": "cancelled"}, request=httpx.Request("POST", url))
 

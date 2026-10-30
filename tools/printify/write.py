@@ -51,9 +51,10 @@ def _record(row: dict) -> None:
 
 def _print_file_bytes(name: str) -> bytes:
     """The print file, from the image service (image.print_file wrote it there)."""
+    from tools._helper_auth import helper_headers
     from tools.image.generate import ImageError, base_url
     try:
-        resp = httpx.get(f"{base_url()}/image/files/{name}", timeout=60)
+        resp = httpx.get(f"{base_url()}/image/files/{name}", timeout=60, headers=helper_headers())
     except (httpx.HTTPError, ImageError) as exc:
         raise h.CommerceError(f"couldn't fetch the print file from the image service ({type(exc).__name__})") from None
     if resp.status_code != 200:

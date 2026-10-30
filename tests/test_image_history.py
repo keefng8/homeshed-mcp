@@ -20,7 +20,7 @@ def paid(tmp_path, monkeypatch):
 def local(monkeypatch, files=None, fail=False):
     monkeypatch.setattr(h, "base_url", lambda: "http://gpu.test")
 
-    def get(url, params=None, timeout=0):
+    def get(url, params=None, timeout=0, headers=None):
         if fail:
             raise httpx.ConnectError("down")
         assert url == "http://gpu.test/image/files" and params == {"limit": params["limit"]}

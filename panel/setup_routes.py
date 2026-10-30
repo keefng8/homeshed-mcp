@@ -61,6 +61,16 @@ def _other_pc_prompt(host: str, port: str) -> str:
             f"link it to the same project on the other PC (Settings > System > Set up there).")
 
 
+def _helper_prompt(settings: str, plan: str) -> str:
+    """The helper PC isn't shipped: the person's own AI builds one to this plan (the routes HomeShed calls, the security
+    rules, models that may be used commercially, and how to connect it). The plan is Pro's (the owner, 2026-10-30:
+    "only pro"): it comes from the signed Pro package through the tool server's /pro/helper-plan, never this repo."""
+    return ("Please build a HomeShed helper service on this PC (the one with the graphics card, if I have one), "
+            f"following the plan below step by step. HomeShed's settings file, on the PC HomeShed runs on, is {settings}. Ask me before "
+            "installing anything, downloading big files or opening a firewall port, and never show me a token.\n\n"
+            + plan)
+
+
 def _model_prompt(settings: str) -> str:
     return ("Please set up a free local AI model for HomeShed on this PC. Install Ollama from https://ollama.com (ask "
             "me before installing anything), then pull a small model such as qwen3:8b. Run `uvx homeshed-mcp setup "
@@ -90,6 +100,13 @@ async def setup_checks(request: Request):
             links = (r.json().get("projects") or []) if r.status_code == 200 else []
         except (httpx.RequestError, ValueError, AttributeError):
             links = []
+        helper = {}
+        if not helper_up:
+            try:
+                r = await client.get(f"{m.MCP_BASE_URL}/pro/helper-plan", headers=m._MCP_HEADERS, timeout=15)
+                helper = r.json() if r.status_code == 200 else {}
+            except (httpx.RequestError, ValueError):
+                helper = {}
     store = "memory-core" if m.MEMORY_CORE_BASE_URL else "the built-in store"
     memory_ok = core_up if m.MEMORY_CORE_BASE_URL else server_up
     steps = [
@@ -115,11 +132,17 @@ async def setup_checks(request: Request):
                     "Drafts and summaries can run on this PC for free, with nothing sent out."),
          **({} if models_up else {"prompt": _model_prompt(settings)})},
         {"id": "helper", "title": "Helper PC (GPU)",
-         "status": "ready" if helper_up else "broken" if m.GPU_SERVICE_URL else "unavailable",
+         "status": "ready" if helper_up else "broken" if m.GPU_SERVICE_URL else "optional",
          "detail": ("Images, document search and file summaries run on it." if helper_up else
                     "The helper PC is set (GPU_SERVICE_URL) but isn't answering." if m.GPU_SERVICE_URL else
-                    "A helper service for a second PC with a graphics card isn't part of this release yet.")},
+                    "Decisions, document search, file summaries and images on a PC with a graphics card. With HomeShed "
+                    "Pro, your own AI builds it to Pro's plan, for your PC: copy the prompt into it on that PC.")},
     ]
+    if helper.get("plan"):
+        steps[-1]["prompt"] = _helper_prompt(settings, helper["plan"])
+    elif not helper_up and not m.GPU_SERVICE_URL:
+        steps[-1].update(status="pro", detail=steps[-1]["detail"] + " " + (helper.get("reason") or
+                                                                            "The plan comes with HomeShed Pro."))
     return {"steps": steps}
 
 

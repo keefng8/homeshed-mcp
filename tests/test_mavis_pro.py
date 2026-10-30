@@ -299,6 +299,24 @@ def test_the_status_route_says_what_pro_features_actually_get(routes, monkeypatc
     assert status == 200 and body["pro"] is False and body["effective_pro"] is badge
 
 
+def test_the_helper_plan_comes_only_with_pro_and_only_from_the_signed_package(routes, monkeypatch, tmp_path):
+    """The owner, 2026-10-30: "only pro". The plan a member's own AI builds a helper PC to lives in the Pro package."""
+    import pro_plugin
+    monkeypatch.setattr(routes.pro, "check", lambda: (False, ""))
+    status, body = call(routes.helper_plan_route, Req())
+    assert status == 200 and body["pro"] is False and "plan" not in body and "Pro" in body["reason"]
+    monkeypatch.setattr(routes.pro, "check", lambda: (True, ""))
+    monkeypatch.setattr(pro_plugin, "load", lambda: {"loaded": False})  # unsigned or missing: never read
+    assert call(routes.helper_plan_route, Req())[1]["plan"] == ""
+    folder = tmp_path / "pro" / "1.0.0" / "homeshed_pro"
+    folder.mkdir(parents=True)
+    (folder / "helper-plan.md").write_text("# plan\n", encoding="utf-8")
+    monkeypatch.setattr(pro_plugin, "load", lambda: {"loaded": True})
+    monkeypatch.setattr(pro_plugin, "installed", lambda: {"version": "1.0.0"})
+    monkeypatch.setattr(pro_plugin, "pro_dir", lambda: tmp_path / "pro")
+    assert call(routes.helper_plan_route, Req())[1] == {"pro": True, "plan": "# plan\n"}
+
+
 def test_the_connect_route_passes_only_the_key_and_never_echoes_it(routes, monkeypatch):
     seen = []
 

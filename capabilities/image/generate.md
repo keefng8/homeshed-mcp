@@ -16,11 +16,12 @@ GPU (stable-diffusion.cpp). There's no API and no per-image cost. Without it, us
 The Control Panel's Image tab has a panel for it.
 
 ## License: read this first
-The default model, **Qwen-Image-2.1, is under the Qwen RESEARCH license: NON-COMMERCIAL,
-research/evaluation only.** Trying it out is fine; nothing generated with it can be part of
-anything sold. The license string comes back with every result, plus `license_info` and `commercial_use`.
-For anything to be sold, use `require_commercial=true`: it refuses Qwen and picks a commercial-safe model
-(local `flux.1-schnell`, Apache-2.0, once installed: `MODELS` in `image.py`; or a configured paid provider).
+The default local model is **FLUX.1-schnell, Apache-2.0: what you make with it may be sold** (it needs its
+weights installed where the image service runs). **Qwen-Image-2.1, used only when named
+(`model="qwen-image-2.1"`), is under the Qwen RESEARCH license: NON-COMMERCIAL**, so nothing made with it can be
+sold. The license string comes back with every result, plus `license_info` and `commercial_use`.
+`require_commercial=true` refuses Qwen and any model not confirmed for sale (local FLUX or a configured paid provider
+is picked instead).
 
 ## Job model: why nothing ever waits (added 2026-09-25)
 An image takes minutes, and nothing should sit waiting on it. So `image.generate` **starts a job and returns in about a second** with a
@@ -42,7 +43,7 @@ from sd.cpp: "reading prompt", "step 7/20", "decoding image"), `elapsed_s` and `
 | `width` / `height` | integer | `768` | 256-1536, divisible by 32. 512 is fastest. |
 | `steps` | integer | `0` | 1-60; `0` = model default (20). |
 | `seed` | integer | `-1` | Random if -1; reuse a returned seed to reproduce. |
-| `model` | string | `""` | Empty = the provider's default (`qwen-image-2.1` locally). Local: `qwen-image-2.1`, `flux.1-schnell`. |
+| `model` | string | `""` | Empty = the provider's default (`flux.1-schnell` locally). Local: `qwen-image-2.1`, `flux.1-schnell`. |
 | `provider` | string | `""` | Empty = `IMAGE_DEFAULT_PROVIDER` or `local-sdcpp`. Paid: `openai`, `stability`, `replicate`, `fal`, `together`, `xai`, `google` (Nano Banana: `gemini-nano-banana-2.1` by default at 2K, about $0.05; 4K above 2048 px, $0.113; `gemini-3-pro-image` only when named; billed in Google AI Studio, which a Gemini app plan doesn't cover; invisible SynthID watermark). |
 | `input_images` | array | none | `google` only: 1-5 images to edit or take a look from (an image name, `"folder/name.png"` or a Printify mockup address, up to 10 MB each), with the prompt as the instruction. The prompt isn't rewritten for an edit. |
 | `require_commercial` | boolean | `false` | Refuse models whose outputs can't be sold; with nothing named, auto-pick a commercial-safe one (may be PAID). |
@@ -67,8 +68,9 @@ or lent out), the local job is cancelled and the image runs on xAI `grok-imagine
 commercial use allowed), with `fell_back` saying why. It needs xAI switched on, its key and room under its daily cap;
 otherwise the job waits in the local line, retried every minute for up to 30 minutes.
 
-## Quality notes (2026-09-25)
-Qwen-Image-2.1 is native **2048px**. The first 512px/8-step test was recognisable but soft,
+## Quality notes (2026-09-25, from Qwen-Image-2.1, then the default)
+Qwen-Image-2.1 is native **2048px**; FLUX.1-schnell is distilled: 4 steps by default, prompts up to about 1,000
+characters. The first 512px/8-step test was recognisable but soft,
 so the dashboard now defaults to 1024px and 20 steps, with prompt enhancement on and upscale
 optional. With `include_image`, status returns a **<=1024px JPEG preview** (`image_b64`,
 `image_mime`, `final_width`/`final_height`) rather than the full PNG. A 4x upscale is 4096px and
@@ -82,7 +84,12 @@ name regex), proxied by the dashboard as `/api/image/file/{name}`.
   as a **subprocess per image, not a resident server**, so a GPU shared with a local LLM gets its
   memory back after each image. `--offload-to-cpu` keeps weights in system RAM and streams them to
   the GPU.
-- **Files:** the service keeps `bin/`, `models/` and `outputs/` (about 10GB) outside the repo:
+- **Files:** the service keeps `bin/`, `models/` and `outputs/` outside the repo. FLUX.1-schnell (the default,
+  about 12GB):
+  - `flux1-schnell-q4_k.gguf` (6.4GB), `t5xxl-Q8_0.gguf` text encoder (4.8GB), `ae.safetensors` VAE (0.3GB),
+    `clip_l.safetensors` (0.2GB)
+
+  Qwen-Image-2.1 (optional, non-commercial, about 9GB):
   - `qwen_image_2.1-Q4_K.gguf` (3.9GB)
   - `Qwen3VL-8B-Instruct-Q4_K_M.gguf` text encoder (4.7GB)
   - `qwen_image_2.1_vae_bf16.safetensors` (0.6GB)

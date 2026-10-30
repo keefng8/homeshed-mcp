@@ -8,6 +8,7 @@ import httpx
 
 from registry import tool
 from tools.image import providers as prov
+from tools._helper_auth import helper_headers
 from tools.image.generate import ImageError, base_url, raise_for_backend
 from tools.image.print_file import MAX_BYTES
 
@@ -50,12 +51,12 @@ def fetch(job_id: str, max_mb: float = DEFAULT_MB, raw: bool = False) -> dict:
     else:
         base = base_url()
         try:
-            resp = httpx.get(f"{base}/image/jobs/{job_id}", timeout=30)
+            resp = httpx.get(f"{base}/image/jobs/{job_id}", timeout=30, headers=helper_headers())
             if resp.status_code == 404:
                 raise ImageError("unknown job id (the GPU service keeps the last 20 jobs in memory)")
             raise_for_backend(resp)
             name = _done_name(resp.json())
-            resp = httpx.get(f"{base}/image/files/{name}", timeout=120)
+            resp = httpx.get(f"{base}/image/files/{name}", timeout=120, headers=helper_headers())
         except httpx.HTTPError as exc:
             raise ImageError(f"image backend unreachable ({type(exc).__name__})") from None
         if resp.status_code == 404:

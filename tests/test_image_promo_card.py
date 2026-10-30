@@ -11,7 +11,7 @@ def test_promo_card_sends_the_card_and_mockup_bytes(monkeypatch, tmp_path):
     (tmp_path / "printify-abc-1234abcd.jpg").write_bytes(b"\xff\xd8\xffjpeg")
     seen = {}
 
-    def fake(url, json, timeout):
+    def fake(url, json, timeout, headers=None):
         seen.update(url=url, body=json)
         return httpx.Response(200, json={"name": "20261007-010101-123450.png", "folder": "promo"})
     monkeypatch.setattr(ipc.httpx, "post", fake)

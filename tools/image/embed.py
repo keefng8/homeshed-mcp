@@ -6,6 +6,7 @@ import base64
 import httpx
 
 from registry import tool
+from tools._helper_auth import helper_headers
 from tools.image.generate import ImageError, base_url, raise_for_backend
 
 MAX_BYTES = 20 * 1024 * 1024
@@ -47,7 +48,8 @@ def embed(image: str = "", image_b64: str = "") -> dict:
         except CommerceError as exc:
             raise ImageError(str(exc)) from None
     try:
-        resp = httpx.post(f"{base_url()}/image/embed", json={"image_b64": base64.b64encode(data).decode()}, timeout=60)
+        resp = httpx.post(f"{base_url()}/image/embed", json={"image_b64": base64.b64encode(data).decode()}, timeout=60,
+                          headers=helper_headers())
     except httpx.HTTPError as exc:
         raise ImageError(f"image backend unreachable ({type(exc).__name__})") from None
     raise_for_backend(resp)

@@ -14,7 +14,7 @@ def posts(monkeypatch):
     sent, state = [], {"code": 200}
     monkeypatch.setattr(ip, "base_url", lambda: "http://gpu:8082")
 
-    def fake(url, json=None, timeout=None):
+    def fake(url, json=None, timeout=None, headers=None):
         sent.append((url, json, timeout))
         body = {"name": "x.jpg", "ref": "previews/x.jpg"} if state["code"] == 200 else {"detail": "no such print file"}
         return httpx.Response(state["code"], json=body, request=httpx.Request("POST", url))

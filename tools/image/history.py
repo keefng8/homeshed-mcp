@@ -7,6 +7,7 @@ import httpx
 
 from registry import tool
 from tools.image import providers as prov
+from tools._helper_auth import helper_headers
 from tools.image.generate import ImageError, base_url
 
 MAX_LIMIT = 100
@@ -19,7 +20,7 @@ def _local(limit: int) -> tuple[list[dict], str | None]:
     """The local image service's recent images with their records, or ([], why) when it can't be read."""
     try:
         base = base_url()
-        resp = httpx.get(f"{base}/image/files", params={"limit": limit}, timeout=15)
+        resp = httpx.get(f"{base}/image/files", params={"limit": limit}, timeout=15, headers=helper_headers())
         files = resp.json().get("files") if resp.status_code == 200 else None
     except (ImageError, httpx.HTTPError, ValueError, AttributeError):
         files = None

@@ -9,6 +9,7 @@ import httpx
 
 from registry import tool
 from tools.image import providers as prov
+from tools._helper_auth import helper_headers
 from tools.image.generate import ImageError, base_url, raise_for_backend
 
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,80}\.(png|jpg|jpeg|webp)$")
@@ -61,7 +62,7 @@ def print_file(image: str, width_px: int, height_px: int, variants: list[str] | 
     if not _slots.acquire(timeout=WAIT_S):
         raise ImageError(f"the image service is busy with other print files (waited {WAIT_S // 60} min); try again")
     try:
-        resp = httpx.post(f"{base_url()}/image/print-file", json=body, timeout=120)
+        resp = httpx.post(f"{base_url()}/image/print-file", json=body, timeout=120, headers=helper_headers())
     except httpx.HTTPError as exc:
         raise ImageError(f"image backend unreachable ({type(exc).__name__})") from None
     finally:

@@ -4,6 +4,7 @@ from __future__ import annotations
 import httpx
 
 from registry import tool
+from tools._helper_auth import helper_headers
 from tools.image.generate import ImageError, base_url, raise_for_backend
 
 _SHOWN = ("job_id", "status", "queue_position", "progress", "prompt", "original_prompt", "folder", "width", "height",
@@ -21,8 +22,8 @@ def queue() -> dict:
     """
     base = base_url()
     try:
-        jobs = httpx.get(f"{base}/image/jobs", timeout=10)
-        models = httpx.get(f"{base}/image/models", timeout=10)
+        jobs = httpx.get(f"{base}/image/jobs", timeout=10, headers=helper_headers())
+        models = httpx.get(f"{base}/image/models", timeout=10, headers=helper_headers())
     except httpx.HTTPError as exc:
         raise ImageError(f"image backend unreachable ({type(exc).__name__})") from None
     raise_for_backend(jobs)

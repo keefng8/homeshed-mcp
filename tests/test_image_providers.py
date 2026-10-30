@@ -313,7 +313,7 @@ def test_image_default_provider_setting(api, monkeypatch):
 def test_require_commercial_refuses_non_commercial_and_check(api, monkeypatch):
     _key(monkeypatch, "STABILITY_API_KEY")
     with pytest.raises(ig.ImageError, match="NON-COMMERCIAL"):
-        ig.generate("a cat", provider="local-sdcpp", require_commercial=True)
+        ig.generate("a cat", provider="local-sdcpp", model="qwen-image-2.1", require_commercial=True)
     with pytest.raises(ig.ImageError, match="not confirmed for commercial use"):
         ig.generate("a cat", provider="stability", require_commercial=True)
 
@@ -447,14 +447,14 @@ def test_a_switched_off_model_is_refused(api, monkeypatch):
     assert ig.generate("a cat", provider="openai")["model"] == "gpt-image-1-mini"
 
 
-def test_switching_off_local_qwen_refuses_the_default(api, monkeypatch):
+def test_switching_off_local_flux_refuses_the_default(api, monkeypatch):
     monkeypatch.setenv("IMAGE_BASE_URL", "http://10.9.9.9:8082")
-    rs.update({prov.model_setting("local-sdcpp", "qwen-image-2.1"): False})
-    with pytest.raises(ig.ImageError, match="qwen-image-2.1 is switched off"):
+    rs.update({prov.model_setting("local-sdcpp", "flux.1-schnell"): False})
+    with pytest.raises(ig.ImageError, match="flux.1-schnell is switched off"):
         ig.generate("a cat")
     rs.update({prov.provider_setting("local-sdcpp"): False})
     with pytest.raises(ig.ImageError, match="local-sdcpp is switched off"):
-        ig.generate("a cat", model="flux.1-schnell")
+        ig.generate("a cat", model="qwen-image-2.1")
 
 
 def test_a_disabled_default_provider_is_refused_not_replaced(api, monkeypatch):

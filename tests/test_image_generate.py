@@ -7,6 +7,7 @@ import pytest
 
 import tools.image.generate as ig
 import tools.image.status as ist
+from tools._helper_auth import helper_headers
 
 URL = "http://10.9.9.9:8082"
 JOB = {"job_id": "abcdef012345", "status": "running", "progress": "loading model", "seed": 1,
@@ -99,15 +100,15 @@ def no_real_llm(monkeypatch):
 
 
 def test_generate_starts_job_and_returns_fast(post_calls):
+    from tools.image import providers
     out = ig.generate("a red fox", enhance_prompt=False)
+    # the default is the commercial-safe FLUX.1-schnell (the owner, 2026-10-30)
     assert out == {**JOB, "original_prompt": "a red fox", "enhanced_by": None, "enhance_error": None,
-                   "auto_selected": False, "provider": "local-sdcpp", "model": "qwen-image-2.1", "paid": False,
-                   "cost_estimate_usd": 0.0, "commercial_use": False,
-                   "license_info": {"name": "Qwen Research License", "commercial_use": False,
-                                    "terms_url": "https://huggingface.co/Qwen"}}
+                   "auto_selected": False, "provider": "local-sdcpp", "model": "flux.1-schnell", "paid": False,
+                   "cost_estimate_usd": 0.0, "commercial_use": True, "license_info": providers.FLUX_SCHNELL}
     url, kw = post_calls[0]
     assert url == f"{URL}/image/generate" and kw["timeout"] == 30  # never waits for the image
-    assert kw["json"] == {"prompt": "a red fox", "model": "qwen-image-2.1", "width": 768,
+    assert kw["json"] == {"prompt": "a red fox", "model": "flux.1-schnell", "width": 768,
                           "height": 768, "steps": None, "seed": -1, "upscale": False,
                           "original_prompt": None,  # set only when the prompt was enhanced (the image's record keeps it)
                           "requested_by": "owner"}  # who asked: image.cancel lets an app stop only its own jobs
@@ -197,7 +198,7 @@ def test_status_strips_image_by_default(get_calls):
     out = ist.status("abcdef012345")
     assert out["status"] == "done" and "image_b64" not in out
     assert get_calls[0] == (f"{URL}/image/jobs/abcdef012345",
-                            {"params": {"include_image": False}, "timeout": 30})
+                            {"params": {"include_image": False}, "timeout": 30, "headers": helper_headers()})
 
 
 def test_status_include_image(get_calls):

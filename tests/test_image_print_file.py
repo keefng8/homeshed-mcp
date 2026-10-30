@@ -19,7 +19,7 @@ def sent(monkeypatch, tmp_path):
     monkeypatch.setenv("IMAGE_BASE_URL", "http://img.test")
     monkeypatch.setattr(pf.prov, "output_dir", lambda: tmp_path)
     calls = []
-    monkeypatch.setattr(pf.httpx, "post", lambda url, json=None, timeout=None: calls.append((url, json)) or R())
+    monkeypatch.setattr(pf.httpx, "post", lambda url, json=None, timeout=None, headers=None: calls.append((url, json)) or R())
     return calls, tmp_path
 
 

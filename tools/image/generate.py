@@ -17,6 +17,7 @@ import threading
 import httpx
 
 from registry import tool
+from tools._helper_auth import helper_headers
 from tools.image import providers as prov
 from tools.local_ai.ask import LocalAIError, ask
 
@@ -146,7 +147,7 @@ def generate(prompt: str, width: int = 768, height: int = 768, steps: int = 0, s
     image service is busy and what's waiting.
 
     Default: FREE local generation on your own local image service (stable-diffusion.cpp), one job at a time (later ones wait in line, status "queued", up to 20), killed
-    after 900s. Its default model qwen-image-2.1 is NON-COMMERCIAL. Remote providers are PAID per image and only
+    after 900s. Its default model flux.1-schnell is commercial-safe; qwen-image-2.1 (only when named) is NON-COMMERCIAL. Remote providers are PAID per image and only
     used when asked for: provider=..., the IMAGE_DEFAULT_PROVIDER setting, or require_commercial=True. Each provider
     and model has an owner-only on/off switch (paid ones start OFF, with a daily cap of 0); image.providers.list
     shows which are usable.
@@ -236,7 +237,7 @@ def generate(prompt: str, width: int = 768, height: int = 768, steps: int = 0, s
         except prov.ProviderError as exc:
             raise ImageError(str(exc)) from None
     try:
-        resp = httpx.post(f"{base}/image/generate", timeout=30, json={
+        resp = httpx.post(f"{base}/image/generate", timeout=30, headers=helper_headers(), json={
             "prompt": prompt, "model": model, "width": width, "height": height,
             "steps": steps or None, "seed": seed, "upscale": upscale,
             # kept in the image's record, so its history shows the wording the person typed too
@@ -278,7 +279,7 @@ def _to_paid(base: str, job: dict, prompt: str, width: int, height: int, seed: i
     except prov.ProviderError:
         return None
     try:
-        httpx.post(f"{base}/image/jobs/{job['job_id']}/cancel", timeout=10).raise_for_status()
+        httpx.post(f"{base}/image/jobs/{job['job_id']}/cancel", timeout=10, headers=helper_headers()).raise_for_status()
     except httpx.HTTPError:
         return None  # it may have just started locally: leave it
     held = str(job.get("progress"))[len("waiting: "):]

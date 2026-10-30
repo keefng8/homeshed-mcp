@@ -223,6 +223,15 @@ def cmd_setup(args) -> int:
     if args.model:
         return 0
     pick_groups(args, model_found=bool(found))
+    import install_choice  # memory, where it runs, a helper PC (the owner, 2026-10-30)
+    choice = install_choice.choose(args, init=lambda env_file: cmd_init(argparse.Namespace(env_file=str(env_file))),
+                                   env_values=_env_values)
+    if choice["where"] == "stop":
+        return 1
+    if choice["where"] == "http":
+        code = _connect_http(args, choice)
+        install_choice.helper(args, data)
+        return code
     flags = "".join(f" -e {e}" for e in env)
     print("\nConnect Claude Code (one command):")
     print(f"    claude mcp add {NAME} -s user{flags} -- uvx {NAME}")  # the same name as the README and buttons
@@ -236,7 +245,25 @@ def cmd_setup(args) -> int:
     print(f"\nThen check it:  uvx {NAME} doctor")
     print(f'Optional web panel, one command (add --at-sign-in to start it with Windows):\n    uvx --from "{NAME}[panel]" '
           f"{NAME} panel --start")
+    install_choice.helper(args, data)
     return code
+
+
+def _connect_http(args, choice: dict) -> int:
+    """HomeShed elsewhere (another PC, or Docker here): the AI apps connect over HTTP with the owner token. The token
+    goes only to Claude Code's own command; for other apps the line says where to put it."""
+    import install_choice
+    print(f"\nConnect your AI apps to {choice['url']} (HTTP), with the header  Authorization: Bearer <the owner token>.")
+    claude = _claude()
+    if claude and not args.no and (args.yes or _ask("Add it to Claude Code now? [Y/n] ")):
+        if not install_choice.add_http_to_claude_code(claude, choice["url"], choice["token"]):
+            return 1
+    print("Other apps (Cursor, VS Code, Claude Desktop): add this to their MCP settings, with the token in place of "
+          "<token>:")
+    print(json.dumps({NAME: {"type": "http", "url": choice["url"], "headers": {"Authorization": "Bearer <token>"}}},
+                     indent=2))
+    print("\nThen check it: start a new Claude Code session and ask it to call memory.recall_facts.")
+    return 0
 
 
 GROUPS_QUESTION = "Numbers to switch on or off (e.g. 2 5), or Enter to keep these: "

@@ -4,6 +4,7 @@ from __future__ import annotations
 import httpx
 
 from registry import tool
+from tools._helper_auth import helper_headers
 from tools.image.generate import ImageError, base_url, raise_for_backend
 
 ACTIONS = ("list", "add", "edit", "remove")
@@ -37,7 +38,8 @@ def prompts(action: str = "list", prompt_id: str = "", prompt: str = "", name: s
     url = f"{base}/image/prompts" + (f"/{prompt_id.strip()}" if action in ("edit", "remove") else "")
     method = {"list": "GET", "add": "POST", "edit": "PUT", "remove": "DELETE"}[action]
     try:
-        resp = httpx.request(method, url, json=body if action in ("add", "edit") else None, timeout=10)
+        resp = httpx.request(method, url, json=body if action in ("add", "edit") else None, timeout=10,
+                             headers=helper_headers())
     except httpx.HTTPError as exc:
         raise ImageError(f"image backend unreachable ({type(exc).__name__})") from None
     raise_for_backend(resp)
