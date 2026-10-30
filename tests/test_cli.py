@@ -371,3 +371,89 @@ def test_panel_starts_even_when_homeshed_is_not_up_yet(panel, monkeypatch, capsy
     monkeypatch.setattr(cli, "_get", lambda url, timeout=3.0: (False, ""))
     assert cli.main(["panel"]) == 0 and len(panel) == 1
     assert "isn't answering" in capsys.readouterr().out
+
+
+# --- panel --start: one command for a newcomer (the prepper for the owner, 2026-10-30) ------------------------------------
+def test_settings_live_in_the_data_folder_unless_this_folder_already_has_them(tmp_path, data_dir):
+    assert cli.default_env_file() == data_dir / ".env"
+    (tmp_path / ".env").write_text("MCP_AUTH_TOKEN=old\n", encoding="utf-8")  # an install made before
+    assert cli.default_env_file() == Path(".env")
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / ".env").write_text("MCP_AUTH_TOKEN=new\n", encoding="utf-8")
+    assert cli.default_env_file() == data_dir / ".env"
+
+
+def test_init_in_the_data_folder_shares_one_vault_key_with_stdio(data_dir, monkeypatch):
+    """A VAULT_KEY in the .env made the panel (HTTP) and the AI app (stdio, which reads no .env) each unable to read
+    the other's credentials. In the data folder, init makes the key file both read instead."""
+    import vault
+    monkeypatch.delenv("VAULT_KEY", raising=False)
+    monkeypatch.setattr(vault, "KEY_FILE", data_dir / "vault" / "vault.key")
+    assert cli.main(["init"]) == 0
+    values = cli._env_values(data_dir / ".env")
+    assert values["MCP_AUTH_TOKEN"] and "VAULT_KEY" not in values
+    assert vault.KEY_FILE.is_file() and vault.enabled()
+
+
+@pytest.fixture
+def starts(panel, monkeypatch):
+    """--start with nothing running yet: background starts and the browser recorded, never run."""
+    import webbrowser
+
+    import panel_start
+    seen = {"bg": [], "browser": [], "sign_in": []}
+    monkeypatch.setattr(panel_start, "_background", lambda cmd, log, pid: seen["bg"].append(cmd))
+    monkeypatch.setattr(panel_start, "_wait", lambda answers, url, seconds=0: True)
+    monkeypatch.setattr(panel_start, "at_sign_in", lambda cmd: seen["sign_in"].append(cmd))
+    monkeypatch.setattr(webbrowser, "open", lambda url: seen["browser"].append(url))
+    monkeypatch.setattr(cli, "_get", lambda url, timeout=3.0: (False, ""))
+    return seen
+
+
+def test_panel_start_does_init_server_panel_and_browser_in_one_go(starts, data_dir, monkeypatch, capsys):
+    import vault
+    monkeypatch.setattr(vault, "KEY_FILE", data_dir / "vault" / "vault.key")
+    assert cli.main(["panel", "--start"]) == 0
+    assert cli._env_values(data_dir / ".env")["MCP_AUTH_TOKEN"]  # init ran
+    server, panel_cmd = starts["bg"]
+    assert server[-6:] == ["serve", "--http", "--port", "8765", "--env-file", str((data_dir / ".env").resolve())]
+    assert "panel" in panel_cmd and "--start" not in panel_cmd
+    assert starts["browser"] == ["http://127.0.0.1:9090"] and starts["sign_in"] == []
+    assert "panel --stop" in capsys.readouterr().out
+
+
+def test_panel_start_reuses_what_runs_and_can_start_at_sign_in(starts, monkeypatch, capsys):
+    monkeypatch.setenv("MCP_AUTH_TOKEN", "tok")
+    monkeypatch.setattr(cli, "_get", lambda url, timeout=3.0: (True, ""))
+    assert cli.main(["panel", "--start", "--at-sign-in", "--no-browser"]) == 0
+    assert starts["bg"] == [] and starts["browser"] == []
+    (cmd,) = starts["sign_in"]
+    assert cmd[cmd.index("panel"):][:3] == ["panel", "--start", "--no-browser"]
+    with pytest.raises(SystemExit):
+        cli.main(["panel", "--at-sign-in"])  # only with --start
+
+
+def test_sign_in_goes_through_uv_when_this_python_is_in_its_cache(monkeypatch, tmp_path):
+    """uv's cache can be cleaned or upgraded away, and the sign-in start would then stop silently (the prepper)."""
+    import panel_start
+    found = {"uvw": "C:/uv/uvw.exe", "uvx": "C:/uv/uvx.exe"}
+    monkeypatch.setattr(panel_start.shutil, "which", lambda name: found.get(name))
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "uv" / "cache" / "archive-v0" / "abc" / "python.exe"))
+    assert panel_start.sign_in_command("homeshed_mcp._app.cli", "x")[:3] == ["C:/uv/uvw.exe", "tool", "run"]
+    del found["uvw"]
+    assert panel_start.sign_in_command("homeshed_mcp._app.cli", "x")[:2] == ["C:/uv/uvx.exe", "--from"]
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "venv" / "python.exe"))  # pip install: its own Python
+    assert panel_start.sign_in_command("homeshed_mcp._app.cli", "x")[1:] == ["-m", "homeshed_mcp._app.cli"]
+
+
+def test_panel_stop_only_stops_a_process_whose_address_still_answers(data_dir, monkeypatch, capsys):
+    import panel_start
+    killed = []
+    monkeypatch.setattr(panel_start.os, "kill", lambda pid, sig: killed.append(pid))
+    run = data_dir / "run"
+    run.mkdir(parents=True)
+    (run / "server.pid").write_text("111", encoding="utf-8")
+    (run / "panel.pid").write_text("222", encoding="utf-8")
+    monkeypatch.setattr(cli, "_get", lambda url, timeout=3.0: ("healthz" in url, ""))  # the panel is gone already
+    assert cli.main(["panel", "--stop"]) == 0
+    assert killed == [111] and not list(run.iterdir())

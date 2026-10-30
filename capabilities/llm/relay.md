@@ -37,7 +37,7 @@ when they finish. Days are the server's local date.
 
 ## llm.chat
 Arguments: `messages` (1-40 `{role: user|assistant|system, content}`, oldest first), `system` (≤ 8,000 chars),
-together ≤ 200,000 characters (system ≤ 32,000); `model` (empty: the default); `max_tokens` 1-16000 (default 1024;
+together ≤ 200,000 characters (system may use all of it); `model` (empty: the default); `max_tokens` 1-16000 (default 1024;
 reasoning tokens are billed on top, and thinking models spend them from this budget); `temperature` 0-2 (optional);
 `provider` (`xai` default, `anthropic`, `openai`, `gemini`). Limits widened 2026-10-23 (the owner) for book chapter
 batches; the wait grows with max_tokens (90 s, plus 1 s per 25 tokens past 2,048, at most 10 minutes).

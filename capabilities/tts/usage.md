@@ -19,3 +19,6 @@ around it. Read-only; needs no Google key.
 
 Only this server's calls are counted: other use of the same Google account isn't seen. See `synthesize.md` for the
 cap and the facts behind it.
+
+## ElevenLabs (provider="elevenlabs", 29 Oct 2026)
+The owner's paid ElevenLabs plan, key `ELEVENLABS_API_KEY` in the vault. Reads the plan from ElevenLabs (`GET /v1/user/subscription`): `tier`, `status`, `characters`, `limit`, `left`, `resets` (UTC), `overage_possible`.

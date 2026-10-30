@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-10-30
+
+### Added
+- **The Control Panel in one command**: `homeshed-mcp panel --start` sets HomeShed up the first time, starts it and the panel in the background (closing the window doesn't stop them), and opens your browser. `--at-sign-in` starts them again when you sign in to Windows (`--not-at-sign-in` undoes it); `panel --stop` stops both; `--no-browser` skips the browser. `setup` now ends by showing this command.
+- **Windows: the simple way**, a new README guide for newcomers: in the Claude app's Code view, open a folder and paste one request. Claude installs HomeShed and opens the Control Panel.
+- Text to speech: **ElevenLabs** as a second provider (`provider="elevenlabs"`): voices, MP3 synthesis and usage from your plan. A piece that would go past your plan's characters is refused before it's sent, so there's no overage. For long narration: seed, previous and next text, request ids, style and speaker boost, and 192 kbps MP3.
+- `voice.transcribe` takes `tts_name`, an MP3 that `tts.synthesize` made for the same app, so an app can check its narration without sending the audio back.
+- Memory: `memory.remember_fact` can tag a fact with a task name and a state (verified or planned); recall keeps only the newest fact per task, so a resumed session never follows a decision that was since replaced.
+
+### Changed
+- Settings live in the data folder's `.env` by default, so `serve --http` and `panel` work from any folder. A `.env` in the current folder, or next to `docker-compose.yml`, is still used when the data folder has none, so Docker and older installs are unchanged.
+- `llm.chat`: the system text may use the whole 200,000-character input (was 32,000).
+- API page: the connect snippet gives the tool server's public https address (`MCP_PUBLIC_URL`), not the panel's address with `:8765`, which a tunnel doesn't forward.
+- GitHub Actions update: docker/login-action 4.7.0.
+- The plugin runs 0.7.2.
+
+### Fixed
+- Keys saved in the Control Panel are readable by the copy of HomeShed your AI app runs (the `uvx homeshed-mcp` install). New setups share one vault key. If your `.env` already has `VAULT_KEY`, re-save your keys after moving to the new setup.
+
 ## [0.7.1] - 2026-10-29
 
 ### Added

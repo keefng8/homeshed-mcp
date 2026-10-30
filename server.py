@@ -631,7 +631,8 @@ async def clients_action(request: Request) -> JSONResponse:
 async def oauth_pending(request: Request) -> JSONResponse:
     """Sign-ins waiting for the owner (oauth_server.py), and whether sign-in is set up here at all."""
     import oauth_server
-    return JSONResponse({"enabled": bool(oauth_server.public_url()), "pending": oauth_server.pending()})
+    url = oauth_server.public_url()  # the panel's connect snippets show it (an address, not a secret)
+    return JSONResponse({"enabled": bool(url), "public_url": url, "pending": oauth_server.pending()})
 
 
 @mcp.custom_route("/oauth/pending/{pid}/{action}", methods=["POST"])

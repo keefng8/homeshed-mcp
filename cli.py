@@ -63,6 +63,16 @@ def default_data_dir() -> Path:
     return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / NAME
 
 
+def default_env_file() -> Path:
+    """Where init writes the settings, and serve --http and the panel read them (2026-10-30): the data folder's .env,
+    so every command finds it from any folder. A .env in this folder still wins when the data folder has none: installs
+    made before, and Docker's, next to docker-compose.yml."""
+    own = Path(os.environ.get("DATA_DIR") or default_data_dir()) / ".env"
+    if not own.exists() and (Path(".env").exists() or Path("docker-compose.yml").exists()):
+        return Path(".env")
+    return own
+
+
 def _prepare() -> Path:
     """Before importing the server's modules: their folder on sys.path, and DATA_DIR set (paths.py reads it once)."""
     if str(HERE) not in sys.path:
@@ -100,9 +110,16 @@ def cmd_init(args) -> int:
     lines = text.splitlines()
     value = {ln.split("=", 1)[0].strip(): ln.split("=", 1)[1].strip() for ln in lines if "=" in ln and not ln.startswith("#")}
     port = os.environ.get("MCP_PORT") or "8765"
+    # The data folder's .env is this machine's own install, which the AI app also runs over stdio (where no .env is
+    # read). There the vault key is the data folder's key file, which both read; a VAULT_KEY here would make the panel
+    # and the AI each unable to read the other's credentials (the prepper, 2026-10-30).
+    local = env.resolve() == (_prepare() / ".env").resolve()
+    if local:
+        import vault
+        vault.ensure_local_key()
     wanted = {  # the server refuses to start over HTTP without the first and the last (server.http_checks)
         "MCP_AUTH_TOKEN": lambda: secrets.token_urlsafe(32),
-        "VAULT_KEY": lambda: base64.urlsafe_b64encode(secrets.token_bytes(32)).decode(),  # a Fernet key
+        **({} if local else {"VAULT_KEY": lambda: base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()}),  # Fernet
         # This machine only, as docker-compose.yml publishes it; the container's healthcheck uses localhost too.
         "MCP_ALLOWED_HOSTS": lambda: f"localhost:{port},127.0.0.1:{port}",
     }
@@ -115,6 +132,7 @@ def cmd_init(args) -> int:
         if key in new and key in value:
             lines[i] = f"{key}={new[key]}"
     lines += [f"{k}={v}" for k, v in new.items() if k not in value]
+    env.parent.mkdir(parents=True, exist_ok=True)
     env.write_text("\n".join(lines) + "\n", encoding="utf-8")
     if os.name != "nt":
         env.chmod(0o600)
@@ -216,6 +234,8 @@ def cmd_setup(args) -> int:
     print(json.dumps({NAME: {"command": "uvx", "args": [NAME],
                              "env": dict(e.split("=", 1) for e in env)}}, indent=2))
     print(f"\nThen check it:  uvx {NAME} doctor")
+    print(f'Optional web panel, one command (add --at-sign-in to start it with Windows):\n    uvx --from "{NAME}[panel]" '
+          f"{NAME} panel --start")
     return code
 
 
@@ -515,8 +535,18 @@ def _env_value(path: Path, key: str) -> str:
 
 def cmd_panel(args) -> int:
     """The optional web panel, on this machine only (127.0.0.1). It talks to a HomeShed already running over HTTP
-    (`serve --http`, or Docker) with the owner token `init` wrote. Its own files live under DATA_DIR/panel."""
+    (`serve --http`, or Docker) with the owner token `init` wrote. Its own files live under DATA_DIR/panel.
+    --start does it all in the background (panel_start.py)."""
     data = _prepare()
+
+    def answers(url: str) -> bool:
+        return _get(url, timeout=2.0)[0]
+
+    if args.stop or args.not_at_sign_in:
+        import panel_start
+        if args.not_at_sign_in:
+            panel_start.at_sign_in(None)
+        return panel_start.stop(args, data, answers) if args.stop else 0
     if not (PANEL_DIR / "main.py").is_file():
         print(f'This install has no web panel. Install it with the panel extra:\n    uvx --from "{NAME}[panel]" {NAME} panel')
         return 1
@@ -525,6 +555,13 @@ def cmd_panel(args) -> int:
     except ImportError:
         print(f'The web panel needs the panel extra:\n    uvx --from "{NAME}[panel]" {NAME} panel')
         return 1
+    if args.start:
+        import panel_start
+        return panel_start.start(
+            args, data, Path(args.env_file).resolve(), panel_start.self_command(__name__, __file__),
+            panel_start.sign_in_command(__name__, __file__), answers,
+            has_token=lambda env: bool(os.environ.get("MCP_AUTH_TOKEN") or _env_values(env).get("MCP_AUTH_TOKEN")),
+            init=lambda env: cmd_init(argparse.Namespace(env_file=str(env))))
     token = os.environ.get("MCP_AUTH_TOKEN") or _env_values(Path(args.env_file)).get("MCP_AUTH_TOKEN", "")
     if not token:
         print(f"There's no MCP_AUTH_TOKEN in {args.env_file} or the environment. Run  {NAME} init  first, then start "
@@ -785,9 +822,10 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("serve", help="run the server (stdio by default)")
     s.add_argument("--http", action="store_true", help="serve over HTTP instead (Docker, a shared server)")
     s.add_argument("--port", type=int, default=None)
-    s.add_argument("--env-file", default=".env", help="with --http: the settings init wrote (the environment wins)")
+    env_help = "default: the data folder's .env (a .env in this folder, when the data folder has none)"
+    s.add_argument("--env-file", help="with --http: the settings init wrote (the environment wins); " + env_help)
     i = sub.add_parser("init", help="write generated secrets into .env for HTTP/Docker")
-    i.add_argument("--env-file", default=".env")
+    i.add_argument("--env-file", help=env_help)
     st = sub.add_parser("setup", help="find a local model and show how to connect an AI app")
     st.add_argument("--model", action="store_true", help="only look for a local model")
     answer = st.add_mutually_exclusive_group()
@@ -795,15 +833,22 @@ def main(argv: list[str] | None = None) -> int:
     answer.add_argument("--no", action="store_true", help="only print how to connect; never ask or change anything")
     d = sub.add_parser("doctor", help="what works, what doesn't, and the fix")
     d.add_argument("--json", action="store_true")
-    d.add_argument("--env-file", default=".env", help="where serve --http reads MCP_PUBLIC_URL (the environment wins)")
+    d.add_argument("--env-file", help="where serve --http reads MCP_PUBLIC_URL (the environment wins); " + env_help)
     pn = sub.add_parser("panel", help="run the optional web panel on this machine (needs the panel extra)")
     pn.add_argument("--port", type=int, default=9090)
     pn.add_argument("--server", default=f"http://127.0.0.1:{os.environ.get('MCP_PORT') or '8765'}",
                     help="where HomeShed answers over HTTP")
-    pn.add_argument("--env-file", default=".env", help="where init wrote MCP_AUTH_TOKEN")
+    pn.add_argument("--env-file", help="where init wrote MCP_AUTH_TOKEN; " + env_help)
+    how = pn.add_mutually_exclusive_group()
+    how.add_argument("--start", action="store_true",
+                     help="all in one: init if needed, HomeShed and the panel in the background, then the browser")
+    how.add_argument("--stop", action="store_true", help="stop what --start started")
+    pn.add_argument("--no-browser", action="store_true", help="with --start: don't open the browser")
+    pn.add_argument("--at-sign-in", action="store_true", help="with --start: start again when you sign in (Windows)")
+    pn.add_argument("--not-at-sign-in", action="store_true", help="stop starting at sign-in")
     remote = argparse.ArgumentParser(add_help=False)  # for a Docker or HTTP install: go through its server
     remote.add_argument("--server", help="a HomeShed running over HTTP (Docker); default: this machine's own install")
-    remote.add_argument("--env-file", default=".env", help="with --server: where init wrote MCP_AUTH_TOKEN")
+    remote.add_argument("--env-file", help="with --server: where init wrote MCP_AUTH_TOKEN; " + env_help)
     pr = sub.add_parser("pro", parents=[remote], help="HomeShed Pro: connect with a key from the Pro website")
     pr.add_argument("action", nargs="?", default="status", choices=["connect", "status", "update", "disconnect"],
                     help="update: download the Pro tools package (it loads when HomeShed next starts)")
@@ -822,6 +867,10 @@ def main(argv: list[str] | None = None) -> int:
         p.error(f"packs {args.action} needs a {'pack name' if args.action in ('install', 'remove') else 'pack file'}")
     if args.command == "packs" and args.action == "compact-at" and not args.name:
         p.error("packs compact-at needs a percentage (1-99) or off")
+    if args.command == "panel" and (args.at_sign_in or args.no_browser) and not args.start:
+        p.error("--at-sign-in and --no-browser go with panel --start")
+    if getattr(args, "env_file", "") is None:
+        args.env_file = str(default_env_file())
     return {"serve": cmd_serve, "init": cmd_init, "setup": cmd_setup, "doctor": cmd_doctor,
             "panel": cmd_panel, "pro": cmd_pro, "packs": cmd_packs}[args.command](args)
 

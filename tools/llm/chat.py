@@ -15,7 +15,7 @@ MAX_MESSAGES = 40
 # The owner, 2026-10-23 ("widen it"): room for a book's chapter batch. A series bible plus the last chapters in, three
 # chapters (about 10,000 words) out. The daily, token and monthly caps still bound what it can cost.
 MAX_INPUT_CHARS = 200_000  # every message plus system: about 50k tokens
-MAX_SYSTEM_CHARS = 32_000
+MAX_SYSTEM_CHARS = MAX_INPUT_CHARS  # the owner, 2026-10-29: the system text may use the whole input (it was 32,000)
 MAX_TOKENS = 16_000
 MAX_TEXT_CHARS = 64_000
 # Claude's output_config.effort. The station's book writer, 2026-10-24: Sonnet 5.5 spent all 16,000 tokens thinking and
@@ -124,7 +124,7 @@ def chat(messages: list[Message], system: str = "", model: str = "", max_tokens:
     Args:
         messages: the conversation, oldest first: [{"role": "user"|"assistant"|"system", "content": "..."}], 1-40
             messages, together with system at most 200,000 characters.
-        system: optional instructions (system prompt), at most 32,000 characters.
+        system: optional instructions (system prompt), up to the 200,000-character input limit.
         model: one of the provider's models in llm.providers.list; empty means its default (xai: grok-4.3).
         max_tokens: most answer tokens, 1-16000 (default 1024). Reasoning tokens are billed on top, and on thinking
             models they come out of this budget too: allow room. A long answer waits up to 10 minutes.

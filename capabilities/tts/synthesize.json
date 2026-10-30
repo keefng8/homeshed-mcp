@@ -2,11 +2,12 @@
   "id": "tts.synthesize",
   "name": "Speak Text (Google Chirp 3 HD)",
   "version": "1.0.0",
-  "description": "Speak up to 5,000 bytes of text as an MP3 with a Google Chirp 3 HD voice, saved on the tool server for tts.fetch. Counted against Google's free 1 million characters a month; a piece that would pass the month's cap is refused with TTS_CAP_REACHED (free only unless the owner allows paid characters).",
+  "description": "Speak up to 5,000 bytes of text as an MP3 with a Google Chirp 3 HD voice, saved on the tool server for tts.fetch. Counted against Google's free 1 million characters a month; a piece that would pass the month's cap is refused with TTS_CAP_REACHED (free only unless the owner allows paid characters). provider=\"elevenlabs\" uses the owner's ElevenLabs plan instead.",
   "category": "tts",
   "risk": "write",
   "requires": [
-    "GOOGLE_TTS_SERVICE_ACCOUNT in the vault (a Google Cloud service account key file)"
+    "GOOGLE_TTS_SERVICE_ACCOUNT in the vault (a Google Cloud service account key file)",
+    "ELEVENLABS_API_KEY in the vault, for provider=\"elevenlabs\""
   ],
   "transport": "mcp",
   "aliases": [
@@ -24,12 +25,75 @@
     },
     "voice": {
       "type": "string",
-      "required": true
+      "required": false,
+      "default": ""
     },
     "speaking_rate": {
       "type": "number",
       "required": false,
       "default": 1.0
+    },
+    "provider": {
+      "type": "string",
+      "required": false,
+      "default": "google"
+    },
+    "voice_id": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "model": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "stability": {
+      "type": "number",
+      "required": false
+    },
+    "similarity_boost": {
+      "type": "number",
+      "required": false
+    },
+    "speed": {
+      "type": "number",
+      "required": false
+    },
+    "style": {
+      "type": "number",
+      "required": false
+    },
+    "use_speaker_boost": {
+      "type": "boolean",
+      "required": false
+    },
+    "seed": {
+      "type": "integer",
+      "required": false
+    },
+    "previous_text": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "next_text": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "previous_request_ids": {
+      "type": "array",
+      "required": false
+    },
+    "next_request_ids": {
+      "type": "array",
+      "required": false
+    },
+    "output_format": {
+      "type": "string",
+      "required": false,
+      "default": ""
     }
   },
   "execution": {

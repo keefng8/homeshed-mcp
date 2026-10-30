@@ -9,6 +9,9 @@ This guide takes you from nothing to a working setup, one step at a time. You do
 - A **terminal** is a window where you type commands instead of clicking.
 - **uv** is a small free program that downloads and runs HomeShed for you.
 
+**On Windows, with the Claude app?** [Windows: the simple way](../README.md#windows-the-simple-way) is quicker. You
+type no commands: Claude installs HomeShed and opens your Control Panel for you.
+
 ## Steps
 
 Install only from the official sources: PyPI `homeshed-mcp`, `ghcr.io/keefng8/homeshed-mcp`,

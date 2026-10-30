@@ -4,6 +4,7 @@ from __future__ import annotations
 from registry import tool
 from tools.memory.capture import DEFAULT_FACT_CATEGORY, facts_session_id
 from tools.memory.recall import recall
+from tools.memory.task_state import current_only
 
 # Facts are meant to be read back in full, as a small standing knowledge base — not paginated
 # conversation history. Lower than a generous "give me everything" number on purpose: categories
@@ -40,9 +41,12 @@ def recall_facts(category: str = DEFAULT_FACT_CATEGORY, limit: int = DEFAULT_LIM
 
     Returns:
         {"messages": [{"id", "role", "content", "timestamp"}], "total": int} — same shape as
-        memory.recall.
+        memory.recall. A fact saved with a task name also has "task" and "state" (verified / planned / ""), and
+        only the newest fact per task name is returned (2026-10-30). "total" still counts what memory held.
 
     Raises:
         MemoryError: same failure modes as memory.recall, plus an invalid category or scope.
     """
-    return recall(facts_session_id(category), limit=limit, max_chars=max_chars, scope=scope, project_dir=project_dir)
+    out = recall(facts_session_id(category), limit=limit, max_chars=max_chars, scope=scope, project_dir=project_dir)
+    # The tag is at the start, so it survives max_chars; an older state of the same task is hidden (task_state.py).
+    return {**out, "messages": current_only(out["messages"])}

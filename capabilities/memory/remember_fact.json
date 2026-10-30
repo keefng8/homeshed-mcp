@@ -1,7 +1,7 @@
 {
   "id": "memory.remember_fact",
   "name": "Remember a Durable Fact",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Write a durable, high-value fact into the dedicated facts tier of persistent memory — outranks topic-scoped memory.capture entries on recall.",
   "category": "memory",
   "risk": "write",
@@ -35,6 +35,21 @@
       "enum": [
         "project",
         "global"
+      ]
+    },
+    "task": {
+      "type": "string",
+      "required": false,
+      "default": ""
+    },
+    "state": {
+      "type": "string",
+      "required": false,
+      "default": "",
+      "enum": [
+        "",
+        "verified",
+        "planned"
       ]
     }
   },

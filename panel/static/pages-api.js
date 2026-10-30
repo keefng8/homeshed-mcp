@@ -15,10 +15,18 @@ function clientStatus(c) {
   if (!c.last_used) return ['warn', 'Never used'];
   return ['good', 'Active'];
 }
+// The tool server's own https address (MCP_PUBLIC_URL, from /api/oauth/pending), when it has one. Port 8765 is only
+// reachable on the home network: a site name opened through a tunnel (Cloudflare) doesn't forward it.
+let _apiMcpPublic = '';
 function connectSnippets(name, token) {
-  const url = `http://${location.hostname}:8765/mcp`;
+  const lan = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname);
+  const home = lan ? `http://${location.hostname}:8765/mcp` : '';
+  const url = _apiMcpPublic ? `${_apiMcpPublic}/mcp` : home || `http://${location.hostname}:8765/mcp`;
   const v = name.toUpperCase().replace(/[^A-Z0-9]/g, '_') + '_MCP_TOKEN';
-  return `<div class="hint">Store it in a user environment variable named <code>${v}</code>, never in code or a committed file, and open a new terminal. Calls made with it are labelled <b>${escapeHtml(name)}</b> on the Overview and counted on this page.</div>
+  const where = _apiMcpPublic
+    ? `Address: <code>${escapeHtml(url)}</code> works from anywhere.${home ? ` On your home network <code>${escapeHtml(home)}</code> is quicker (no internet round trip).` : ' On your home network, the tool server\'s own address on port 8765 also works, quicker.'}`
+    : `Address: <code>${escapeHtml(url)}</code>, on your home network only (this server has no public address set).`;
+  return `<div class="hint">${where}</div><div class="hint">Store it in a user environment variable named <code>${v}</code>, never in code or a committed file, and open a new terminal. Calls made with it are labelled <b>${escapeHtml(name)}</b> on the Overview and counted on this page.</div>
     <pre>Claude Code: .mcp.json in the project's root folder (the token is read when Claude starts)
 { "mcpServers": { "homeshed": { "type": "http", "url": "${url}",
   "headers": { "Authorization": "Bearer \${${v}}" } } } }</pre>
@@ -522,6 +530,7 @@ async function loadSigninHelp() {
   if (!body) return;
   let d;
   try { d = await apiCall('GET', '/api/oauth/pending'); } catch (e) { d = { enabled: false, error: e.message }; }
+  if (d.public_url) _apiMcpPublic = d.public_url;
   const waiting = (d.pending || []).length;
   state.textContent = d.enabled ? (waiting ? `${waiting} sign-in${waiting === 1 ? '' : 's'} waiting at the top of the page` : 'sign-in is on') : 'not set up yet';
   body.innerHTML = d.enabled ? `<ol class="hint" style="margin:8px 0 0 18px;padding:0;display:grid;gap:6px">

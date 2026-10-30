@@ -53,3 +53,7 @@ refusal (HTTP status and a short reason, never the key or an address); Google to
 Sign-in: the first real call with an API key (2026-10-28) got HTTP 401, "API keys are not supported by this API.
 Expected OAuth2 access token". So the tools sign in as a service account (its JSON key file in the vault as
 `GOOGLE_TTS_SERVICE_ACCOUNT`), with an API key (`GOOGLE_TTS_API_KEY`) only as a fallback for projects that accept one.
+
+## ElevenLabs (provider="elevenlabs", 29 Oct 2026)
+The owner's paid ElevenLabs plan, key `ELEVENLABS_API_KEY` in the vault. `voice_id` (or `voice`) from `tts.voices(provider="elevenlabs")`, `model` (default `eleven_multilingual_v2`), optional `stability` and `similarity_boost` (0 to 1) and `speed` (0.7 to 1.2). Up to 5,000 characters a piece; MP3 at `mp3_44100_128`, kept for `tts.fetch` like Google's. Before sending, the plan's characters left are read from ElevenLabs: a piece that would go past them is refused with `TTS_CAP_REACHED`, and nothing is sent, so the plan never goes into overage. Source: elevenlabs.io/docs/api-reference/text-to-speech/convert (checked 2026-10-29).
+Continuity (passed to ElevenLabs as given): `seed`, `previous_text` / `next_text` (up to 1,000 characters each), `previous_request_ids` / `next_request_ids` (up to 3 `request_id`s this tool returned), `style` (0 to 1), `use_speaker_boost`, and `output_format` `mp3_44100_128` or `mp3_44100_192` (Creator tier and up). MP3 only, since `tts.fetch` hands out MP3s.

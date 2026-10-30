@@ -18,6 +18,7 @@ import projects
 from registry import tool
 from tools.memory.capture import MemoryError, facts_session_id
 from tools.memory.recall import check_max_chars, recall, shorten
+from tools.memory.task_state import current_only
 
 # Fact categories to search besides the session itself. Found 2026-09-29: recall_relevant only ranked one session's
 # captured messages, and nothing is captured under a Claude session's id (facts go in with remember_fact), so every
@@ -181,6 +182,7 @@ def _ranked(session_id: str, query: str, limit: int, max_results: int, max_chars
     # A fact that says "SUPERSEDES msg-<id>" hides the one it replaces (ids may be given in short form).
     gone = {g.lower() for m in messages for g in SUPERSEDES_RE.findall(str(m.get("content") or ""))}
     messages = [m for m in messages if not any(str(m.get("id") or "").lower().startswith(g) for g in gone)]
+    messages = current_only(messages)  # a newer fact for the same task name hides the older ones (task_state.py)
 
     contents = [str(m.get("content") or "") for m in messages]
     lexical = [s * r for s, r in zip(bm25(query, contents), _recency(messages))]

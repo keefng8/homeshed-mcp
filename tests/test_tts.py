@@ -291,3 +291,100 @@ def test_a_refused_access_token_is_not_reused(google, monkeypatch):
     with pytest.raises(g.TTSError, match="HTTP 401"):
         synthesize("Hi.", VOICE)
     assert g._token["value"] == "" and "ya29" not in str(google.calls[-1].url)
+
+
+# --- ElevenLabs (provider="elevenlabs"; the owner's paid plan, 29 Oct) ------------------------------------------------
+
+from tools.tts import _eleven as el  # noqa: E402
+
+EL_VOICE = "JBFqnCBsd6RMkjVDRZzb"
+
+
+class FakeEleven:
+    def __init__(self, used=0, limit=100_000):
+        self.calls, self.used, self.limit = [], used, limit
+
+    def __call__(self, request):
+        self.calls.append(request)
+        assert request.headers["xi-api-key"] == "el-key-456"
+        if request.url.path == "/v1/user/subscription":
+            return httpx.Response(200, json={"tier": "creator", "status": "active", "character_count": self.used,
+                                             "character_limit": self.limit, "next_character_count_reset_unix": 1794000000,
+                                             "can_extend_character_limit": True})
+        if request.url.path == "/v2/voices":
+            page2 = request.url.params.get("next_page_token") == "p2"
+            v = {"voice_id": "B" * 20 if page2 else EL_VOICE, "name": "Zed" if page2 else "George",
+                 "labels": {"gender": "male", "accent": "british"}, "category": "premade", "preview_url": None}
+            return httpx.Response(200, json={"voices": [v], "has_more": not page2, "next_page_token": None if page2 else "p2"})
+        if request.url.path == f"/v1/text-to-speech/{EL_VOICE}":
+            return httpx.Response(200, content=MP3, headers={"content-type": "audio/mpeg", "request-id": "req_abc123"})
+        return httpx.Response(404, json={"detail": {"message": "no"}})
+
+
+@pytest.fixture
+def eleven(monkeypatch, tmp_path):
+    monkeypatch.setenv("TTS_OUTPUT_DIR", str(tmp_path / "out"))
+    monkeypatch.setattr(el, "secret", lambda name: "el-key-456" if name == el.KEY_NAME else None)
+    monkeypatch.setattr(el, "_voices_cache", {})
+    monkeypatch.setattr(el, "_reserved", 0)
+    fake = FakeEleven()
+    monkeypatch.setattr(el, "_TRANSPORT", httpx.MockTransport(fake))
+    return fake
+
+
+def test_elevenlabs_voices_come_from_every_page_with_their_labels(eleven):
+    out = voices(provider="elevenlabs")
+    assert out["provider"] == "elevenlabs" and [v["name"] for v in out["voices"]] == ["George", "Zed"]
+    assert out["voices"][0]["voice_id"] == EL_VOICE and out["voices"][0]["accent"] == "british"
+
+
+def test_elevenlabs_synthesize_saves_an_mp3_for_fetch_and_sends_the_settings(eleven):
+    out = synthesize("Chapter one.", provider="elevenlabs", voice_id=EL_VOICE, stability=0.4, speed=1.1)
+    assert out["provider"] == "elevenlabs" and out["seconds"] == 6.0 and out["model"] == "eleven_multilingual_v2"
+    req = [r for r in eleven.calls if r.url.path.startswith("/v1/text-to-speech/")][0]
+    assert req.url.params["output_format"] == "mp3_44100_128"
+    import json as _j
+    body = _j.loads(req.content)
+    assert body["voice_settings"] == {"stability": 0.4, "speed": 1.1} and body["text"] == "Chapter one."
+    assert fetch(out["name"])["bytes"] == len(MP3)
+
+
+def test_elevenlabs_refuses_a_piece_past_the_plan_before_sending(eleven):
+    eleven.used, eleven.limit = 99_995, 100_000
+    with pytest.raises(g.TTSError, match="TTS_CAP_REACHED"):
+        synthesize("Ten chars.", provider="elevenlabs", voice_id=EL_VOICE)
+    assert not [r for r in eleven.calls if r.url.path.startswith("/v1/text-to-speech/")]
+
+
+def test_elevenlabs_usage_reads_the_plan(eleven):
+    eleven.used = 1234
+    out = usage(provider="elevenlabs")
+    assert out["characters"] == 1234 and out["left"] == 100_000 - 1234 and out["resets"].endswith("Z")
+
+
+def test_elevenlabs_checks_its_inputs_and_key(eleven, monkeypatch):
+    with pytest.raises(g.TTSError, match="voice_id"):
+        synthesize("Hi.", provider="elevenlabs", voice_id="not a voice")
+    with pytest.raises(g.TTSError, match="speed"):
+        synthesize("Hi.", provider="elevenlabs", voice_id=EL_VOICE, speed=3)
+    with pytest.raises(g.TTSError, match="provider"):
+        voices(provider="azure")
+    monkeypatch.setattr(el, "secret", lambda name: None)
+    with pytest.raises(g.TTSError, match="ELEVENLABS_API_KEY"):
+        usage(provider="elevenlabs")
+
+
+def test_elevenlabs_continuity_options_pass_through_and_the_request_id_comes_back(eleven):
+    import json as _j
+    out = synthesize("Part two.", provider="elevenlabs", voice_id=EL_VOICE, seed=42, previous_text="Part one.",
+                     next_text="Part three.", previous_request_ids=["req_prev01"], style=0.3, use_speaker_boost=False,
+                     output_format="mp3_44100_192")
+    assert out["request_id"] == "req_abc123" and out["output_format"] == "mp3_44100_192"
+    req = [r for r in eleven.calls if r.url.path.startswith("/v1/text-to-speech/")][0]
+    body = _j.loads(req.content)
+    assert req.url.params["output_format"] == "mp3_44100_192"
+    assert body["seed"] == 42 and body["previous_text"] == "Part one." and body["previous_request_ids"] == ["req_prev01"]
+    assert body["voice_settings"] == {"use_speaker_boost": False, "style": 0.3}
+    for bad in ({"output_format": "pcm_44100"}, {"seed": -1}, {"previous_request_ids": ["a"] * 4}, {"style": 2}):
+        with pytest.raises(g.TTSError):
+            synthesize("Hi.", provider="elevenlabs", voice_id=EL_VOICE, **bad)

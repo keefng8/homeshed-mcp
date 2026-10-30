@@ -18,3 +18,6 @@ million covers). Asked of Google at most once a day per language; listing voices
 
 ## Errors
 No sign-in (`GOOGLE_TTS_SERVICE_ACCOUNT`), a language that isn't a code, Google's own refusal.
+
+## ElevenLabs (provider="elevenlabs", 29 Oct 2026)
+The owner's paid ElevenLabs plan, key `ELEVENLABS_API_KEY` in the vault. Lists the account's voices (`GET /v2/voices`, every page, cached an hour): `voice_id`, `name`, `gender`, `accent`, `age`, `use_case`, `description`, `category`, `preview_url`, `labels`. `search` matches name, description and labels; `language` is ignored.

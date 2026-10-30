@@ -210,7 +210,7 @@ def test_an_incomplete_answer_is_flagged(fake):
     ({"messages": [{"role": "user"}]}, "role"),
     ({"messages": [{"role": "user", "content": "x"}] * 41}, "at most 40"),
     ({"messages": [{"role": "user", "content": "x" * 200_001}]}, "limit is 200,000"),
-    ({"system": "s" * 32_001}, "system is over"),
+    ({"system": "s" * 200_001}, "system is over"),
     ({"max_tokens": 0}, "max_tokens"), ({"max_tokens": 16_001}, "max_tokens"), ({"max_tokens": True}, "max_tokens"),
     ({"temperature": 2.5}, "temperature"), ({"temperature": -1}, "temperature"),
     ({"model": "gpt-9"}, "no model 'gpt-9'"),

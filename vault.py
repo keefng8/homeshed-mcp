@@ -13,9 +13,10 @@ file mode 600; every change goes to an audit trail that never holds a value. Wit
 lookups fall back to the environment and changes are refused, so the server works exactly as before the vault.
 
 The default install (`uvx homeshed-mcp` started by an AI app, over stdio) has no .env and so no VAULT_KEY. There the
-key comes from KEY_FILE in the data folder (vault/vault.key, mode 600), which only an explicit `homeshed-mcp pro
-connect` creates (ensure_local_key; 2026-10-01: without it a pasted Pro key had nowhere to go). VAULT_KEY in the
-environment always wins, so Docker and HTTP installs are unchanged.
+key comes from KEY_FILE in the data folder (vault/vault.key, mode 600), which an explicit `homeshed-mcp pro
+connect` creates (ensure_local_key; 2026-10-01: without it a pasted Pro key had nowhere to go), and so does `init`
+writing the data folder's .env (2026-10-30), so the panel's `serve --http` and the AI app's stdio share one key.
+VAULT_KEY in the environment always wins, so Docker and HTTP installs are unchanged.
 
 Limits, stated plainly: this stops *accidental* exposure (a tool result, a log, a transcript). It is not a wall
 against someone with root on the host, who can read VAULT_KEY from the same .env, or the key file from the same disk.

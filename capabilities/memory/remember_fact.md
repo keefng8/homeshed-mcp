@@ -48,6 +48,13 @@ Editing a stored fact isn't possible through memory-core's API: its query result
 store, and changing files on disk doesn't change them. An edit tool that reported success without
 really changing anything would be worse than none, so there isn't one.
 
+**Task state (2026-10-30).** Save a task's state with a `task` name, and the newest fact under that name replaces the
+older ones: `memory.recall_facts` and `memory.recall_relevant` return only the newest, so a resumed session never
+picks up a "waiting on X" that was settled since. Add `state`: `verified` (checked: tests ran, the live result was
+seen) or `planned` (intended, not yet checked). Recall returns both as fields. Stored as a `TASK[<name>] <state>: `
+prefix, so it survives `max_chars`. Example: `remember_fact("storyeditor seat claims tasks", category="tasks",
+task="storyeditor seat", state="verified")`.
+
 ## Parameters
 | Name | Type | Default | Description |
 |---|---|---|---|
@@ -55,6 +62,8 @@ really changing anything would be worse than none, so there isn't one.
 | `category` | string | `"general"` | Which facts log this belongs to. Lowercase letters/digits/hyphens, 1-40 chars. See the table above. |
 | `project_dir` | string | `""` | Your working folder, e.g. `/home/you/my-app`. Memory is kept per project: a folder registered on the server (`GET`/`POST /projects`) uses that project's own memory (the longest match wins); any other folder gets its own memory on the built-in store, and the shared memory on memory-core; no folder uses the shared memory. Only the owner's sessions can choose: an app with its own client login always uses its own memory. An `X-Homelab-Project` header on the connection does the same. |
 | `scope` | string | `"project"` | `"project"` saves to this project's (or this app's) own facts. `"global"` saves to the shared facts: the owner's write goes straight in; an app's waits until the owner approves it on the web panel (API access). |
+| `task` | string | `""` | A short task name, 1-60 letters, digits, spaces or `_ . : / -`. The newest fact under a name hides the older ones on recall. |
+| `state` | string | `""` | With `task`: `verified` or `planned`. Anything else, or a state with no task, is refused. |
 
 ## Returns
 `{accepted: bool, message_id: str | None}`, the same shape as `memory.capture`, including its `pending` answer for

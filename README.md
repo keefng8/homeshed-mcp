@@ -33,6 +33,7 @@
 </p>
 
 <p align="center">
+  <a href="#windows-the-simple-way">Windows: the simple way</a> ·
   <a href="#install">Install</a> ·
   <a href="#try-it-things-to-ask">Try it</a> ·
   <a href="#what-your-ai-can-do">What your AI can do</a> ·
@@ -147,6 +148,69 @@ Once HomeShed is added, just ask your AI. A few favourites:
 | "Was my email to the team approved yet?" | `approvals.status`: waiting, approved or declined, and who decided |
 | "Read chapter one aloud as an MP3" | `tts.synthesize` speaks it with a Google Chirp 3 HD voice, inside the free monthly allowance, once you've set it up |
 | "Which container keeps restarting?" | `docker.container.list` and `docker.container.logs`, once you switch Docker on |
+
+## Windows: the simple way
+
+New to all this? You only need the **Claude** desktop app. Claude does the installing for you, and you never need
+to type a command. Takes about 10 minutes.
+
+**Before you start:** Claude's **Code** tab needs a paid Claude plan (Pro or higher). On the free plan, use
+[Install](#install) below instead.
+
+1. **Get the Claude app.** Download it from [claude.com/download](https://claude.com/download), install it, open it
+   and sign in. Using the app already? Skip this step.
+2. **Make a folder for HomeShed.** Open **File Explorer**, go to **Documents**, right-click an empty space, choose
+   **New > Folder** and call it `HomeShed`.
+3. **Switch Claude to Code.** In the Claude app, click the **Code** button, the `</>` icon at the top right (the
+   **Chat** button beside it takes you back). This is where Claude can install things on your PC. Everything below
+   happens in the Code view: your chats won't show there, and this one won't show under Chat. That's normal.
+4. **Point it at your folder.** Under the message box, click the first box and pick **Local**. Click the box next
+   to it, choose **Open folder…** and pick the `HomeShed` folder you made.
+5. **Ask Claude to install HomeShed.** Copy this, paste it into the message box and press **Enter**:
+
+   ```text
+   Install HomeShed on this Windows PC by following "For AI agents: install on Windows" in
+   https://github.com/keefng8/homeshed-mcp, then start the Control Panel and give me its link.
+   ```
+
+   Claude asks before running each command. Read what it's going to run, then click **Allow**. The first download
+   takes a minute or two. If Claude asks you to restart the app, quit it fully (right-click the Claude icon by the
+   clock and choose **Quit**), open it again, open the `HomeShed` folder in the Code view, and say *"carry on"*.
+6. **Sign in to your Control Panel.** It opens in your browser at http://127.0.0.1:9090. Claude tells you where to
+   find your first-time password. Sign in, then change the password in **Settings** and keep it somewhere safe.
+7. **Try it.** Start a new session in the Code view (so Claude loads HomeShed), then ask:
+   *"What tools do you have from homeshed-mcp?"*
+
+**Next time,** the Control Panel starts by itself when you sign in to Windows. Bookmark http://127.0.0.1:9090.
+
+**Already use Claude Code in a terminal?** You can type the same request into `claude` instead. To follow along in
+the Claude app too, type `/remote-control` and choose **Enable Remote Control**: the session then shows in the app's
+Code view.
+
+<details><summary><b>For AI agents: install on Windows</b></summary>
+
+<a id="for-ai-agents-install-on-windows"></a>
+You're installing HomeShed for someone who may be new to all this. Run each step in PowerShell, in the folder they
+opened. Say what each command does before you run it. Never print or save their keys or tokens.
+
+1. **uv**, which runs HomeShed. If `uvx --version` fails, install it with
+   `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`, then make it usable in this shell:
+   `$env:Path = "$env:USERPROFILE\.local\bin;$env:Path"`.
+2. **Add HomeShed to Claude Code.** If the `claude` command works, run
+   `claude mcp add -s user homeshed-mcp -- uvx homeshed-mcp`. If it doesn't (common in the Claude app's Code view), write a `.mcp.json` file in this folder containing
+   `{"mcpServers": {"homeshed-mcp": {"command": "uvx", "args": ["homeshed-mcp"]}}}`. Then run `uvx homeshed-mcp doctor`
+   and fix anything it reports. If you installed uv in step 1, the app can't find `uvx` until it restarts: finish
+   step 3 first, then ask the person to quit the app fully and open it again (the app will ask them to trust this
+   folder's `.mcp.json`; they should accept).
+3. **The Control Panel.** Run `uvx --from "homeshed-mcp[panel]" homeshed-mcp panel --start --at-sign-in`. It sets
+   HomeShed up the first time (its settings and token go in the data folder; never show them), starts HomeShed and
+   the panel in the background, opens http://127.0.0.1:9090, and starts them again whenever the person signs in to
+   Windows. On the first start it prints where the sign-in password file is: tell the person that path, not the
+   password. `panel --stop` stops both; `panel --not-at-sign-in` removes the sign-in start.
+4. **Tell them** to start a new session so the HomeShed tools load, and to try *"What tools do you have from
+   homeshed-mcp?"* If anything fails, run `uvx homeshed-mcp doctor` and follow what it says.
+
+</details>
 
 ## Install
 
@@ -914,9 +978,9 @@ flowchart LR
 | Tool | What it does | Risk | Needs |
 |---|---|---|---|
 | `tts.fetch` | An MP3 that tts.synthesize made, byte for byte as base64 (audio_b64), so the caller can save it. An app gets only its own files; files are kept 7 days. | read | nothing |
-| `tts.synthesize` | Speak up to 5,000 bytes of text as an MP3 with a Google Chirp 3 HD voice, saved on the tool server for tts.fetch. Counted against Google's free 1 million characters a month; a piece that would pass the month's cap is refused with TTS_CAP_REACHED (free only unless the owner allows paid characters). | write | GOOGLE_TTS_SERVICE_ACCOUNT in the vault (a Google Cloud service account key file) |
-| `tts.usage` | This month's text-to-speech characters against Google's free 1 million and the owner's paid allowance, characters left, the reset date (Pacific time) and each app's calls. | read | nothing |
-| `tts.voices` | Google's Chirp 3 HD voices for tts.synthesize: name, gender and language, optionally for one language. Asked of Google at most once a day per language. | read | GOOGLE_TTS_SERVICE_ACCOUNT in the vault (a Google Cloud service account key file) |
+| `tts.synthesize` | Speak up to 5,000 bytes of text as an MP3 with a Google Chirp 3 HD voice, saved on the tool server for tts.fetch. Counted against Google's free 1 million characters a month; a piece that would pass the month's cap is refused with TTS_CAP_REACHED (free only unless the owner allows paid characters). provider="elevenlabs" uses the owner's ElevenLabs plan instead. | write | GOOGLE_TTS_SERVICE_ACCOUNT in the vault (a Google Cloud service account key file), ELEVENLABS_API_KEY in the vault, for provider="elevenlabs" |
+| `tts.usage` | This month's text-to-speech characters against Google's free 1 million and the owner's paid allowance, characters left, the reset date (Pacific time) and each app's calls. provider="elevenlabs" uses the owner's ElevenLabs plan instead. | read | ELEVENLABS_API_KEY in the vault, for provider="elevenlabs" |
+| `tts.voices` | Google's Chirp 3 HD voices for tts.synthesize: name, gender and language, optionally for one language. Asked of Google at most once a day per language. provider="elevenlabs" uses the owner's ElevenLabs plan instead. | read | GOOGLE_TTS_SERVICE_ACCOUNT in the vault (a Google Cloud service account key file), ELEVENLABS_API_KEY in the vault, for provider="elevenlabs" |
 
 </details>
 
@@ -1017,7 +1081,7 @@ keys stay in your own HomeShed. If you find a fake copy, please [tell us](SECURI
 | | Official reference servers | Gateways (Docker MCP Gateway, MetaMCP) | **HomeShed** |
 |---|---|---|---|
 | One endpoint for everything | ❌ one server per job | ✅ | ✅ |
-| Tools built in | ➖ each installed separately | ❌ bundles servers you add | ✅ <!--count:total-->171<!--/count-->: <!--count:ready-->71<!--/count--> ready at once, <!--count:off-->13<!--/count--> off until you enable them, <!--count:needs-->87<!--/count--> connect to what you run |
+| Tools built in | ➖ each installed separately | ❌ bundles servers you add | ✅ <!--count:total-->171<!--/count-->: <!--count:ready-->70<!--/count--> ready at once, <!--count:off-->13<!--/count--> off until you enable them, <!--count:needs-->88<!--/count--> connect to what you run |
 | Per-app keys, grants, rate limits and audit | ❌ | ➖ varies | ✅ |
 | Hands routine work to your own model | ❌ | ❌ | ✅ if you run one |
 | Write tools off until you enable them | ➖ | ➖ | ✅ |
