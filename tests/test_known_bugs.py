@@ -21,6 +21,13 @@ def test_the_same_error_with_different_details_is_one_bug():
     assert again["title"] == "Deploy piped to tail hides failure"          # a repeat never renames the bug
 
 
+def test_the_failing_check_is_kept_with_the_bug():
+    kb.report("Wheel misses a module", error_text="No module named 'tools.todo.families'",
+              regression_test="tests/test_pro_wheel.py::test_every_import_ships")
+    again = kb.report("Wheel misses a module", error_text="No module named 'tools.todo.families'")
+    assert again["regression_test"] == "tests/test_pro_wheel.py::test_every_import_ships"  # a repeat keeps it
+
+
 def test_bugs_without_error_text_never_merge():
     a, b = kb.report("First bug with no error text"), kb.report("Second bug with no error text")
     assert a["id"] != b["id"] and not b["matched"]

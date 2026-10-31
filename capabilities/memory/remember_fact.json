@@ -51,6 +51,11 @@
         "verified",
         "planned"
       ]
+    },
+    "evidence": {
+      "type": "string",
+      "required": false,
+      "default": ""
     }
   },
   "execution": {

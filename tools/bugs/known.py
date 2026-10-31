@@ -26,7 +26,7 @@ BUGS_FILE = Path(os.environ.get("KNOWN_BUGS_FILE") or data_path("observations/kn
 STATUSES = ("open", "workaround-only", "fixed")
 BUG_ID = re.compile(r"(?:PRO-)?KB-\d{4}")
 TEXT_LIMITS = {"title": 120, "symptom": 600, "error_text": 1500, "root_cause": 800, "workaround": 600,
-               "fix": 800, "component": 60, "guard": 80}
+               "fix": 800, "component": 60, "guard": 80, "regression_test": 200}
 _lock = threading.Lock()
 _SECRETS = [
     re.compile(r"\b(?:hlc_|nvapi-|gh[pousr]_|github_pat_|sk-|xox[abprs]-)[A-Za-z0-9_-]{16,}"),
@@ -100,7 +100,7 @@ def _summary(entry: dict, **extra) -> dict:
 @tool(name="report", category="bugs", doc="bugs/known.md")
 def report(title: str, symptom: str = "", error_text: str = "", root_cause: str = "", workaround: str = "",
            fix: str = "", fix_status: str = "", component: str = "", guard: str = "", tags: list[str] | None = None,
-           source: str = "claude", id: str = "", audience: str = "") -> dict:
+           source: str = "claude", id: str = "", audience: str = "", regression_test: str = "") -> dict:
     """Record a known bug, or a new occurrence of one already known (same error fingerprint), with its cause and fix.
 
     Args:
@@ -118,6 +118,8 @@ def report(title: str, symptom: str = "", error_text: str = "", root_cause: str 
         id: update this known bug (e.g. "KB-0012") instead of matching by fingerprint; for marking a fix.
         audience: "public" puts the bug in the Pro known-bugs feed (bugs.export); "private" (the default for a
             new bug) keeps it on this install only.
+        regression_test: the check that failed on the bug before the fix and passes after it (a test path, e.g.
+            "tests/test_x.py::test_y"): written first, kept as the regression test (R&D, 2026-10-31: red first).
     Returns:
         The stored bug (occurrences as a count). "matched": true when it was already known.
     """
@@ -130,7 +132,7 @@ def report(title: str, symptom: str = "", error_text: str = "", root_cause: str 
         raise BugsError("audience must be public or private")
     fields = {f: _clean(f, v) for f, v in (("title", title), ("symptom", symptom), ("error_text", error_text),
               ("root_cause", root_cause), ("workaround", workaround), ("fix", fix), ("component", component),
-              ("guard", guard))}
+              ("guard", guard), ("regression_test", regression_test))}
     tag_list = [_clean("component", t) for t in (tags or []) if str(t).strip()][:10]
     fp = fingerprint(error_text)
     with _lock:

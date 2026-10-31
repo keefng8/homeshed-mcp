@@ -12,7 +12,8 @@ rediscover it.
 ## Parameters
 `bugs.report`:
 - `title` (3-120 characters). Also `symptom`, `error_text`, `root_cause`, `workaround`, `fix`, `component`, `guard`
-  (the guard id that now prevents it), `tags`, `source`.
+  (the guard id that now prevents it), `tags`, `source`, `regression_test` (the check that failed on the bug before
+  the fix: write it first, keep it as the regression test).
 - `fix_status`: `open`, `workaround-only` or `fixed`. Empty keeps the current status (`open` for a new bug).
 - A report with the same error fingerprint as a known bug adds an occurrence to it instead of creating a new one.
 

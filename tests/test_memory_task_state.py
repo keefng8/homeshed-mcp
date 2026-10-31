@@ -24,11 +24,28 @@ def fact(i, content, ts):
 
 def test_tagged_adds_the_prefix_and_refuses_bad_input():
     assert tagged("x", "", "") == "x"
-    assert tagged("seat claims", "storyeditor seat", "Verified") == "TASK[storyeditor seat] verified: seat claims"
+    assert (tagged("seat claims", "storyeditor seat", "Verified", "test_seat.py::test_claims")
+            == "TASK[storyeditor seat] verified: seat claims\nEvidence: test_seat.py::test_claims")
     assert tagged("x", "release 0.7.2", "") == "TASK[release 0.7.2]: x"
+    assert tagged("x", "t", "planned") == "TASK[t] planned: x"  # planned needs no proof
     for task, state in (("", "planned"), ("a]b", ""), ("ok", "done"), ("x" * 61, "")):
         with pytest.raises(ValueError):
             tagged("x", task, state)
+
+
+def test_a_verified_state_needs_its_proof():
+    """R&D, 2026-10-31: verified names what proves it, so a reader can check it again."""
+    with pytest.raises(ValueError, match="needs evidence"):
+        tagged("done", "t", "verified")
+    with pytest.raises(ValueError, match="needs evidence"):
+        tagged("done", "t", "verified", "   ")
+    with pytest.raises(ValueError):
+        tagged("x", "", "", "commit 3f2a9c1")  # evidence needs a task
+    stored = tagged("done", "t", "verified", "commit 3f2a9c1,\n 3226 passed")
+    assert stored.endswith("\nEvidence: commit 3f2a9c1, 3226 passed")  # one line, so recall can find it
+    out = label({"content": stored})
+    assert out["evidence"] == "commit 3f2a9c1, 3226 passed" and out["state"] == "verified"
+    assert "evidence" not in label({"content": "TASK[t] planned: waiting"})
 
 
 def test_the_newest_fact_per_task_wins_and_others_stay():
@@ -57,11 +74,13 @@ def test_remember_fact_stores_the_tag_and_rejects_a_bad_state():
     ok = MagicMock(status_code=200)
     ok.json.return_value = {"code": 0, "data": {"accepted_ids": ["msg-1"]}}
     with patch("tools.memory.capture.httpx.post", return_value=ok) as post:
-        module.remember_fact("claims tasks", category="tasks", task="seat", state="verified")
-    assert post.call_args_list[0].kwargs["json"]["messages"][0]["content"] == "TASK[seat] verified: claims tasks"
-    with patch("tools.memory.capture.httpx.post", return_value=ok) as post, pytest.raises(MemoryError):
-        module.remember_fact("x", category="tasks", task="seat", state="maybe")
-    post.assert_not_called()
+        module.remember_fact("claims tasks", category="tasks", task="seat", state="verified", evidence="commit 3f2a9c1")
+    assert (post.call_args_list[0].kwargs["json"]["messages"][0]["content"]
+            == "TASK[seat] verified: claims tasks\nEvidence: commit 3f2a9c1")
+    for state, evidence in (("maybe", ""), ("verified", "")):
+        with patch("tools.memory.capture.httpx.post", return_value=ok) as post, pytest.raises(MemoryError):
+            module.remember_fact("x", category="tasks", task="seat", state=state, evidence=evidence)
+        post.assert_not_called()
 
 
 def test_recall_facts_hides_the_older_state():

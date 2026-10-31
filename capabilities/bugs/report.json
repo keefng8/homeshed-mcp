@@ -48,6 +48,10 @@
       "type": "string",
       "required": false
     },
+    "regression_test": {
+      "type": "string",
+      "required": false
+    },
     "tags": {
       "type": "array",
       "required": false

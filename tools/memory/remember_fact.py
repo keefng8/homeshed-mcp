@@ -9,7 +9,7 @@ from tools.memory.task_state import tagged
 
 @tool(name="remember_fact", category="memory", doc="memory/remember_fact.md")
 def remember_fact(content: str, category: str = DEFAULT_FACT_CATEGORY, project_dir: str = "",
-                  scope: str = "project", task: str = "", state: str = "") -> dict:
+                  scope: str = "project", task: str = "", state: str = "", evidence: str = "") -> dict:
     """Write a durable, high-value fact about the project into the dedicated facts tier of
     persistent memory — distinct from memory.capture's general-purpose, topic-scoped storage.
 
@@ -40,6 +40,8 @@ def remember_fact(content: str, category: str = DEFAULT_FACT_CATEGORY, project_d
             one with no SUPERSEDES line (R&D, 2026-10-30). Use the same name each time you save that task's state.
         state: with task: "verified" (checked: tests ran, the live result was seen) or "planned" (intended, not yet
             checked). Recall returns it as the fact's "state" field.
+        evidence: with task: the proof (a test path, a commit, a check's output; up to 300 chars). Required for
+            "verified" (R&D, 2026-10-31); recall returns it as "evidence".
 
     Returns:
         {"accepted": bool, "message_id": str | None}
@@ -48,7 +50,7 @@ def remember_fact(content: str, category: str = DEFAULT_FACT_CATEGORY, project_d
         MemoryError: same failure modes as memory.capture, plus an invalid category.
     """
     try:
-        content = tagged(content, task, state)
+        content = tagged(content, task, state, evidence)
     except ValueError as exc:
         raise MemoryError(str(exc)) from None
     with projects.working_in(project_dir):

@@ -3,6 +3,8 @@
 A fact saved with remember_fact(task=..., state=...) starts with a tag, "TASK[<name>] <state>: ". The newest fact
 for a task name hides the older ones on recall, with no SUPERSEDES marker needed, and each one is labelled verified
 (checked: tests ran, the live result was seen) or planned (intended, not yet checked), so a reader can tell them apart.
+A verified one names its proof (R&D, 31 Oct: a test path, a commit or a check's output), kept on an "Evidence: " last
+line and returned as "evidence".
 """
 from __future__ import annotations
 
@@ -11,28 +13,39 @@ import re
 STATES = ("verified", "planned")
 TASK_NAME_RE = re.compile(r"^[A-Za-z0-9][\w .:/-]{0,59}$")
 TAG_RE = re.compile(r"^TASK\[([^\]\n]{1,60})\](?: (verified|planned))?: ")
+EVIDENCE_RE = re.compile(r"\nEvidence: ([^\n]+)\s*$")
+EVIDENCE_MAX = 300
 
 
-def tagged(content: str, task: str, state: str) -> str:
-    """content with its task tag in front. Raises ValueError for a bad name or state."""
+def tagged(content: str, task: str, state: str, evidence: str = "") -> str:
+    """content with its task tag in front (and its evidence line at the end). Raises ValueError for a bad name or
+    state, or a verified state with no evidence."""
     task, state = (task or "").strip(), (state or "").strip().lower()
+    evidence = " ".join(str(evidence or "").split())[:EVIDENCE_MAX]
     if not task:
-        if state:
-            raise ValueError("state needs a task name")
+        if state or evidence:
+            raise ValueError("state and evidence need a task name")
         return content
     if not TASK_NAME_RE.match(task):
         raise ValueError("task must be 1-60 letters, digits, spaces or _ . : / -")
     if state and state not in STATES:
         raise ValueError(f"state must be one of {', '.join(STATES)}")
-    return f"TASK[{task}]{' ' + state if state else ''}: {content}"
+    if state == "verified" and not evidence:
+        raise ValueError("a verified state needs evidence: the test path, commit or check output that proves it "
+                         "(no proof yet? save it as planned)")
+    return f"TASK[{task}]{' ' + state if state else ''}: {content}" + (f"\nEvidence: {evidence}" if evidence else "")
 
 
 def label(message: dict) -> dict:
-    """The message with "task" and "state" fields when its content carries a tag."""
-    m = TAG_RE.match(str(message.get("content") or ""))
+    """The message with "task" and "state" fields (and "evidence", when it has one) when its content carries a tag."""
+    content = str(message.get("content") or "")
+    m = TAG_RE.match(content)
     if not m:
         return message
-    return {**message, "task": m.group(1), "state": m.group(2) or ""}
+    out = {**message, "task": m.group(1), "state": m.group(2) or ""}
+    if e := EVIDENCE_RE.search(content):
+        out["evidence"] = e.group(1).strip()
+    return out
 
 
 def current_only(messages: list[dict]) -> list[dict]:

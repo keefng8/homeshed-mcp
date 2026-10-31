@@ -39,7 +39,8 @@ def main() -> int:
         out["pro_latest"] = shape(httpx.get(mavis_pro.api_url() + pro_plugin.LATEST_PATH, headers=head, timeout=20).json())
     gpu = (os.environ.get("GPU_SERVICE_URL") or os.environ.get("LOCAL_AI_DECIDE_BASE_URL") or "").rstrip("/")
     if gpu:
-        out["rtk_daily"] = shape(httpx.get(f"{gpu}/stats/rtk/daily", timeout=20).json())
+        from tools._helper_auth import helper_headers  # the helper needs X-GPU-Token on every route (2026-10-30)
+        out["rtk_daily"] = shape(httpx.get(f"{gpu}/stats/rtk/daily", headers=helper_headers(), timeout=20).json())
     sx = (os.environ.get("SEARXNG_URL") or "").rstrip("/")
     if sx:
         out["searxng_search"] = shape(httpx.get(f"{sx}/search", params={"q": "print on demand t-shirt sizes",

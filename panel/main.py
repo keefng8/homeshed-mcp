@@ -1826,7 +1826,7 @@ async def claude_context():
         return off
     try:
         async with httpx.AsyncClient(timeout=5) as client:
-            r = await client.get(f"{GPU_SERVICE_URL}/stats/context")
+            r = await client.get(f"{GPU_SERVICE_URL}/stats/context", headers=_GPU_AUTH)
         if r.status_code == 200:
             return r.json()
         return JSONResponse({"error": f"GPU service returned HTTP {r.status_code}"}, status_code=502)
@@ -2014,7 +2014,7 @@ SETTING_SOURCES = {"main-pc": "your PC", "tool-server": "the tool server", "pane
 
 
 async def _remote_settings(client: httpx.AsyncClient, source: str) -> tuple[dict | None, str | None]:
-    url, headers = ((f"{GPU_SERVICE_URL}/settings", {}) if source == "main-pc"
+    url, headers = ((f"{GPU_SERVICE_URL}/settings", _GPU_AUTH) if source == "main-pc"
                     else (f"{MCP_BASE_URL}/settings", _MCP_HEADERS))
     try:
         r = await client.get(url, headers=headers)
@@ -2251,7 +2251,7 @@ async def rules_monitor():
                                       "and neither is set up on this install.", "not_set_up": True})
     try:
         async with httpx.AsyncClient(timeout=5) as client:
-            r = await client.get(f"{GPU_SERVICE_URL}/stats/rules")
+            r = await client.get(f"{GPU_SERVICE_URL}/stats/rules", headers=_GPU_AUTH)
         if r.status_code == 200:
             return r.json()
         return JSONResponse({"error": f"GPU service returned HTTP {r.status_code}"}, status_code=502)
@@ -3405,7 +3405,8 @@ async def savings():
             out[key] = {"available": False, "not_set_up": True}
             return
         try:
-            r = await client.get(f"{GPU_SERVICE_URL}/stats/rtk/{key}", timeout=100 if key == "discover" else 20)
+            r = await client.get(f"{GPU_SERVICE_URL}/stats/rtk/{key}", headers=_GPU_AUTH,
+                                 timeout=100 if key == "discover" else 20)
             out[key] = r.json() if r.status_code == 200 else {"available": False, "error": f"HTTP {r.status_code}"}
         except (httpx.RequestError, ValueError):
             out[key] = {"available": False, "error": "GPU service unreachable"}
@@ -3436,7 +3437,7 @@ async def tokens():
             out["rtk"] = {"available": False, "not_set_up": True}
             return
         try:
-            r = await client.get(f"{GPU_SERVICE_URL}/stats/rtk")
+            r = await client.get(f"{GPU_SERVICE_URL}/stats/rtk", headers=_GPU_AUTH)
             out["rtk"] = r.json() if r.status_code == 200 else {"available": False}
         except (httpx.RequestError, ValueError):
             out["rtk"] = {"available": False}

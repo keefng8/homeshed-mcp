@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-10-31
+
+### Added
+- `bugs.report` takes `regression_test`: the check that failed on the bug before it was fixed, kept with the bug as its regression test.
+
+### Changed
+- `memory.remember_fact`: a task state saved as `verified` must name its proof in `evidence` (a test path, a commit, a check's output). With none it's refused: save it as `planned` until there is proof. Recall returns it as `evidence`.
+- The plugin runs 0.7.5.
+
+### Fixed
+- The Control Panel sends the helper's token (`X-GPU-Token`) on every call to a helper service (image files, jobs, prompts, folders, settings, stats), so a helper can require it on every route.
+
 ## [0.7.4] - 2026-10-30
 
 ### Added
