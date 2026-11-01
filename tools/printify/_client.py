@@ -64,6 +64,17 @@ def put(path: str, body: dict, setting: str = WRITE_SETTING, label: str = "Editi
     return h.json_of("printify", resp)
 
 
+def delete(path: str) -> Any:
+    """A delete of an unpublished draft (printify.product.delete_draft checks it's one first; same switches as post)."""
+    h.require(SETTING, "Printify")
+    h.require(WRITE_SETTING, "Editing Printify drafts")
+    tok = _token()
+    resp = h.request("printify", "DELETE", path, secrets=(tok,),
+                     headers={"Authorization": f"Bearer {tok}", "User-Agent": USER_AGENT,
+                              "Accept": "application/json"})
+    return h.json_of("printify", resp) if resp.content else {}
+
+
 PUBLISH_SETTING = "commerce_printify_publish_enabled"
 LIVE_UPDATE_SETTING = "commerce_printify_live_update_enabled"
 

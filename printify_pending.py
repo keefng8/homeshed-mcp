@@ -65,6 +65,13 @@ AUTO_TRUST_SETTING = "approvals_trusted_auto_clients"
 BOT_TRUST_SETTING = "approvals_trusted_bots"  # bots whose "bot:<name>" approval counts, for BOT_ACTIONS only
 BOT_ACTIONS = ("etsy", "update")  # Etsy listing details (owner, 2026-10-14) and a live product's words (2026-10-25),
 # never a publish
+# Housekeeping (the owner, 2026-10-31: "Yes" to the Director approving these so the owner stops getting the taps): a
+# bot named here may approve a waiting Etsy details card that changes only these, its attributes and photo alt text.
+# New, removed or re-ordered photos, and every other kind of request, still wait for the owner.
+HOUSEKEEPING_BOTS_SETTING = "approvals_housekeeping_bots"
+HOUSEKEEPING_FIELDS = frozenset({"shipping_profile_id", "shop_section_id", "production_partner_ids", "materials",
+                                 "taxonomy_id"})
+BOT_NAME_RE = re.compile(r"^[a-z0-9_-]{1,30}$")
 STALE_FILE = Path(os.environ.get("PRINTIFY_STALE_FILE") or data_path("usage/printify_stale.json"))
 STALE_WINDOW_S = 48 * 3600
 STALE_PARK_AFTER = 3  # the first withdrawal and two failed re-asks (2026-10-25)
@@ -289,8 +296,10 @@ def _approval_problem(client: str | None, ok, action: str = "publish", payload: 
         if action not in BOT_ACTIONS:
             return (f'a bot\'s approval ("{by}") counts only for Etsy listing details and a live product\'s words, '
                     f'not for a {action}')
-        if action == "update" and ((payload or {}).get("prices") or (payload or {}).get("enabled")):
-            return f'a bot\'s approval ("{by}") doesn\'t count for a live price or variant change: that waits for the owner'
+        if action == "update" and ((payload or {}).get("prices") or (payload or {}).get("enabled")
+                                   or (payload or {}).get("moves")):
+            return (f'a bot\'s approval ("{by}") doesn\'t count for a live price, variant or print area change: that '
+                    'waits for the owner')
         if bot not in {b.lower() for b in trusted_clients(BOT_TRUST_SETTING)}:
             return (f'"{by}" isn\'t a bot the owner lets approve: the owner can name it in Settings > Shops and social '
                     '> "Bots that may approve listing details and live product words"')
@@ -315,8 +324,9 @@ def _sweep_problem(sweep, at: float, action: str, payload: dict | None) -> str |
     from datetime import datetime
     if action not in SWEEP_ACTIONS:
         return f"a sweep grant covers live product words and Etsy listing details only, not a {action}"
-    if action == "update" and ((payload or {}).get("prices") or (payload or {}).get("enabled")):
-        return "a sweep grant doesn't cover a live price or variant change: that waits for the owner"
+    if action == "update" and ((payload or {}).get("prices") or (payload or {}).get("enabled")
+                               or (payload or {}).get("moves")):
+        return "a sweep grant doesn't cover a live price, variant or print area change: that waits for the owner"
     if not isinstance(sweep, dict) or not APPROVAL_ID_RE.match(str(sweep.get("id") or "")):
         return 'sweep needs "id" (3-80 letters, digits, _ . : -), "items" and "until"'
     items = sweep.get("items")
@@ -571,6 +581,40 @@ def decide(item_id: str, approve: bool, via: str = "") -> dict:
         except (h.CommerceError, PendingError) as exc:
             result["etsy_reapply_error"] = f"re-apply the Etsy details by hand (etsy.listing.update reapply=true): {exc}"
     return result
+
+
+def housekeeping_problem(item: dict) -> str | None:
+    """Why a bot can't approve this waiting request as housekeeping, or None."""
+    if (item.get("action") or "publish") != "etsy":
+        return f"a {item.get('action') or 'publish'} request isn't listing housekeeping: it waits for the owner"
+    send = (item.get("payload") or {}).get("send") or {}
+    other = sorted(set(send.get("fields") or {}) - HOUSEKEEPING_FIELDS)
+    if other:
+        return f"it changes {', '.join(other)}, which isn't housekeeping: it waits for the owner"
+    photos = [k for k in ("images", "remove_images", "images_rank") if send.get(k)]
+    if photos:
+        return "it adds, removes or re-orders photos: it waits for the owner"
+    if not (send.get("fields") or send.get("properties") or send.get("images_alt")):
+        return "it changes nothing a bot may approve"
+    return None
+
+
+def approve_housekeeping(item_id: str, bot: str) -> dict:
+    """A bot the owner named (approvals_housekeeping_bots) approves a waiting housekeeping-only Etsy details card. It
+    runs through decide(), so the daily limit and the re-checks still apply, and it's logged as the bot's
+    ("bot:<name>"), never as the owner's tap."""
+    bot = str(bot or "").strip().lower()
+    if not BOT_NAME_RE.match(bot):
+        raise PendingError("bot must be a bot's name (a-z, 0-9, _ or -, up to 30)")
+    if bot not in {b.lower() for b in trusted_clients(HOUSEKEEPING_BOTS_SETTING)}:
+        raise PendingError(f'"{bot}" isn\'t a bot the owner lets approve housekeeping: the owner can name it in '
+                           'Settings > Shops and social > "Bots that may approve listing housekeeping"')
+    item = next((i for i in list_pending() if i["id"] == item_id), None)
+    if item is None:
+        raise PendingError(f"no request {item_id} is waiting (already decided, or older than {TTL_S // 3600} hours?)")
+    if problem := housekeeping_problem(item):
+        raise PendingError(problem)
+    return decide(item_id, True, via=f"housekeeping (approve_housekeeping, bot:{bot})")
 
 
 def withdraw(item_id: str, reason: str) -> dict:

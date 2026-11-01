@@ -2,7 +2,7 @@
   "id": "instagram.publish",
   "name": "Post to Instagram",
   "version": "1.0.0",
-  "description": "Post one image or a carousel (2-10 images) with a caption to the owner's connected Instagram professional account. Public; off until the owner switches it on.",
+  "description": "Post one image, a carousel (2-10 images) or a video as a Reel, with a caption, to the owner's connected Instagram professional account. Public; off until the owner switches it on.",
   "category": "instagram",
   "risk": "write",
   "requires": [
@@ -27,9 +27,13 @@
     },
     "image_names": {
       "type": "array",
-      "required": true
+      "required": false
     },
     "alt_text": {
+      "type": "string",
+      "required": false
+    },
+    "video_name": {
       "type": "string",
       "required": false
     }

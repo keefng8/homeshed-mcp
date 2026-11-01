@@ -14,20 +14,23 @@ owner switches **Let apps post to Instagram** on (Settings > Shops and social), 
 |---|---|---|
 | `text` | yes | The caption, 1-2,200 characters and at most 5 #hashtags, including the AI line. Links aren't clickable in Instagram captions: say "link in bio". |
 | `ai_generated` | yes | `true` when any of it was made by AI: a last line "Image made with AI." is added (unless the caption already says "made with AI"). |
-| `image_names` | yes | 1-10 images by their `saved_as` name: 1 = an image post, 2-10 = a carousel. JPEG only, 320-1440 px wide, 4:5 portrait to 1.91:1 landscape. Local images (image.carousel slides included) are sent as the image service's JPEG, up to 1440 px; a paid image is used as it is, so it must already be a JPEG. Every image is checked before anything is uploaded. |
+| `video_name` | no | A finished video by file name, without .mp4, from the videos folder (`VIDEO_DIR`, default `/videos`), posted as a **Reel** that is also shown in the feed. 9:16, 3-90 s and up to 300 MB. The size is checked before anything is uploaded; a `<name>.json` beside it (`{"seconds", "format"}`) lets the length and shape be checked too, and without one Instagram checks them while it processes the Reel. Not together with `image_names`; the AI line is then "Video made with AI." |
+| `image_names` | unless `video_name` | 1-10 images by their `saved_as` name: 1 = an image post, 2-10 = a carousel. JPEG only, 320-1440 px wide, 4:5 portrait to 1.91:1 landscape. Local images (image.carousel slides included) are sent as the image service's JPEG, up to 1440 px; a paid image is used as it is, so it must already be a JPEG. Every image is checked before anything is uploaded. |
 | `alt_text` | no | A description read out for each image (screen readers), up to 1,000 characters. |
 
 ## How it posts
 Meta's Instagram API with Instagram Login: each image is staged privately (a signed link, about an hour), a media
 container is made from it (carousel items first, then the carousel), the tool waits until Meta says the container is
-`FINISHED` (up to a minute), then calls `media_publish`. The staged files are deleted afterwards either way.
+`FINISHED` (up to a minute), then calls `media_publish`. The staged files are deleted afterwards either way. A Reel is
+staged the same way as an MP4 and made as a `REELS` container with `share_to_feed`; Meta gets up to 5 minutes to
+process it. It goes through the same switch, client grant and approval as an image post.
 
 ## Limits
 At most `INSTAGRAM_DAILY_MAX` posts in 24 hours (default 25; Meta's own limit is 100). Each post is logged (who, when,
 media type, ai_generated) and audited.
 
 ## Returns
-`{"posted": true, "id", "permalink", "media_type": "IMAGE" | "CAROUSEL", "posted_today", "daily_max", "ai_generated",
+`{"posted": true, "id", "permalink", "media_type": "IMAGE" | "CAROUSEL" | "REELS", "posted_today", "daily_max", "ai_generated",
 "ai_line"}`.
 
 ## Errors

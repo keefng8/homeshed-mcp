@@ -44,6 +44,12 @@ def test_edits_text_tags_and_prices_and_keeps_the_old_values(fake):
     assert up._edits()[0]["old"] == out["old"]  # kept for undo
 
 
+def test_the_zip_hoodie_gets_the_hoodie_floor():
+    """bp91 (AWDIS JH050 full-zip hoodie) is a hoodie: the owner wants £56.99 for a 3869p one (31 Oct)."""
+    assert up.min_margin(91) == up.min_margin(77) == 0.15
+    assert up.floor_pence(3869, 91) == 5521 <= 5699 < up.floor_pence(3869) == 5934
+
+
 def test_the_floor_keeps_20_percent_15_on_hoodies_after_etsy_fees(fake, monkeypatch):
     """The owner, 2026-10-09: 20% on everything, 15% on hoodies (it was 30% for all)."""
     tee, hoodie = up.floor_pence(1112), up.floor_pence(1112, 77)
@@ -104,3 +110,70 @@ def test_switch_off_or_already_as_asked_sends_nothing(fake):
     with pytest.raises(h.CommerceError, match="switched off"):
         up.product_update("abc123", title="Another title")
     assert puts == []
+
+
+OLD_AREAS = [{"variant_ids": [1, 2, 3], "placeholders": [{"position": "front", "images": [
+    {"id": "img-old", "x": 0.5, "y": 0.5, "scale": 1, "angle": 0}]}]}]
+CATALOG = {"variants": [{"id": 1, "placeholders": [{"position": "front"}, {"position": "back"}]},
+                        {"id": 2, "placeholders": [{"position": "front"}, {"position": "back"}]}]}
+BACK_AND_CHEST = [{"position": "back", "print_file": "back.png", "scale": 1, "x": 0.5, "y": 0.45},
+                  {"position": "front", "print_file": "chest.png", "scale": 0.3, "x": 0.7, "y": 0.25}]
+
+
+@pytest.fixture
+def areas(fake, monkeypatch):
+    """The draft has a blueprint, provider and a front print; the catalogue and Printify's uploads are faked."""
+    from tools.printify import write as wr
+    state, puts, switches = fake
+    state["product"] = {**DRAFT, "blueprint_id": 6, "print_provider_id": 99, "print_areas": OLD_AREAS}
+    monkeypatch.setattr(pf, "get", lambda path, params=None: CATALOG if "/catalog/" in path else state["product"])
+    uploads = []
+    monkeypatch.setattr(wr, "_print_file_bytes", lambda name: b"PNG")
+    monkeypatch.setattr(pf, "post", lambda path, body: uploads.append((path, body["file_name"])) or {"id": f"img-{len(uploads)}"})
+    return state, puts, uploads
+
+
+def test_print_areas_replace_a_drafts_layout_and_keep_the_old_one_for_undo(areas):
+    state, puts, uploads = areas
+    out = up.product_update("abc123", print_areas=BACK_AND_CHEST)
+    assert out["changed"] == ["print_areas"] and out["old"] == {"print_areas": OLD_AREAS}
+    assert uploads == [("/v1/uploads/images.json", "back.png"), ("/v1/uploads/images.json", "chest.png")]
+    [(path, body)] = puts
+    assert path == "/v1/shops/29235685/products/abc123.json" and set(body) == {"print_areas"}  # no prices or variants
+    assert body["print_areas"] == [{"variant_ids": [1, 2, 3], "placeholders": [
+        {"position": "back", "images": [{"id": "img-1", "x": 0.5, "y": 0.45, "scale": 1.0, "angle": 0}]},
+        {"position": "front", "images": [{"id": "img-2", "x": 0.7, "y": 0.25, "scale": 0.3, "angle": 0}]}]}]
+    assert up._edits()[0]["old"] == {"print_areas": OLD_AREAS} and up._edits()[0]["fields"] == ["print_areas"]
+    assert state["product"]["variants"] == DRAFT["variants"]  # prices untouched
+
+
+def test_print_areas_with_a_price_change_keep_the_other_prices(areas):
+    _, puts, _ = areas
+    out = up.product_update("abc123", variants=[{"id": 2, "price_pence": 2299}], print_areas=BACK_AND_CHEST[:1])
+    assert out["changed"] == ["prices", "print_areas"] and out["old"]["prices"] == {"2": 2199}
+    [(_, body)] = puts
+    assert [v["price"] for v in body["variants"]] == [2199, 2299, 2199]
+
+
+def test_print_areas_on_a_published_product_are_refused(areas):
+    state, puts, uploads = areas
+    state["product"] = {**state["product"], "external": {"id": "123", "handle": "https://etsy.com/listing/123"}}
+    with pytest.raises(h.CommerceError, match="only unpublished drafts.*sales channel"):
+        up.product_update("abc123", print_areas=BACK_AND_CHEST)
+    assert puts == [] and uploads == []
+
+
+@pytest.mark.parametrize("change, match", [
+    ({"position": "sleeve"}, "sleeve isn't on this blueprint.*back, front"),
+    ({"scale": 0.01}, "scale must be a number from 0.05 to 2.0"), ({"scale": 2.5}, "scale must be"),
+    ({"x": 1.2}, "x must be a number from 0.0 to 1.0"), ({"y": -0.1}, "y must be"),
+    ({"angle": 200}, "angle must be"), ({"scale": True}, "scale must be"),
+    ({"print_file": "../x.png"}, "PNG name"), ({"print_file": "x.jpg"}, "PNG name"),
+])
+def test_bad_print_areas_are_refused_before_any_upload_or_edit(areas, change, match):
+    _, puts, uploads = areas
+    with pytest.raises(h.CommerceError, match=match):
+        up.product_update("abc123", print_areas=[{**BACK_AND_CHEST[1], **change}])
+    assert puts == [] and uploads == []
+    with pytest.raises(h.CommerceError, match="list of 1-10"):
+        up.product_update("abc123", print_areas=[])

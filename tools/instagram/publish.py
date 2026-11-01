@@ -25,7 +25,11 @@ LOCAL_PX = 1440
 POSTS_FILE = Path(os.environ.get("INSTAGRAM_POSTS_FILE") or data_path("usage/instagram_posts.json"))
 WAIT_S, WAIT_STEP_S = 60, 3  # Meta fetches the image while the container processes
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,80}\.(png|jpg|jpeg)$")
-AI_LINE = "Image made with AI."
+AI_LINE, AI_VIDEO_LINE = "Image made with AI.", "Video made with AI."
+VIDEO_DIR = Path(os.environ.get("VIDEO_DIR", "/videos"))  # a folder of finished .mp4 videos (a read-only mount)
+VIDEO_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,80}$")
+MIN_REEL_S, MAX_REEL_S, MAX_VIDEO_BYTES = 3, 90, 300 * 2**20  # Reels: 3-90 s, 9:16, up to 300 MB
+WAIT_VIDEO_S, WAIT_VIDEO_STEP_S = 300, 5  # Meta fetches and processes a video for longer than an image
 _lock = threading.Lock()
 
 
@@ -109,9 +113,34 @@ def _create(uid: str, tok: str, body: dict) -> str:
     return str(cid)
 
 
-def _wait(cid: str, tok: str) -> None:
-    waited = 0
-    while waited < WAIT_S:
+def _video(name: str) -> bytes:
+    """A finished video by name (<name>.mp4 in VIDEO_DIR), checked against Reels' limits before anything is uploaded.
+    A <name>.json beside it ({"seconds", "format"}, as a video maker may write) lets the length and shape be checked
+    here too; without one, Instagram checks them itself while it processes the Reel."""
+    if not VIDEO_RE.match(name or ""):
+        raise h.CommerceError("video_name is a video's file name without .mp4 (lower-case letters, numbers, dashes)")
+    path = VIDEO_DIR / f"{name}.mp4"
+    if not path.is_file():
+        raise h.CommerceError(f"no video called {name}.mp4 in the videos folder")
+    if path.stat().st_size > MAX_VIDEO_BYTES:
+        raise h.CommerceError(f"{name} is over 300 MB (Instagram's limit for Reels)")
+    try:
+        meta = json.loads((VIDEO_DIR / f"{name}.json").read_text(encoding="utf-8"))
+        seconds, shape = float(meta.get("seconds") or 0), meta.get("format")
+    except OSError:
+        return path.read_bytes()  # no details file: Instagram's own processing checks length and shape
+    except (ValueError, AttributeError, TypeError):
+        raise h.CommerceError(f"{name}.json isn't readable details ({{\"seconds\", \"format\"}})") from None
+    if not MIN_REEL_S <= seconds <= MAX_REEL_S:
+        raise h.CommerceError(f"{name} runs {seconds:.0f} s; Reels take {MIN_REEL_S}-{MAX_REEL_S} s")
+    if shape != "9:16":
+        raise h.CommerceError(f"{name} is {shape or 'an unknown shape'}; Reels take 9:16")
+    return path.read_bytes()
+
+
+def _wait(cid: str, tok: str, limit_s: int = WAIT_S, step_s: float | None = None) -> None:
+    waited, step = 0, WAIT_STEP_S if step_s is None else step_s
+    while waited < limit_s:
         st = h.json_of("instagram", h.request("instagram", "GET", f"{API}/{cid}", headers={}, secrets=(tok,),
                                               params={"fields": "status_code,status", "access_token": tok}))
         code = st.get("status_code")
@@ -119,25 +148,31 @@ def _wait(cid: str, tok: str) -> None:
             return
         if code in ("ERROR", "EXPIRED"):
             raise h.CommerceError(f"Instagram couldn't prepare the post: {h.clean(st.get('status') or code, (tok,))}")
-        time.sleep(WAIT_STEP_S)
-        waited += max(WAIT_STEP_S, 1)
-    raise h.CommerceError("Instagram was still preparing the post after a minute: nothing was posted, try again")
+        time.sleep(step)
+        waited += max(step, 1)
+    raise h.CommerceError(f"Instagram was still preparing the post after {max(1, limit_s // 60)} minute(s): nothing was "
+                          "posted, try again")
 
 
 @tool(name="publish", category="instagram", doc="instagram/publish.md")
-def publish(text: str, ai_generated: bool, image_names: list[str], alt_text: str = "") -> dict:
-    """Post to the owner's connected Instagram professional account: one image, or a carousel of 2-10. PUBLIC, and
+def publish(text: str, ai_generated: bool, image_names: list[str] | None = None, alt_text: str = "",
+            video_name: str = "") -> dict:
+    """Post to the owner's connected Instagram professional account: one image, a carousel of 2-10, or a video as a
+    Reel. PUBLIC, and
     can't be unposted from here: only call it for a post that has been approved for publishing. Off until the owner
     switches "Let apps post to Instagram" on.
 
     Args:
         text: the caption, 1-2,200 characters and at most 5 #hashtags (with the AI line when ai_generated). Links in
             a caption aren't clickable on Instagram: say "link in bio".
-        ai_generated: required. True when any of it was made by AI: a last line "Image made with AI." is added.
+        ai_generated: required. True when any of it was made by AI: a last line "Image made with AI." (or "Video
+            made with AI." for a Reel) is added.
         image_names: 1-10 images by their saved_as name: 1 = an image post, 2-10 = a carousel. JPEG, 320-1440 px wide,
             4:5 to 1.91:1 (image.carousel's "4:5" or "1:1" slides are made for this). Staged privately for about an
             hour and deleted after posting.
         alt_text: a description read out for each image (screen readers); up to 1000 characters.
+        video_name: a finished video by file name without .mp4, from the videos folder (VIDEO_DIR), posted as a Reel
+            (also shown in the feed): 9:16, 3-90 s, up to 300 MB. Not together with image_names.
 
     Returns:
         {"posted": true, "id", "permalink", "media_type", "posted_today", "daily_max", "ai_generated", "ai_line"}.
@@ -148,19 +183,24 @@ def publish(text: str, ai_generated: bool, image_names: list[str], alt_text: str
     text = (text or "").strip()
     if not text:
         raise h.CommerceError("the caption is empty")
+    video_name = (video_name or "").strip()
+    names = [str(n).strip() for n in (image_names or []) if str(n).strip()]
+    if video_name and names:
+        raise h.CommerceError("a post has images or a video, not both")
+    line = AI_VIDEO_LINE if video_name else AI_LINE
     added = False
     if ai_generated and "made with ai" not in text.lower():
-        text, added = f"{text}\n\n{AI_LINE}", True
+        text, added = f"{text}\n\n{line}", True
     if len(text) > MAX_CHARS:
         raise h.CommerceError(f"the caption is over {MAX_CHARS} characters by {len(text) - MAX_CHARS}"
                               + ("; that includes the AI line" if added else ""))
     if len(re.findall(r"(?<!\w)#\w", text)) > MAX_HASHTAGS:
         raise h.CommerceError(f"Instagram allows at most {MAX_HASHTAGS} #hashtags in a caption")
-    names = [str(n).strip() for n in (image_names or []) if str(n).strip()]
-    if not 1 <= len(names) <= MAX_IMAGES:
-        raise h.CommerceError(f"give 1-{MAX_IMAGES} images (Instagram has no text-only posts)")
+    if not video_name and not 1 <= len(names) <= MAX_IMAGES:
+        raise h.CommerceError(f"give 1-{MAX_IMAGES} images or a video_name (Instagram has no text-only posts)")
     alt = {"alt_text": " ".join(alt_text.split())[:1000]} if (alt_text or "").strip() else {}
     media = [_media(n) for n in names]  # every image checked before anything is uploaded or posted
+    clip = _video(video_name) if video_name else None
     import clients
     import r2
     who = clients.current_client.get() or "owner"
@@ -177,7 +217,14 @@ def publish(text: str, ai_generated: bool, image_names: list[str], alt_text: str
                 r2.put(key, data, "image/jpeg")
                 staged.append(key)
                 urls.append(r2.presign_get(key, 3600))
-            if len(urls) == 1:
+            if clip is not None:
+                key = f"instagram/{time.strftime('%Y%m%d')}/{uuid.uuid4().hex}.mp4"
+                r2.put(key, clip, "video/mp4")
+                staged.append(key)
+                cid, kind = _create(uid, tok, {"media_type": "REELS", "video_url": r2.presign_get(key, 3600),
+                                               "caption": text, "share_to_feed": "true"}), "REELS"
+                _wait(cid, tok, WAIT_VIDEO_S, WAIT_VIDEO_STEP_S)  # a video takes Meta longer to fetch and process
+            elif len(urls) == 1:
                 cid, kind = _create(uid, tok, {"image_url": urls[0], "caption": text, **alt}), "IMAGE"
             else:
                 kids = [_create(uid, tok, {"image_url": u, "is_carousel_item": "true", **alt}) for u in urls]
@@ -185,7 +232,8 @@ def publish(text: str, ai_generated: bool, image_names: list[str], alt_text: str
                     _wait(k, tok)
                 cid, kind = _create(uid, tok, {"media_type": "CAROUSEL", "children": ",".join(kids),
                                                "caption": text}), "CAROUSEL"
-            _wait(cid, tok)
+            if kind != "REELS":
+                _wait(cid, tok)
             pid = h.json_of("instagram", h.request("instagram", "POST", f"{API}/{uid}/media_publish", headers={},
                                                    secrets=(tok,), data={"creation_id": cid, "access_token": tok})).get("id")
             if not pid:
@@ -207,7 +255,7 @@ def publish(text: str, ai_generated: bool, image_names: list[str], alt_text: str
     clients._audit("instagram post", None if who == "owner" else who, post=str(pid), ai_generated=ai_generated,
                    **({"not_visible": True} if gone and not link else {}))
     out = {"posted": True, "id": str(pid), "permalink": link, "media_type": kind, "posted_today": today + 1,
-           "daily_max": _daily_max(), "ai_generated": ai_generated, "ai_line": AI_LINE if added else None}
+           "daily_max": _daily_max(), "ai_generated": ai_generated, "ai_line": line if added else None}
     if gone and not link:
         out.update(posted=False, warning="Instagram returned an id but doesn't show the post (it may have removed it, "
                                          "e.g. posts too close together): check the account, and space posts out")

@@ -16,7 +16,7 @@ Threads). **Public.** Only call it for a post that has been approved for publish
 | `link` | no | One `https://` address, shown as a preview card. Text posts only (Meta ignores it with images). |
 | `image_names` | no | Images by their `saved_as` name: 1 = an IMAGE post, 2-10 = a CAROUSEL. |
 | `alt_text` | no | A description of the images for screen readers (each image gets it), up to 1000 characters. |
-| `video_name` | no | A finished Studio video by name (no `.mp4`): a VIDEO post, up to 5 minutes and 1 GB, staged in R2 like images; Meta gets up to 5 minutes to process it. Not with `image_names`. |
+| `video_name` | no | A finished video by file name (no `.mp4`) from the videos folder (`VIDEO_DIR`, default `/videos`): a VIDEO post (a `<name>.json` beside it with `"seconds"` lets the length be checked before upload), up to 5 minutes and 1 GB, staged in R2 like images; Meta gets up to 5 minutes to process it. Not with `image_names`. |
 | `topic_tag` | no | The post's one topic (blue, links to the topic's feed): 1-50 characters, spaces allowed, no `.` or `&` (Meta's rules); a leading `#` is dropped. Sent on the post's own container, so the text needs no #tag. |
 
 ## Media (2026-10-07)

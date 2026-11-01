@@ -42,6 +42,10 @@
     "owner_approval": {
       "type": "object",
       "required": false
+    },
+    "move_print_areas": {
+      "type": "array",
+      "required": false
     }
   },
   "execution": {

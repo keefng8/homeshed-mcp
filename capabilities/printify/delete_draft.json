@@ -1,0 +1,45 @@
+{
+  "id": "printify.product.delete_draft",
+  "name": "Delete An Unpublished Printify Draft",
+  "version": "1.0.0",
+  "description": "A bot the owner named (Settings > Shops and social > \"Bots that may delete Printify drafts\") deletes one UNPUBLISHED Printify draft, such as a test or a duplicate. Published products, ones mid-publish, waiting for publish approval or published today are refused. The draft is saved first and each delete audited with its reason.",
+  "category": "printify",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "delete printify draft",
+    "remove test product",
+    "delete unpublished product"
+  ],
+  "inputs": {
+    "product_id": {
+      "type": "string",
+      "required": true
+    },
+    "bot": {
+      "type": "string",
+      "required": true
+    },
+    "reason": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.printify.delete.product_delete_draft"
+  },
+  "latency": {
+    "expected_ms": 2000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "printify.products.list",
+    "printify.product.update",
+    "printify.product.create"
+  ]
+}

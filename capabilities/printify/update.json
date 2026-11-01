@@ -2,7 +2,7 @@
   "id": "printify.product.update",
   "name": "Edit A Printify Draft",
   "version": "1.0.0",
-  "description": "Edit an unpublished Printify draft's title, description, tags, variant prices and SKUs. Drafts only (never published, mid-publish or awaiting publish approval), never under the margin floor (20%, hoodies 15%) after Etsy's fees, audited with the old values kept.",
+  "description": "Edit an unpublished Printify draft's title, description, tags, variant prices and SKUs, or replace its print areas (e.g. a back print plus a left-chest front print). Drafts only (never published, mid-publish or awaiting publish approval), never under the margin floor (20%, hoodies 15%) after Etsy's fees, audited with the old values kept.",
   "category": "printify",
   "risk": "write",
   "requires": [
@@ -37,6 +37,23 @@
     "variants": {
       "type": "array",
       "required": false
+    },
+    "print_areas": {
+      "type": "array",
+      "required": false,
+      "description": "Replaces the draft's print areas (prices and variants stay). 1-10 items.",
+      "items": {
+        "type": "object",
+        "required": ["position", "print_file", "scale", "x", "y"],
+        "properties": {
+          "position": {"type": "string", "description": "One of the blueprint's print positions at its provider: front, back, ..."},
+          "print_file": {"type": "string", "description": "A PNG name from image.print_file"},
+          "scale": {"type": "number", "minimum": 0.05, "maximum": 2.0},
+          "x": {"type": "number", "minimum": 0, "maximum": 1},
+          "y": {"type": "number", "minimum": 0, "maximum": 1},
+          "angle": {"type": "number", "minimum": -180, "maximum": 180, "default": 0}
+        }
+      }
     }
   },
   "execution": {

@@ -73,9 +73,12 @@ def _check_size(size: int, limit: int) -> None:
     if size > MAX_BYTES:
         raise ImageError("that image is over 25 MB (take it from the image service's folder instead)")
     if size > limit:
-        mb = size / 1024 / 1024
-        hint = f"; ask again with max_mb={min(MAX_MB, mb + 0.1):.1f}" if size <= MAX_BYTES else " (the limit is 25 MB)"
-        raise ImageError(f"that image is {mb:.1f} MB, over max_mb{hint}")
+        # KB-0130: the old text ("over max_mb; ask again with max...") lost the exact value when cut short. The value
+        # to pass now comes first, and the 1 MB default stays: the base64 lands in the caller's context.
+        mb, asked = size / 1024 / 1024, limit / 1024 / 1024
+        raise ImageError(f"call image.fetch again with max_mb={min(MAX_MB, mb + 0.1):.1f}: the image is {mb:.1f} MB, "
+                         f"over max_mb={asked:g}{' (the default)' if asked == DEFAULT_MB else ''}; its base64 text is "
+                         "a third bigger, so ask for it only to save the file")
 
 
 def _done_name(job: dict) -> str:

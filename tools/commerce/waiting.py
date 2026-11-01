@@ -48,3 +48,27 @@ def requests_list(days: int = 7) -> dict:
                 **({"note": r["note"]} if r.get("note") else {}), **({"client": r.get("client")} if me is None else {})}
                for r in pp.history(days) if mine(r)]
     return {"waiting": waiting, "decided": decided[:100], "days": days}
+
+
+@tool(name="requests.approve_housekeeping", category="commerce", doc="commerce/approve_housekeeping.md")
+def approve_housekeeping(request_id: str, bot: str) -> dict:
+    """A bot the owner named approves one waiting Etsy details card that only does listing housekeeping: delivery
+    profile, shop section, production partners, materials, category, attributes and photo alt text. Anything else
+    (prices, words, photos added, removed or moved, publishing, Pinterest, a card mixing these) still waits for the owner.
+
+    Args:
+        request_id: the waiting request's id (commerce.requests.list).
+        bot: the approving bot's name, e.g. "director". It must be in Settings > Shops and social > "Bots that may
+            approve listing housekeeping".
+
+    Returns:
+        {"id", "approved": true, "etsy": summary, "result"}: as the owner's approval does. Logged as "bot:<name>".
+    """
+    import clients
+    import printify_pending as pp
+    if clients.current_client.get() is not None:
+        raise h.CommerceError("only the owner's own sessions may approve housekeeping, not an app")
+    try:
+        return pp.approve_housekeeping(str(request_id or "").strip(), bot)
+    except pp.PendingError as exc:
+        raise h.CommerceError(str(exc)) from None

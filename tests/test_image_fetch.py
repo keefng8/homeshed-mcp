@@ -66,9 +66,21 @@ def test_a_small_default_and_an_opt_in_up_to_25_mb(env, monkeypatch):
     big = PNG + b"x" * (1024 * 1024)  # just over 1 MB
     monkeypatch.setattr(f.httpx, "get",
                         lambda url, **kw: R(js={"status": "done", "saved_as": "a.png"}) if "/jobs/" in url else R(content=big))
-    with pytest.raises(ImageError, match=r"1\.0 MB, over max_mb; ask again with max_mb=1\.1"):
+    with pytest.raises(ImageError, match=r"^call image\.fetch again with max_mb=1\.1: the image is 1\.0 MB, over "
+                                         r"max_mb=1 \(the default\)"):
         f.fetch("0123456789ab")
     assert f.fetch("0123456789ab", max_mb=2)["bytes"] == len(big)
+
+
+def test_kb0130_a_design_png_over_max_mb_names_the_exact_value_first(env, monkeypatch):
+    """KB-0130: a 2.8 MB PNG was refused with text that, cut at 120 characters, lost the value to ask with."""
+    png = PNG + b"x" * int(2.8 * 1024 * 1024)
+    monkeypatch.setattr(f.httpx, "get",
+                        lambda url, **kw: R(js={"status": "done", "saved_as": "a.png"}) if "/jobs/" in url else R(content=png))
+    with pytest.raises(ImageError) as e:
+        f.fetch("0123456789ab", max_mb=2)
+    assert str(e.value)[:60].startswith("call image.fetch again with max_mb=2.9") and "over max_mb=2;" in str(e.value)
+    assert f.fetch("0123456789ab", max_mb=2.9)["bytes"] == len(png)
     for bad in (0, -1, 26, True, "2"):
         with pytest.raises(ImageError, match="max_mb"):
             f.fetch("0123456789ab", max_mb=bad)

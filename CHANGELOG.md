@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-11-01
+
+### Added
+- `printify.product.update` takes `print_areas`: which design goes where on a draft (a back print plus a small left-chest front, for example). Each file is uploaded to Printify first, positions are checked against the blueprint, and the old layout is kept for undo. Drafts only.
+- `printify.product.update_live` takes `move_print_areas`: move or resize the design already on a live product's print position (`x`, `y`, `scale`, `angle`). The same file stays and the Etsy photos are left alone. It always waits for the owner's own tap: an app's, a bot's or a sweep approval is refused for it.
+- `printify.product.delete_draft`: a bot the owner names ("Bots that may delete Printify drafts", empty by default) deletes one unpublished draft, with a reason. Published, mid-publish, waiting or published-today products are refused. The draft is saved first and the delete audited.
+- `commerce.requests.approve_housekeeping`: a bot the owner names ("Bots that may approve listing housekeeping", empty by default) approves a waiting Etsy details card that only changes the delivery profile, shop section, production partners, materials, category, attributes or photo alt text. Prices, words, photo changes and everything else still wait for the owner. Logged as the bot's.
+- `instagram.publish` takes `video_name`: a finished .mp4 from the videos folder (`VIDEO_DIR`, default `/videos`) posted as a Reel shared to the feed (9:16, 3-90 s, up to 300 MB). A `<name>.json` beside it (`{"seconds", "format"}`) lets the length and shape be checked before upload; without one Instagram checks them. Images or a video, not both.
+
+### Changed
+- `threads.publish`: `video_name` takes any .mp4 in the videos folder (`VIDEO_DIR`, default `/videos`; it read `STUDIO_VIDEO_DIR` before). A `<name>.json` beside it (`{"seconds"}`) still lets the length be checked first.
+- The Printify margin floor counts the full-zip hoodie (blueprint 91) as a hoodie (15%), beside blueprint 77.
+- `etsy.listings.list`: `limit` is 1-100 in every mode (plain rows were capped at 20).
+- The plugin runs 0.7.6.
+
+### Fixed
+- `local_ai.ask`: strict OpenAI-compatible backends (Groq, OpenRouter, Mistral, Gemini, OVH) get only the standard fields, so they no longer fail with HTTP 400.
+- `image.fetch`: a too-big image's error starts with the exact retry (`max_mb=...`).
+- A Printify "Validation failed." error now includes Printify's reason.
+
 ## [0.7.5] - 2026-10-31
 
 ### Added

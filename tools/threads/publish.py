@@ -46,7 +46,7 @@ def _record(row: dict) -> None:
 
 
 MAX_IMAGES, MAX_IMAGE_BYTES, MIN_W, MAX_W = 10, 8 * 2**20, 320, 1440  # Meta: JPEG/PNG, 8 MB, 320-1440 px wide
-VIDEO_DIR = Path(os.environ.get("STUDIO_VIDEO_DIR", "/videos"))  # the studio's finished videos (read-only mount)
+VIDEO_DIR = Path(os.environ.get("VIDEO_DIR", "/videos"))  # a folder of finished .mp4 videos (a read-only mount)
 VIDEO_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,80}$")
 MAX_VIDEO_BYTES, MAX_VIDEO_S, WAIT_VIDEO_S = 1024 ** 3, 300, 300  # Meta: MP4/MOV H.264, up to 1 GB and 5 minutes
 LOCAL_PX = 1440  # local images go as the image service's JPEG fitted in this box (Threads' widest; originals can be 20 MB upscales)
@@ -110,12 +110,13 @@ def _create(uid: str, tok: str, body: dict) -> str:
 
 
 def _video(name: str) -> bytes:
-    """A finished Studio video by name, checked against Meta's limits before anything is uploaded."""
+    """A finished video by name (<name>.mp4 in VIDEO_DIR), checked against Meta's limits before anything is uploaded.
+    A <name>.json beside it ({"seconds"}) lets the length be checked here too; without one, Meta checks it."""
     if not VIDEO_RE.match(name or ""):
-        raise h.CommerceError("video_name is a Studio video's name (letters, numbers and dashes)")
+        raise h.CommerceError("video_name is a video's file name without .mp4 (lower-case letters, numbers, dashes)")
     path = VIDEO_DIR / f"{name}.mp4"
     if not path.is_file():
-        raise h.CommerceError(f"no Studio video called {name}")
+        raise h.CommerceError(f"no video called {name}.mp4 in the videos folder")
     if path.stat().st_size > MAX_VIDEO_BYTES:
         raise h.CommerceError(f"{name} is over 1 GB (Threads' limit)")
     try:
@@ -168,8 +169,8 @@ def publish(text: str, ai_generated: bool, link: str = "", image_names: list[str
             carousel. Local images go as a JPEG up to 1440 px; paid ones as they are (JPEG or PNG, 320-1440 px wide,
             up to 8 MB). They are staged privately for about an hour and deleted after posting.
         alt_text: a description read out for each image (screen readers); up to 1000 characters.
-        video_name: a finished Studio video by name (its file name without .mp4): a video post, up to 5 minutes and
-            1 GB. Not together with image_names. It is staged privately like images and deleted after posting.
+        video_name: a finished video from the videos folder (VIDEO_DIR), its file name without .mp4: a video post,
+            up to 5 minutes and 1 GB. Not together with image_names. It is staged privately like images and deleted after posting.
         topic_tag: the post's one topic (shown blue, links to that topic's feed), 1-50 characters, spaces allowed,
             no "." or "&" (Meta's rules); a leading # is dropped. Keeps the text free of #tags.
 

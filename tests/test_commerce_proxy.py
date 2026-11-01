@@ -363,7 +363,7 @@ def test_bad_arguments(fake):
     on("etsy", "printify")
     with pytest.raises(h.CommerceError, match="state must be"):
         er.listings_list(state="all")
-    with pytest.raises(h.CommerceError, match="limit must be 1 to 20"):
+    with pytest.raises(h.CommerceError, match="limit must be 1 to 100"):
         er.listings_list(limit=500)
     with pytest.raises(h.CommerceError, match="was_paid"):
         er.orders_list(was_paid="maybe")
@@ -390,6 +390,14 @@ def test_every_result_is_under_5k_with_no_personal_details_or_secrets(fake, call
     for p in PII + ["secret street"]:
         assert p not in out
     no_secrets(out)
+
+
+def test_kb0128_listings_list_takes_a_full_etsy_page_and_stays_small(fake):
+    """KB-0128: limit=100 without photos was refused ("limit must be 1 to 20") though Etsy serves 100 a page."""
+    on("etsy")
+    lst = er.listings_list(limit=100)
+    assert len(lst["listings"]) == 100 and lst["next_offset"] == 100 and fake.calls[-1].url.params["limit"] == "100"
+    assert len(json.dumps(lst)) < 20_000  # titles trimmed, no descriptions: a full page stays bounded
 
 
 def test_etsy_shapes(fake):

@@ -39,7 +39,7 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
-HOODIE_BLUEPRINTS = {77}  # Printify's Gildan 18500 hoodie
+HOODIE_BLUEPRINTS = {77, 91}  # Printify's Gildan 18500 hoodie; AWDIS JH050 full-zip hoodie (the owner, 31 Oct)
 
 
 def min_margin(blueprint_id=None) -> float:
@@ -188,10 +188,65 @@ def fields_of(body: dict, old: dict) -> list[str]:
     return sorted([k for k in body if k != "variants"] + [k for k in ("prices", "skus", "enabled") if k in old])
 
 
+MAX_PRINT_AREAS = 10
+# Each number's allowed range (2026-10-31): scale is the image's width as a share of the print area's
+AREA_RANGES = {"scale": (0.05, 2.0), "x": (0.0, 1.0), "y": (0.0, 1.0), "angle": (-180, 180)}
+
+
+def check_print_areas(areas) -> list[dict]:
+    """The asked-for print_areas, checked (shape and ranges only; the positions are checked against the blueprint
+    once the draft is read): [{"position", "print_file", "scale", "x", "y", "angle"}]."""
+    from tools.printify.write import check_print_file
+    if not isinstance(areas, list) or not 1 <= len(areas) <= MAX_PRINT_AREAS:
+        raise h.CommerceError(f"print_areas must be a list of 1-{MAX_PRINT_AREAS} {{position, print_file, scale, x, y}}")
+    out = []
+    for i, a in enumerate(areas, 1):
+        if not isinstance(a, dict):
+            raise h.CommerceError(f"print area {i}: give {{position, print_file, scale, x, y, angle?}}")
+        pos = a.get("position")
+        if not isinstance(pos, str) or not pos.strip():
+            raise h.CommerceError(f"print area {i}: position is a print position name, like front or back")
+        row = {"position": pos.strip().lower(), "print_file": check_print_file(a.get("print_file"))}
+        for key, (low, high) in AREA_RANGES.items():
+            v = a.get(key, 0 if key == "angle" else None)
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or not low <= v <= high:
+                raise h.CommerceError(f"print area {i} ({row['position']}): {key} must be a number from {low} to {high}")
+            row[key] = int(v) if key == "angle" else float(v)
+        out.append(row)
+    return out
+
+
+def blueprint_positions(product: dict) -> set[str]:
+    """The print positions the draft's blueprint has at its print provider (Printify's catalogue, as
+    printify.variants.list reads it)."""
+    bid, ppid = product.get("blueprint_id"), product.get("print_provider_id")
+    if not isinstance(bid, int) or not isinstance(ppid, int):
+        raise h.CommerceError("the draft doesn't say its blueprint and print provider, so its print positions can't "
+                              "be checked")
+    d = pf.get(f"/v1/catalog/blueprints/{bid}/print_providers/{ppid}/variants.json") or {}
+    raw = d.get("variants") if isinstance(d, dict) else d
+    return {str(p.get("position")).lower() for v in raw if isinstance(raw, list) and isinstance(v, dict)
+            for p in v.get("placeholders") or [] if isinstance(p, dict) and p.get("position")}
+
+
+def print_areas_body(product: dict, areas: list[dict], image_ids: list[str]) -> list[dict]:
+    """Printify's print_areas for the asked-for areas, on the draft's own variant ids (every variant its print areas
+    cover now, or else all of them). Two images on one position share its placeholder."""
+    vids = sorted({vid for pa in product.get("print_areas") or [] if isinstance(pa, dict)
+                   for vid in pa.get("variant_ids") or [] if isinstance(vid, int)})
+    vids = vids or [v["id"] for v in product.get("variants") or [] if isinstance(v, dict) and isinstance(v.get("id"), int)]
+    placeholders: dict[str, list] = {}
+    for a, image_id in zip(areas, image_ids):
+        placeholders.setdefault(a["position"], []).append(
+            {"id": image_id, "x": a["x"], "y": a["y"], "scale": a["scale"], "angle": a["angle"]})
+    return [{"variant_ids": vids, "placeholders": [{"position": p, "images": imgs} for p, imgs in placeholders.items()]}]
+
+
 @tool(name="product.update", category="printify", doc="printify/update.md")
 def product_update(product_id: str, title: str = "", description: str = "", tags: list[str] | None = None,
-                   variants: list[dict] | None = None) -> dict:
-    """Edit an UNPUBLISHED Printify draft: its title, description, tags, variant prices and SKUs. Drafts only
+                   variants: list[dict] | None = None, print_areas: list[dict] | None = None) -> dict:
+    """Edit an UNPUBLISHED Printify draft: its title, description, tags, variant prices and SKUs, and its print areas
+    (which design goes where). Drafts only
     (anything on a sales channel, mid-publish, waiting for publish approval or published today is refused). No price
     under the margin floor (20%, hoodies 15%) after Etsy's fees. Every edit is audited and keeps the old values. Off unless the
     owner's switch "Let apps create and edit Printify drafts" is on. A published product: printify.product.update_live.
@@ -204,6 +259,10 @@ def product_update(product_id: str, title: str = "", description: str = "", tags
         variants: [{"id": variant id, "price_pence": new price, "sku": new SKU, "enabled": true/false}] for the
             variants to change (any of the keys; a SKU is 1-32 letters, digits, dots, dashes, slashes or underscores;
             "enabled": false takes a size or colour off sale, never all of them); the others keep theirs.
+        print_areas: [{"position": "front"/"back"/... (one of the blueprint's print positions), "print_file": a PNG
+            name from image.print_file, "scale": 0.05-2.0 (the image's width as a share of the area's), "x", "y": 0-1
+            (the image's centre; 0.5, 0.5 is the middle), "angle": -180 to 180 (default 0)}]: REPLACES all the
+            draft's print areas (each file is uploaded to Printify first). Prices and variants stay as they are.
 
     Returns:
         {"product_id", "changed": [fields], "old": {...the values before}, "published": false, "edits_today",
@@ -211,7 +270,11 @@ def product_update(product_id: str, title: str = "", description: str = "", tags
         Printify didn't keep a SKU it was sent.
     """
     pid = h.check_hex_id(product_id, "product_id")
-    title, description, tags, prices, skus = check_input(title, description, tags, variants)
+    areas = check_print_areas(print_areas) if print_areas is not None else None
+    if areas and not (title or description or tags is not None or variants):
+        title, description, tags, prices, skus = "", "", None, {}, {}  # only the print areas change
+    else:
+        title, description, tags, prices, skus = check_input(title, description, tags, variants)
     h.require(pf.SETTING, "Printify")
     h.require(pf.WRITE_SETTING, "Editing Printify drafts")
     shop = pf.shop_id()
@@ -221,6 +284,13 @@ def product_update(product_id: str, title: str = "", description: str = "", tags
     if why := _not_a_draft(pid, product):
         raise h.CommerceError(f"only unpublished drafts can be edited, and this one isn't: {why}")
     body, old = changes(product, title, description, tags, prices, skus, enabled_of(variants))
+    if areas:
+        allowed = blueprint_positions(product)
+        if bad := sorted({a["position"] for a in areas} - allowed):
+            raise h.CommerceError(f"print position {', '.join(bad)} isn't on this blueprint at this print provider: "
+                                  f"it has {', '.join(sorted(allowed)) or 'none listed'}")
+        body["print_areas"] = []  # filled with the uploaded image ids below, under the daily limit
+        old["print_areas"] = product.get("print_areas") or []  # the whole old layout, so it can be put back
     if not body:
         return {"product_id": pid, "changed": [], "old": {}, "published": False, "note": "already as asked: nothing sent"}
     import clients
@@ -230,6 +300,10 @@ def product_update(product_id: str, title: str = "", description: str = "", tags
         today = [r for r in _edits() if time.time() - float(r.get("at") or 0) < 86400]
         if len(today) >= _daily_max():
             raise h.CommerceError(f"{len(today)} draft edits in the last 24 hours: the daily limit ({_daily_max()}) is reached")
+        if areas:
+            from tools.printify.write import upload_print_file
+            ids = {f: upload_print_file(f) for f in dict.fromkeys(a["print_file"] for a in areas)}  # each file once
+            body["print_areas"] = print_areas_body(product, areas, [ids[a["print_file"]] for a in areas])
         sent = pf.put(f"/v1/shops/{shop}/products/{pid}.json", body)
         _record({"at": time.time(), "product_id": pid, "by": who, "fields": fields, "old": old})
     clients._audit("printify draft edited", None if who == "owner" else who, product=pid, fields=",".join(fields))

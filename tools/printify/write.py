@@ -64,6 +64,24 @@ def _print_file_bytes(name: str) -> bytes:
     return resp.content
 
 
+def check_print_file(name) -> str:
+    """A print file name from image.print_file: a bare PNG name (no folders)."""
+    if not isinstance(name, str) or not name.endswith(".png") or "/" in name or "\\" in name or ".." in name:
+        raise h.CommerceError("print_file must be a PNG name from image.print_file")
+    return name
+
+
+def upload_print_file(name: str) -> str:
+    """The print file, from the image service, uploaded to Printify's media library: its image id. Shared with
+    printify.product.update (print_areas)."""
+    raw = _print_file_bytes(check_print_file(name))
+    up = pf.post("/v1/uploads/images.json", {"file_name": name, "contents": base64.b64encode(raw).decode()})
+    image_id = up.get("id") if isinstance(up, dict) else None
+    if not image_id:
+        raise h.CommerceError("Printify didn't return an image id for the upload")
+    return str(image_id)
+
+
 @tool(name="product.create", category="printify", doc="printify/write.md")
 def product_create(title: str, description: str, blueprint_id: int, print_provider_id: int, variants: list[dict],
                    print_file: str, position: str = "front", tags: list[str] | None = None) -> dict:
@@ -101,8 +119,7 @@ def product_create(title: str, description: str, blueprint_id: int, print_provid
         vs.append({"id": vid, "price": price, "is_enabled": True})
     h.check_id(blueprint_id, "blueprint_id")
     h.check_id(print_provider_id, "print_provider_id")
-    if not (print_file or "").endswith(".png") or "/" in print_file or ".." in print_file:
-        raise h.CommerceError("print_file must be a PNG name from image.print_file")
+    check_print_file(print_file)
     h.require(pf.SETTING, "Printify")
     h.require(pf.WRITE_SETTING, "Creating Printify products")
     shop = pf.shop_id()
@@ -112,11 +129,7 @@ def product_create(title: str, description: str, blueprint_id: int, print_provid
         made = len(_today())
         if made >= _daily_max():
             raise h.CommerceError(f"{made} products made in the last 24 hours: the daily limit ({_daily_max()}) is reached")
-        raw = _print_file_bytes(print_file)
-        up = pf.post("/v1/uploads/images.json", {"file_name": print_file, "contents": base64.b64encode(raw).decode()})
-        image_id = up.get("id") if isinstance(up, dict) else None
-        if not image_id:
-            raise h.CommerceError("Printify didn't return an image id for the upload")
+        image_id = upload_print_file(print_file)
         body = {"title": title, "description": description, "blueprint_id": int(blueprint_id),
                 "print_provider_id": int(print_provider_id), "variants": vs, "tags": tags,
                 "print_areas": [{"variant_ids": [v["id"] for v in vs],

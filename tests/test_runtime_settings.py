@@ -58,6 +58,11 @@ try:  # the outgoing mail server comes with the email tools
     PRIVATE = {**PRIVATE, **{key: spec["default"] for key, spec in _EMAIL_SETTINGS.items()}}
 except ImportError:
     pass
+try:  # the video tools' own settings, where that add-on is installed (none without it)
+    from tools.video import SETTINGS as _VIDEO_SETTINGS
+    PRIVATE = {**PRIVATE, **{key: spec["default"] for key, spec in _VIDEO_SETTINGS.items()}}
+except ImportError:
+    pass
 PUBLIC = {"local_ai_allow_cloud": True, "ntfy_default_topic": "Alerts", "local_ai_base_url": "", "ntfy_base_url": "",
           "stray_command_stop": True, "bugs_search_public": False, "bug_capture": True, "library_url": "", "agents_messaging": True,
           "claude_compact_window": "default"}

@@ -53,6 +53,7 @@ def _reason(resp: httpx.Response) -> str:
         return ""
     if not isinstance(body, dict):
         return ""
+    found = []
     for k in ("error_description", "error", "message", "detail", "errors"):
         v = body.get(k)
         if isinstance(v, dict):
@@ -60,8 +61,10 @@ def _reason(resp: httpx.Response) -> str:
         if isinstance(v, list):
             v = "; ".join(str(x) for x in v[:3])
         if v:
-            return str(v)
-    return ""
+            found.append(str(v))
+            if k != "message" or not isinstance(body.get("errors"), (dict, list)):
+                break  # Printify's "Validation failed." says why only in "errors" (1 Nov): keep that too
+    return " ".join(found)
 
 
 ETSY_QUOTA: dict = {}  # the last Etsy answer's own limit headers (2026-10-21: a 429 "daily rate limit")

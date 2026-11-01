@@ -33,7 +33,7 @@ every result carries a `warning` to re-authorise and store it.
 | Tool | Etsy endpoint | Inputs |
 |---|---|---|
 | `etsy.shop.get` | `GET /v3/application/shops/{shop_id}`, plus `/production-partners`, `/policies/return` and `/sections` (shops_r) | none |
-| `etsy.listings.list` | `GET /v3/application/shops/{shop_id}/listings` (listings_r) | `state` active/inactive/sold_out/draft/expired, `limit` 1-20, `offset` |
+| `etsy.listings.list` | `GET /v3/application/shops/{shop_id}/listings` (listings_r) | `state` active/inactive/sold_out/draft/expired, `limit` 1-100, `offset` |
 | `etsy.listing.get` | `GET /v3/application/listings/{listing_id}` | `listing_id` |
 | `etsy.orders.list` | `GET /v3/application/shops/{shop_id}/receipts` (transactions_r) | `limit` 1-20, `offset`, `was_paid`/`was_shipped` any/yes/no |
 | `etsy.order.get` | `GET /v3/application/shops/{shop_id}/receipts/{receipt_id}` | `receipt_id` |

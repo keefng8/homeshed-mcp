@@ -107,6 +107,7 @@ def backends() -> list[dict]:
     out = []
     for entry in _load_registry():
         cloud, tier = bool(entry.get("cloud")), int(entry.get("tier", 99))
+        strict = bool(entry.get("openai_strict"))  # standard OpenAI fields only (KB-0127)
         base = runtime_settings.address(entry.get("url_env", "")) or entry.get("url")  # Settings page first
         key = vault.secret(entry["key_env"]) if entry.get("key_env") else None  # Credentials first, then .env
         if entry.get("discover"):
@@ -114,13 +115,13 @@ def backends() -> list[dict]:
             by_model = {v: k for k, v in aliases.items()}
             for model_id in _discover(entry):
                 out.append({"name": model_id, "base_url": base, "model": model_id, "key": key,
-                            "cloud": cloud, "tier": tier, "configured": bool(base and key),
+                            "cloud": cloud, "tier": tier, "configured": bool(base and key), "strict": strict,
                             "aliases": [by_model[model_id]] if model_id in by_model else []})
             continue
         model = os.environ.get(entry.get("model_env", "")) or entry.get("model")
         configured = bool(base and model and (key or not entry.get("key_env")))
         out.append({"name": entry["name"], "base_url": base, "model": model, "key": key,
-                    "cloud": cloud, "tier": tier, "configured": configured,
+                    "cloud": cloud, "tier": tier, "configured": configured, "strict": strict,
                     "aliases": list(entry.get("aliases") or [])})
     return out
 
@@ -207,10 +208,12 @@ def _call(b: dict, prompt: str, max_tokens: int, temperature: float, enable_thin
     # enable_thinking=false it spent a whole 20-token budget deliberating (verified 2026-09-25).
     # A strict provider (Groq, 2026-10-30, a Pro user's friend) refuses the field with HTTP 400: that one is asked
     # again without it, and remembered, so a cloud backup isn't skipped for a setting it doesn't need.
+    # KB-0127: a registry entry marked "openai_strict" (Groq, OpenRouter, Mistral, Gemini, OVH) never gets it: only
+    # the standard OpenAI fields below, so no first request is spent on a 400 (or a 422 that doesn't name the field).
     url = f"{b['base_url'].rstrip('/')}/chat/completions"
     body = {"model": b["model"], "messages": [{"role": "user", "content": prompt}],
             "max_tokens": max_tokens, "temperature": temperature}
-    if url not in _no_template_kwargs:
+    if not b.get("strict") and url not in _no_template_kwargs:
         body["chat_template_kwargs"] = {"enable_thinking": enable_thinking}
     headers = {"Authorization": f"Bearer {b['key']}"} if b["key"] else None
     timeout = max(CLOUD_MIN_TIMEOUT_S if b["cloud"] else MIN_TIMEOUT_S, max_tokens / TOKENS_PER_SECOND_FLOOR)

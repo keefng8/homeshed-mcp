@@ -17,6 +17,7 @@ Printify and re-published, with only the changed parts sent to Etsy.
 | `description` | no | Up to 5,000 characters; empty keeps it. |
 | `tags` | no | The new full list: up to 13, each up to 20 characters. Omit to keep them. |
 | `variants` | no | `[{"id": variant id, "price_pence": new price, "enabled": true/false}]` for the variants to reprice or put on / take off sale (2026-10-09, without touching SKUs; every variant off is refused); the others keep theirs. A switch made in Printify meanwhile makes the request stale. |
+| `move_print_areas` | no | `[{"position": "back", "x"?, "y"?, "scale"?, "angle"?}]`: move or resize the design already on a print position (2026-11-01: the zip hoodie's back print sat under the hood at y 0.5). `x`, `y` 0-1 are the design's centre (0.5, 0.5 the middle), `scale` 0.05-2.0, `angle` -180 to 180; leave one out to keep it. The same file stays (nothing is uploaded), on every variant that has it, and only on a position with one image. Always the owner's tap: an `owner_approval`, a bot or a sweep grant is refused. A move made in Printify meanwhile makes the request stale. |
 
 ## Safety
 - **Published products only.** A draft is refused (use `printify.product.update`), and so is one Printify has locked
@@ -36,7 +37,8 @@ Printify and re-published, with only the changed parts sent to Etsy.
   when it was asked (someone edited it meanwhile), the approval fails and the request stays waiting with the reason:
   decline it and ask again. The edit is built from the product as it is then, so nothing else is sent back stale.
 - **Selective publish.** Only the changed parts are published (`title`, `description`, `tags`, `variants`); images,
-  key features and the delivery template are left as they are on Etsy.
+  key features and the delivery template are left as they are on Etsy. A print area move changes what's printed, not
+  the Etsy photos: Printify's own mockups update, the listing's photos stay, so a new hero shot is a separate step.
 - **Capped and audited.** At most `PRINTIFY_LIVE_UPDATE_DAILY_MAX` approved updates in 24 hours (default 10, counted
   apart from publishes). Each step is in the audit log; the old values are kept in `usage/printify_published.json`.
 - **Switches.** The read switch plus "Let apps ask to update live Printify products"

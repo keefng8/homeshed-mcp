@@ -2,7 +2,7 @@
   "id": "threads.publish",
   "name": "Post to Threads",
   "version": "1.0.0",
-  "description": "Post text, one image, a carousel (2-10 images) or a Studio video to the owner's connected Threads account. Public; off until the owner switches it on.",
+  "description": "Post text, one image, a carousel (2-10 images) or a video to the owner's connected Threads account. Public; off until the owner switches it on.",
   "category": "threads",
   "risk": "write",
   "requires": [

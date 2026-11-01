@@ -202,3 +202,80 @@ def test_a_boost_raises_the_daily_limit_until_its_end(monkeypatch):
     monkeypatch.delenv("PRINTIFY_LIVE_UPDATE_BOOST")
     monkeypatch.setenv("PRINTIFY_LIVE_UPDATE_DAILY_MAX", "90")
     assert printify_pending.update_daily_max() == 50  # the plain setting keeps its ceiling
+
+
+AREAS = [{"variant_ids": [1, 2], "placeholders": [
+    {"position": "back", "images": [{"id": "img-back", "x": 0.5, "y": 0.5, "scale": 0.9, "angle": 0}]},
+    {"position": "front", "images": [{"id": "img-a", "x": 0.3, "y": 0.3, "scale": 0.2, "angle": 0},
+                                     {"id": "img-b", "x": 0.7, "y": 0.3, "scale": 0.2, "angle": 0}]}]}]
+
+
+def test_a_print_area_move_waits_for_the_owner_then_applies_without_touching_the_etsy_photos(fake):
+    """1 Nov: the zip hoodie's back print sat under the hood at y 0.5; the Director asked to move it to 0.57."""
+    import copy
+    state, sent, _ = fake
+    state["product"]["print_areas"] = copy.deepcopy(AREAS)
+    item = ul.product_update_live("abc123", move_print_areas=[{"position": "Back", "y": 0.57}])
+    assert item["pending"] is True and item["changed"] == ["print_areas"] and sent == []
+    assert "back print y 0.5 -> 0.57" in pp.list_pending()[0]["summary"]
+    pp.decide(item["id"], True)
+    put, publish = sent[0], sent[1]
+    back = put[2]["print_areas"][0]["placeholders"][0]["images"][0]
+    assert put[0] == "PUT" and back == {"id": "img-back", "x": 0.5, "y": 0.57, "scale": 0.9, "angle": 0}
+    assert put[2]["print_areas"][0]["placeholders"][1] == AREAS[0]["placeholders"][1]  # the front is as it was
+    assert publish[0] == "PUBLISH" and not any(publish[2].values())  # no images, words or variants re-sent
+
+
+def test_a_move_is_never_bot_or_app_approved_and_odd_positions_are_refused(fake):
+    import copy
+    state, sent, _ = fake
+    state["product"]["print_areas"] = copy.deepcopy(AREAS)
+    with pytest.raises(h.CommerceError, match="always waits for the owner"):
+        ul.product_update_live("abc123", move_print_areas=[{"position": "back", "y": 0.57}],
+                               owner_approval={"id": "ok-1", "by": "bot:director", "at": "2026-11-01T00:00:00Z"})
+    with pytest.raises(h.CommerceError, match="several images"):
+        ul.product_update_live("abc123", move_print_areas=[{"position": "front", "y": 0.4}])
+    with pytest.raises(h.CommerceError, match="no image"):
+        ul.product_update_live("abc123", move_print_areas=[{"position": "sleeve", "y": 0.4}])
+    with pytest.raises(h.CommerceError, match="y must be a number"):
+        ul.product_update_live("abc123", move_print_areas=[{"position": "back", "y": 1.4}])
+    with pytest.raises(h.CommerceError, match="at least one of"):
+        ul.product_update_live("abc123", move_print_areas=[{"position": "back"}])
+    assert ul.product_update_live("abc123", move_print_areas=[{"position": "back", "y": 0.5}])["pending"] is False
+    assert pp.list_pending() == [] and sent == []
+
+
+def test_a_move_made_in_printify_meanwhile_makes_it_stale(fake):
+    import copy
+    state, sent, _ = fake
+    state["product"]["print_areas"] = copy.deepcopy(AREAS)
+    item = ul.product_update_live("abc123", move_print_areas=[{"position": "back", "y": 0.57}])
+    state["product"]["print_areas"][0]["placeholders"][0]["images"][0]["y"] = 0.55
+    with pytest.raises(ul.Stale, match="print areas"):
+        pp.decide(item["id"], True)
+    assert sent == []
+
+
+def test_the_move_sends_only_what_printify_takes_back(fake):
+    """1 Nov: the read-back sent as it was (image name, src, size, flips, layer fields, an empty front placeholder)
+    got HTTP 400 "Validation failed" on the live zip."""
+    state, sent, _ = fake
+    state["product"]["print_areas"] = [{"variant_ids": [1, 2], "placeholders": [
+        {"position": "back", "decoration_method": "dtg", "images": [
+            {"id": "img-back", "name": "art.png", "type": "image/png", "height": 4000, "width": 3000, "x": 0.5,
+             "y": 0.5, "scale": 1, "angle": 0, "flipX": False, "flipY": False, "src": "https://x", "layerType": "image",
+             "imageId": "img-back"}]},
+        {"position": "front", "decoration_method": "dtg", "images": []}]}]
+    item = ul.product_update_live("abc123", move_print_areas=[{"position": "back", "y": 0.57}])
+    pp.decide(item["id"], True)
+    assert sent[0][2]["print_areas"] == [{"variant_ids": [1, 2], "placeholders": [
+        {"position": "back", "images": [{"id": "img-back", "x": 0.5, "y": 0.57, "scale": 1, "angle": 0}]}]}]
+    assert ul.product_update_live("abc123", move_print_areas=[{"position": "back", "y": 0.5}])["pending"] is False
+
+
+def test_printifys_validation_reason_is_kept(monkeypatch):
+    import httpx
+    resp = httpx.Response(400, json={"status": "error", "message": "Validation failed.",
+                                     "errors": {"reason": "print_areas.0.placeholders.1.images must not be empty"}})
+    assert h._reason(resp) == "Validation failed. print_areas.0.placeholders.1.images must not be empty"
+    assert h._reason(httpx.Response(400, json={"message": "Not found"})) == "Not found"

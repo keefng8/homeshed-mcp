@@ -225,7 +225,7 @@ def test_a_bot_approves_a_live_products_words_but_never_its_prices(bot_update, f
     assert bot_update(1)["pending"] is False and pp.list_pending() == []
     for i, change in ((2, {"prices": {"1": 2999}}), (3, {"enabled": {"1": False}})):
         out = bot_update(i, change, pid=f"p{i}")
-        assert out["pending"] is True and "live price or variant change" in out["owner_approval"]
+        assert out["pending"] is True and "live price, variant or print area change" in out["owner_approval"]
 
 
 def test_a_stale_update_is_withdrawn_then_parked_and_a_success_clears_it(bot_update, fake):
@@ -286,8 +286,9 @@ def test_a_sweep_grant_covers_a_batch_after_its_first_hour_up_to_its_items(fake)
 
 @pytest.mark.parametrize("grant, action, payload, why", [
     (sweep("apr_a1"), "publish", {}, "not a publish"),
-    (sweep("apr_a2"), "update", {"prices": [1]}, "price or variant"),
-    (sweep("apr_a3"), "update", {"enabled": [1]}, "price or variant"),
+    (sweep("apr_a2"), "update", {"prices": [1]}, "price, variant"),
+    (sweep("apr_a3"), "update", {"enabled": [1]}, "price, variant"),
+        (sweep("apr_a10"), "update", {"moves": [{"position": "back", "y": 0.57}]}, "print area"),
     (sweep("apr_a4", until_days=-0.01), "update", WORDS, "ended at"),
     (sweep("apr_a5", until_days=8), "update", WORDS, "at most 7 days"),
     (sweep("apr_a6", items=0), "update", WORDS, "whole number"),

@@ -159,7 +159,8 @@ def test_the_monthly_limit_is_the_owners_setting_and_off_by_default(fake):
 
 def test_a_new_month_starts_at_zero(fake, monkeypatch):
     prov._add_month_cost("anthropic", 100.0)
-    monkeypatch.setattr(prov.time, "strftime", lambda fmt, *a: "2026-11" if fmt == "%Y-%m" else "2026-11-01")
+    # a month far ahead: a fixed "2026-11" stopped being new on 1 Nov 2026
+    monkeypatch.setattr(prov.time, "strftime", lambda fmt, *a: "2099-01" if fmt == "%Y-%m" else "2099-01-01")
     assert prov.month_cost("anthropic") == 0.0
 
 

@@ -132,6 +132,23 @@ SETTINGS = {
                 "and only from an app in \"Apps whose own approval counts\". Each is logged as that bot's, not yours. "
                 "Empty: no bot.",
     },
+    "approvals_housekeeping_bots": {
+        "type": "names", "default": "", "group": "Online shops",
+        "label": "Bots that may approve listing housekeeping",
+        "help": "Bot names, separated by commas (e.g. director). A bot named here may approve a waiting Etsy listing "
+                "card that only changes the delivery profile, shop section, production partners, materials, category, "
+                "attributes or photo alt text, so those don't need your tap. Prices, titles, descriptions, tags, "
+                "photos added, removed or moved, publishing and Pinterest still wait for you, and so does any card "
+                "mixing those in. Each approval is logged as that bot's. Empty: no bot.",
+    },
+    "printify_draft_delete_bots": {
+        "type": "names", "default": "", "group": "Online shops",
+        "label": "Bots that may delete Printify drafts",
+        "help": "Bot names, separated by commas (e.g. director). A bot named here may delete an UNPUBLISHED Printify "
+                "draft, such as a test or a duplicate: never a product on your shop, one being published, one waiting "
+                "for your publish approval or one published today. Each draft is saved first and each delete logged "
+                "with its reason. Empty: no bot.",
+    },
     "approvals_photo_delete_bots": {
         "type": "names", "default": "", "group": "Online shops",
         "label": "Bots that may delete listing photos",

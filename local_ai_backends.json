@@ -1,5 +1,5 @@
 {
-  "_about": "Model registry for local_ai.ask model=\"auto\" (tools/local_ai/ask.py). Adding a model = one entry here, with no code change. Lower tier is tried first; within a tier the starting model rotates so every model gets work. A \"discover\" entry asks an OpenAI-compatible gateway which models it serves (cached 5 min), so a model added to your gateway is used automatically. No secrets in this file: urls/keys come from the named env vars.",
+  "_about": "Model registry for local_ai.ask model=\"auto\" (tools/local_ai/ask.py). Adding a model = one entry here, with no code change. Lower tier is tried first; within a tier the starting model rotates so every model gets work. A \"discover\" entry asks an OpenAI-compatible gateway which models it serves (cached 5 min), so a model added to your gateway is used automatically. \"openai_strict\": true sends only standard OpenAI request fields (for providers that refuse extras such as chat_template_kwargs with HTTP 400). No secrets in this file: urls/keys come from the named env vars.",
   "backends": [
     {
       "name": "local",
@@ -57,6 +57,7 @@
         "llama-3.3-70b*"
       ],
       "cloud": true,
+      "openai_strict": true,
       "tier": 5,
       "notes": "Free tier (about 100 requests a minute). Dormant until GROQ_API_KEY is set; get a key at console.groq.com. Prompts leave your machine."
     },
@@ -69,6 +70,7 @@
         "*:free"
       ],
       "cloud": true,
+      "openai_strict": true,
       "tier": 5,
       "notes": "Free tier (free models only (ids end in :free): 20 a minute, 50 a day). Dormant until OPENROUTER_API_KEY is set; get a key at openrouter.ai. Prompts leave your machine."
     },
@@ -82,6 +84,7 @@
         "codestral-*"
       ],
       "cloud": true,
+      "openai_strict": true,
       "tier": 5,
       "notes": "Free tier (about 1 request a second). Dormant until MISTRAL_API_KEY is set; get a key at console.mistral.ai. Prompts leave your machine."
     },
@@ -102,6 +105,7 @@
         "*embed*"
       ],
       "cloud": true,
+      "openai_strict": true,
       "tier": 5,
       "notes": "Free tier (about 15 a minute and 1,500 a day on the free Flash models). Dormant until GEMINI_API_KEY is set; get a key at aistudio.google.com. Prompts leave your machine."
     },
@@ -115,6 +119,7 @@
         "Meta-Llama-3_3-70B-Instruct"
       ],
       "cloud": true,
+      "openai_strict": true,
       "tier": 5,
       "notes": "Free tier (2 a minute without a token; a free token raises it). Dormant until OVH_AI_ENDPOINTS_TOKEN is set; get a key at endpoints.ai.cloud.ovh.net. Prompts leave your machine."
     }

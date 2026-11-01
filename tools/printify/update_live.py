@@ -92,6 +92,92 @@ def _live(pid: str) -> dict:
     return p
 
 
+MOVE_KEYS = ("x", "y", "scale", "angle")
+
+
+def check_moves(moves) -> list[dict]:
+    """move_print_areas, checked: [{"position", and any of "x", "y", "scale", "angle"}], one row per position."""
+    if not isinstance(moves, list) or not 1 <= len(moves) <= up.MAX_PRINT_AREAS:
+        raise h.CommerceError(f"move_print_areas must be a list of 1-{up.MAX_PRINT_AREAS} "
+                              "{position, x?, y?, scale?, angle?}")
+    out, seen = [], set()
+    for i, m in enumerate(moves, 1):
+        pos = m.get("position") if isinstance(m, dict) else None
+        if not isinstance(pos, str) or not pos.strip():
+            raise h.CommerceError(f"move {i}: position is a print position name, like front or back")
+        row = {"position": pos.strip().lower()}
+        if row["position"] in seen:
+            raise h.CommerceError(f"move {i}: {row['position']} is listed twice")
+        seen.add(row["position"])
+        for key in MOVE_KEYS:
+            if key in m:
+                low, high = up.AREA_RANGES[key]
+                v = m[key]
+                if isinstance(v, bool) or not isinstance(v, (int, float)) or not low <= v <= high:
+                    raise h.CommerceError(f"move {i} ({row['position']}): {key} must be a number from {low} to {high}")
+                row[key] = int(v) if key == "angle" else float(v)
+        if len(row) == 1:
+            raise h.CommerceError(f"move {i} ({row['position']}): give at least one of x, y, scale, angle")
+        out.append(row)
+    return out
+
+
+def _layout(areas) -> list:
+    """A print_areas list in a comparable form: (variant ids, position, [(image id, x, y, scale, angle)])."""
+    return sorted((sorted(pa.get("variant_ids") or []), str(ph.get("position")).lower(),
+                   [(im.get("id"), im.get("x"), im.get("y"), im.get("scale"), im.get("angle"))
+                    for im in ph.get("images") or [] if isinstance(im, dict)])
+                  for pa in areas or [] if isinstance(pa, dict)
+                  for ph in pa.get("placeholders") or [] if isinstance(ph, dict) and ph.get("images"))
+
+
+def _images_at(areas: list, pos: str) -> list[list]:
+    return [ph.get("images") or [] for pa in areas if isinstance(pa, dict)
+            for ph in pa.get("placeholders") or [] if isinstance(ph, dict) and str(ph.get("position")).lower() == pos]
+
+
+def moved_areas(p: dict, moves: list[dict]) -> list[dict]:
+    """The product's print_areas with each move applied to the one image on that position (the same file: nothing is
+    uploaded). A position with no image, or with several, can't be moved this way."""
+    import copy
+    areas = copy.deepcopy(p.get("print_areas") or [])
+    for m in moves:
+        found = _images_at(areas, m["position"])
+        if not any(found) or not all(len(i) == 1 for i in found):
+            raise h.CommerceError(f"the {m['position']} print area has "
+                                  + ("no image" if not any(found) else "several images")
+                                  + ": only a position with one image can be moved")
+        for imgs in found:
+            imgs[0].update({k: m[k] for k in MOVE_KEYS if k in m})
+    return _sendable(areas)
+
+
+IMAGE_KEYS = ("id", "x", "y", "scale", "angle")
+
+
+def _sendable(areas: list) -> list[dict]:
+    """print_areas as Printify takes them back (1 Nov: sending its read-back as it was, with each image's name, src,
+    size, flips and layer fields and an empty front placeholder, got HTTP 400 "Validation failed"): only each image's
+    id, x, y, scale and angle, and only placeholders that have an image, as printify.product.update sends a draft's."""
+    out = []
+    for pa in areas:
+        phs = [{"position": ph.get("position"),
+                "images": [{k: im[k] for k in IMAGE_KEYS if k in im} for im in ph.get("images") or []
+                           if isinstance(im, dict)]}
+               for ph in pa.get("placeholders") or [] if isinstance(ph, dict) and ph.get("images")]
+        if phs:
+            out.append({"variant_ids": pa.get("variant_ids") or [], "placeholders": phs})
+    return out
+
+
+def _moved_said(p: dict, moves: list[dict]) -> str:
+    def now(pos, key):
+        found = [i for i in _images_at(p.get("print_areas") or [], pos) if i]
+        return found[0][0].get(key) if found else None
+    return "; ".join(f"{m['position']} print " + ", ".join(f"{k} {now(m['position'], k)} -> {m[k]}"
+                                                            for k in MOVE_KEYS if k in m) for m in moves)
+
+
 def _said(old: dict, title: str, tags: list[str] | None, prices: dict[int, int],
           enabled: dict[int, bool] | None = None) -> str:
     """The change in a few words, for the owner's approval card."""
@@ -116,7 +202,8 @@ def _said(old: dict, title: str, tags: list[str] | None, prices: dict[int, int],
 
 @tool(name="product.update_live", category="printify", doc="printify/update_live.md")
 def product_update_live(product_id: str, title: str = "", description: str = "", tags: list[str] | None = None,
-                        variants: list[dict] | None = None, owner_approval: dict | None = None) -> dict:
+                        variants: list[dict] | None = None, owner_approval: dict | None = None,
+                        move_print_areas: list[dict] | None = None) -> dict:
     """Ask to update a PUBLISHED Printify product's title, description, tags or variant prices on the owner's Etsy
     shop. It is NOT changed by this call: it's checked, then waits for the owner's approval in the Control Panel; only
     then is it edited and re-published (just the changed parts). SKUs can't change on a live product (Printify matches
@@ -131,7 +218,10 @@ def product_update_live(product_id: str, title: str = "", description: str = "",
         variants: [{"id": variant id, "price_pence": new price, "enabled": true/false}] for the variants to reprice
             or to put on / take off sale (never all of them off); the others keep theirs.
         owner_approval: {"id", "by", "at"}: the owner's own approval inside a trusted app (as printify.product.publish);
-            then it runs at once.
+            then it runs at once. Not with a print area move: that always waits for the owner.
+        move_print_areas: [{"position": "back", "x"?, "y"?, "scale"?, "angle"?}]: move or resize the design already on
+            a print position (x, y 0-1 are its centre, 0.5 the middle; scale 0.05-2.0; angle -180 to 180). The same
+            file stays, only on a position with one image. The Etsy photos are left as they are.
 
     Returns:
         {"pending": true, "id", "update", "changed", "old", "expires_in_h", "how"}: the approval request, not a change
@@ -139,26 +229,39 @@ def product_update_live(product_id: str, title: str = "", description: str = "",
     """
     import printify_pending
     pid = h.check_hex_id(product_id, "product_id")
-    title, description, tags, prices, _ = up.check_input(title, description, tags, variants, skus_allowed=False)
+    moves = check_moves(move_print_areas) if move_print_areas is not None else None
+    if moves and owner_approval is not None:
+        raise h.CommerceError("a print area move always waits for the owner's own tap: send it without owner_approval")
+    if moves and not (title or description or tags is not None or variants):
+        title, description, tags, prices = "", "", None, {}  # only the print areas move
+    else:
+        title, description, tags, prices, _ = up.check_input(title, description, tags, variants, skus_allowed=False)
     h.require(pf.SETTING, "Printify")
     h.require(pf.LIVE_UPDATE_SETTING, LABEL)
     p = _live(pid)
     _hold_unless_active(p)
     enabled = up.enabled_of(variants)
     body, old = up.changes(p, title, description, tags, prices, {}, enabled)
+    said = _said(old, title, tags, prices, enabled)
+    if moves:
+        new = moved_areas(p, moves)
+        if _layout(new) != _layout(p.get("print_areas")):
+            body["print_areas"], old["print_areas"] = new, p.get("print_areas") or []
+            said = "; ".join(filter(None, [said, _moved_said(p, moves)]))
     if not body:
         return {"product_id": pid, "pending": False, "changed": [], "note": "already as asked: nothing queued"}
     fields = up.fields_of(body, old)
     name = h.trim(p.get("title"), 60) or "untitled"
     etsy_set = any(f in body for f in RESETS_ETSY_DETAILS) and _etsy_details(p) is not None
-    summary = h.trim(f'Update live "{name}" on your Etsy shop: {_said(old, title, tags, prices, enabled)}'
+    summary = h.trim(f'Update live "{name}" on your Etsy shop: {said}'
                      + ("; its Etsy details are queued again after" if etsy_set else ""), 300)
     checks = {"fields": fields, "listing": (p.get("external") or {}).get("handle") or (p.get("external") or {}).get("id"),
               "updated_last_24h": len(printify_pending.done_today("update")),
               "daily_max": printify_pending.update_daily_max(), "etsy_details_reapplied_after": etsy_set}
     payload = {"title": title, "description": description, "tags": tags,
                "prices": {str(v): c for v, c in prices.items()},
-               "enabled": {str(v): on for v, on in enabled.items()}, "old": old}
+               "enabled": {str(v): on for v, on in enabled.items()}, "old": old,
+               **({"moves": moves} if "print_areas" in body else {})}
     try:
         out = printify_pending.add(pid, summary, checks, action="update", payload=payload, owner_approval=owner_approval)
     except printify_pending.PendingError as exc:
@@ -185,11 +288,15 @@ def execute_update(product_id: str, payload: dict) -> dict:
     stale += [f"price of variant {v}" for v, c in (old.get("prices") or {}).items() if now.get(int(v)) != c]
     on_now = {v.get("id"): bool(v.get("is_enabled", True)) for v in p.get("variants") or [] if isinstance(v, dict)}
     stale += [f"variant {v} on/off" for v, was in (old.get("enabled") or {}).items() if on_now.get(int(v)) != was]
+    if "print_areas" in old and _layout(p.get("print_areas")) != _layout(old["print_areas"]):
+        stale.append("print areas")
     enabled = {int(v): bool(on) for v, on in (payload.get("enabled") or {}).items()}
     if stale:
         raise Stale(f"the product changed since this was asked ({', '.join(stale)}): withdrawn, ask again")
     body, _ = up.changes(p, payload.get("title") or "", payload.get("description") or "", payload.get("tags"), prices, {},
                          enabled)
+    if payload.get("moves"):
+        body["print_areas"] = moved_areas(p, payload["moves"])
     if not body:
         return {"product_id": pid, "changed": [], "note": "already as asked: nothing sent"}
     _hold_unless_active(p)  # again on approval: it may have been turned off since it was asked

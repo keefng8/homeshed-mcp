@@ -140,6 +140,25 @@ def test_a_provider_that_refuses_chat_template_kwargs_is_asked_again_without_it(
     assert "chat_template_kwargs" not in sent[-1] and len(sent) == 3
 
 
+def test_kb0127_strict_openai_backends_get_only_standard_fields(env, monkeypatch):
+    """KB-0127: Groq and other strict OpenAI-compatible providers answered HTTP 400 to chat_template_kwargs."""
+    reg = json.loads(env.read_text())
+    reg["backends"][2]["openai_strict"] = True
+    env.write_text(json.dumps(reg))
+    monkeypatch.setattr(module, "_no_template_kwargs", set())
+    monkeypatch.setattr(module, "_is_busy", lambda base_url: True)
+    calls = _routed({SUPER: _ok("strict"), ULTRA: _ok("strict")}, monkeypatch)
+    assert module.ask("hi")["text"] == "strict" and len(calls) == 1
+    assert set(calls[0]["json"]) == {"model", "messages", "max_tokens", "temperature"}
+
+
+def test_shipped_registry_marks_the_strict_cloud_providers():
+    shipped = json.loads((module.Path(module.__file__).resolve().parents[2] / "local_ai_backends.json").read_text())
+    strict = {e["name"] for e in shipped["backends"] if e.get("openai_strict")}
+    assert {"groq", "openrouter", "mistral", "gemini", "ovh"} <= strict
+    assert not strict & {"local", "gateway", "nvidia"}  # these need chat_template_kwargs (Nemotron, Qwen)
+
+
 def test_failed_backend_is_benched_then_retried_after_bench_window(monkeypatch):
     t = [1000.0]
     monkeypatch.setattr(module.time, "time", lambda: t[0])

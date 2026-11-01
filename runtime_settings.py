@@ -167,6 +167,12 @@ try:  # the owner's outgoing mail server lives with the email tools
 except ImportError:
     pass
 
+try:  # the video tools' own settings, where that add-on is installed (none without it)
+    from tools.video import SETTINGS as _VIDEO_SETTINGS
+    SCHEMA.update(_VIDEO_SETTINGS)
+except ImportError:
+    pass
+
 _lock = threading.Lock()
 _cache: tuple[object, dict] = (None, {})
 
@@ -191,6 +197,9 @@ def validate(key: str, value):
         raise ValueError(f"{spec['label']}: a server name like smtp.example.com, or empty.")
     if spec["type"] == "email" and not (isinstance(value, str) and (not value.strip() or EMAIL_RE.fullmatch(value.strip()))):
         raise ValueError(f"{spec['label']}: an email address like you@example.com, or empty.")
+    if spec["type"] == "text" and not (isinstance(value, str) and len(value.strip()) <= spec.get("max", 120)
+                                       and value.isprintable()):  # a line of free text, e.g. a shop's name
+        raise ValueError(f"{spec['label']}: up to {spec.get('max', 120)} characters on one line.")
     if spec["type"] == "select" and value not in spec["options"]:
         raise ValueError(f"{spec['label']}: choose one of the listed options.")
     if spec["type"] == "names":  # a list of names, e.g. apps: "a,b", or empty for none (2026-10-09)

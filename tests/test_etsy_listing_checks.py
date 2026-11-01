@@ -157,8 +157,10 @@ def test_listings_list_can_bring_each_first_photo_in_the_same_call(monkeypatch):
     assert out["listings"][1]["photo"] is None
     plain = er.listings_list()
     assert "includes" not in calls[-1] and "photo" not in plain["listings"][0]
+    er.listings_list(limit=100)  # KB-0128: a full Etsy page without photos too (plain rows are the smallest)
+    assert calls[-1]["limit"] == 100 and "includes" not in calls[-1]
     with pytest.raises(er.h.CommerceError):
-        er.listings_list(limit=100)  # 100 a page only with photos (the compact list stays small)
+        er.listings_list(limit=101)
 
 
 def test_listings_list_detail_carries_what_a_listing_check_reads(monkeypatch):

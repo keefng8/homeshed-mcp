@@ -207,3 +207,66 @@ def test_media_takes_jpeg_only_in_instagrams_shapes(meta, tmp_path, monkeypatch)
         pub._media("wide.jpg")
     with pytest.raises(Exception, match="isn't a JPEG"):
         pub._media("p.png")
+
+
+def _clip(folder, name="promo", seconds=13.0, shape="9:16"):
+    (folder / f"{name}.mp4").write_bytes(b"\x00\x00\x00\x18ftypmp42video")
+    if seconds is not None:
+        (folder / f"{name}.json").write_text(json.dumps({"seconds": seconds, "format": shape, "kind": "slideshow"}))
+
+
+def test_a_studio_video_posts_as_a_reel_shared_to_the_feed(meta, tmp_path):
+    staged = []
+    pub, calls, _ = _ready(meta, staged)
+    meta[-1].setattr(pub, "VIDEO_DIR", tmp_path)
+    _clip(tmp_path)
+    out = pub.publish("New drop. Link in bio.", ai_generated=True, video_name="promo")
+    made = parse_qs(next(c for c in calls if c.url.path == "/v21.0/1784/media").content.decode())
+    assert made["media_type"] == ["REELS"] and made["share_to_feed"] == ["true"] and "image_url" not in made
+    assert made["video_url"][0].startswith("https://acct.r2.cloudflarestorage.com/b/instagram/")
+    assert made["caption"][0].endswith("\n\nVideo made with AI.") and out["ai_line"] == "Video made with AI."
+    assert out["media_type"] == "REELS" and [c for c in calls if c.url.path.endswith("/media_publish")]
+    assert staged[0][1].endswith(".mp4") and staged[0][2] == "video/mp4" and staged[-1][0] == "delete"
+
+
+def test_a_reel_is_checked_before_anything_is_uploaded(meta, tmp_path):
+    staged = []
+    pub, calls, state = _ready(meta, staged)
+    meta[-1].setattr(pub, "VIDEO_DIR", tmp_path)
+    _clip(tmp_path, "wide", shape="16:9")
+    _clip(tmp_path, "long", seconds=95)
+    _clip(tmp_path, "short", seconds=2)
+    _clip(tmp_path, "bare", seconds=None)
+    for kw, match in ((dict(video_name="promo", image_names=["a.png"]), "not both"),
+                      (dict(video_name="missing"), "no video called"), (dict(video_name="../x"), "without .mp4"),
+                      (dict(video_name="wide"), "9:16"), (dict(video_name="long"), "3-90"),
+                      (dict(video_name="short"), "3-90")):
+        with pytest.raises(Exception, match=match):
+            pub.publish("hi", ai_generated=False, **kw)
+    assert staged == [] and not [c for c in calls if "/media" in c.url.path]
+    assert pub._video("bare").startswith(b"\x00")  # no details file: any .mp4 goes, Instagram checks the rest
+
+
+def test_a_reel_meta_cant_process_posts_nothing(meta, tmp_path):
+    staged = []
+    pub, calls, state = _ready(meta, staged)
+    meta[-1].setattr(pub, "VIDEO_DIR", tmp_path)
+    _clip(tmp_path)
+    state["status_code"] = "ERROR"
+    with pytest.raises(Exception, match="couldn't prepare"):
+        pub.publish("x", ai_generated=False, video_name="promo")
+    assert not [c for c in calls if c.url.path.endswith("/media_publish")] and staged[-1][0] == "delete"
+
+
+def test_a_reel_still_processing_times_out_without_posting(meta, tmp_path):
+    staged = []
+    pub, calls, state = _ready(meta, staged)
+    mp = meta[-1]
+    mp.setattr(pub, "VIDEO_DIR", tmp_path)
+    mp.setattr(pub, "WAIT_VIDEO_S", 2)
+    mp.setattr(pub, "WAIT_VIDEO_STEP_S", 0)
+    _clip(tmp_path)
+    state["status_code"] = "IN_PROGRESS"
+    with pytest.raises(Exception, match="still preparing"):
+        pub.publish("x", ai_generated=False, video_name="promo")
+    assert not [c for c in calls if c.url.path.endswith("/media_publish")] and staged[-1][0] == "delete"

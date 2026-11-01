@@ -1,0 +1,41 @@
+{
+  "id": "commerce.requests.approve_housekeeping",
+  "name": "Bot Approves Listing Housekeeping",
+  "version": "1.0.0",
+  "description": "A bot the owner named (Settings > Shops and social > \"Bots that may approve listing housekeeping\") approves one waiting Etsy details card that only changes delivery profile, shop section, production partners, materials, category, attributes or photo alt text. Prices, words, photo adds, removals or moves, publishing and Pinterest still wait for the owner. Logged as the bot's.",
+  "category": "commerce",
+  "risk": "write",
+  "requires": [],
+  "transport": "mcp",
+  "aliases": [
+    "director approve etsy details",
+    "approve housekeeping card",
+    "bot approves listing details"
+  ],
+  "inputs": {
+    "request_id": {
+      "type": "string",
+      "required": true
+    },
+    "bot": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "execution": {
+    "type": "python",
+    "handler": "tools.commerce.waiting.approve_housekeeping"
+  },
+  "latency": {
+    "expected_ms": 3000
+  },
+  "cache": {
+    "enabled": false,
+    "freshness": "real_time"
+  },
+  "related": [
+    "commerce.requests.list",
+    "etsy.listing.update",
+    "approvals.status"
+  ]
+}

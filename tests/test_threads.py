@@ -299,7 +299,7 @@ def test_bad_topic_tag_posts_nothing(meta):
     assert len(calls) == before and not staged
 
 
-def test_video_post_from_a_studio_video(meta, monkeypatch, tmp_path):
+def test_video_post_from_the_videos_folder(meta, monkeypatch, tmp_path):
     staged = []
     pub, calls = _ready(meta, staged)
     monkeypatch.setattr(pub, "VIDEO_DIR", tmp_path)
@@ -319,7 +319,7 @@ def test_video_post_refusals_post_nothing(meta, monkeypatch, tmp_path):
     (tmp_path / "long.mp4").write_bytes(b"v")
     (tmp_path / "long.json").write_text('{"seconds": 400}', encoding="utf-8")
     before = len(calls)
-    for kw, msg in (({"video_name": "long"}, "up to 300"), ({"video_name": "missing"}, "no Studio video"),
+    for kw, msg in (({"video_name": "long"}, "up to 300"), ({"video_name": "missing"}, "no video called"),
                     ({"video_name": "../etc"}, "letters, numbers"),
                     ({"video_name": "long", "image_names": ["a.png"]}, "not both")):
         with pytest.raises(Exception, match=msg):

@@ -109,3 +109,53 @@ def test_decisions_are_kept_30_days_and_days_picks_how_far_back(queue, monkeypat
     assert requests_list(days=30)["days"] == 30 and len(requests_list(days=30)["decided"]) == 1
     with pytest.raises(Exception):
         requests_list(days=31)
+
+
+def etsy_card(send):
+    return pp.add("etsy-4607", "Set Etsy details", {}, action="etsy", payload={"listing_id": "4607", "send": send})["id"]
+
+
+@pytest.fixture
+def housekeeping(queue, monkeypatch):
+    ran = []
+    monkeypatch.setattr("tools.etsy.write.execute", lambda payload: ran.append(payload) or {"note": "Set on Etsy."})
+    monkeypatch.setattr(pp, "trusted_clients", lambda setting=pp.TRUST_SETTING:
+                        {"director"} if setting == pp.HOUSEKEEPING_BOTS_SETTING else set())
+    return ran
+
+
+def test_a_named_bot_approves_a_housekeeping_card_and_it_is_logged_as_the_bots(housekeeping):
+    from approvals import _commerce
+    from tools.commerce.waiting import approve_housekeeping
+    rid = etsy_card({"fields": {"shipping_profile_id": 3175, "materials": ["cotton"]}, "properties": [],
+                     "images_alt": [{"listing_image_id": 1, "alt_text": "zip hoodie"}]})
+    assert approve_housekeeping(rid, "Director")["approved"] is True and len(housekeeping) == 1
+    got = _commerce(rid)
+    assert got["status"] == "approved" and got["decided_by"] == "bot:director"
+
+
+@pytest.mark.parametrize("send, why", [
+    ({"fields": {"shipping_profile_id": 1}, "images": [{"name": "x.png"}]}, "photos"),
+    ({"fields": {"shipping_profile_id": 1}, "remove_images": [5]}, "photos"),
+    ({"fields": {"title": "New words"}}, "title"),
+    ({"fields": {}, "properties": []}, "nothing"),
+])
+def test_anything_beyond_housekeeping_still_waits_for_the_owner(housekeeping, send, why):
+    from tools.commerce.waiting import approve_housekeeping
+    rid = etsy_card(send)
+    with pytest.raises(h.CommerceError, match=why):
+        approve_housekeeping(rid, "director")
+    assert housekeeping == [] and [i["id"] for i in pp.list_pending()] == [rid]
+
+
+def test_other_kinds_unnamed_bots_and_apps_are_refused(housekeeping):
+    from tools.commerce.waiting import approve_housekeeping
+    pub = ask(None, "aa11")
+    with pytest.raises(h.CommerceError, match="publish request"):
+        approve_housekeeping(pub, "director")
+    rid = etsy_card({"fields": {"materials": ["cotton"]}})
+    with pytest.raises(h.CommerceError, match="isn't a bot the owner lets"):
+        approve_housekeeping(rid, "planner")
+    with pytest.raises(h.CommerceError, match="not an app"):
+        as_client("shopbot", approve_housekeeping, rid, "director")
+    assert len(pp.list_pending()) == 2

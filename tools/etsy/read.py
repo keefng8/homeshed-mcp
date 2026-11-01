@@ -88,7 +88,7 @@ def listings_list(state: str = "active", limit: int = 20, offset: int = 0, photo
 
     Args:
         state: active (default), inactive, sold_out, draft or expired.
-        limit: 1-20 per page (1-100 with photos).
+        limit: 1-100 per page (Etsy's own page size; a plain row is about 150 bytes, so 100 stay small).
         offset: skip this many (paging: use "next_offset").
         photos: True adds each listing's first photo ({url, alt}) in the same Etsy call, and allows 100 a page: a
             catalogue in 2 calls instead of one etsy.listing.get per listing (2026-10-21: per-listing refreshes were a
@@ -105,7 +105,8 @@ def listings_list(state: str = "active", limit: int = 20, offset: int = 0, photo
     if state not in LISTING_STATES:
         raise h.CommerceError(f"state must be one of {', '.join(LISTING_STATES)}")
     photos = photos or detail
-    limit, offset = h.clamp(limit, 1, 100 if photos else 20, "limit"), h.clamp(offset, 0, 100_000, "offset")
+    # KB-0128: plain rows were capped at 20 though photo rows (bigger) allowed 100; one Etsy page either way.
+    limit, offset = h.clamp(limit, 1, 100, "limit"), h.clamp(offset, 0, 100_000, "offset")
     d = et.get(f"/v3/application/shops/{et.shop_id()}/listings",
                params={"state": state, "limit": limit, "offset": offset, "sort_on": "updated",
                        "sort_order": "desc", **({"includes": "Images"} if photos else {})}) or {}
