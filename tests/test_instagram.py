@@ -118,7 +118,7 @@ def _ready(meta_tuple, staged):
     mp.setattr(r2, "put", lambda key, data, mime: staged.append(("put", key, mime)))
     mp.setattr(r2, "presign_get", lambda key, s: f"https://acct.r2.cloudflarestorage.com/b/{key}?X-Amz-Signature=zz")
     mp.setattr(r2, "delete", lambda key: staged.append(("delete", key)) or True)
-    mp.setattr(pub, "_media", lambda n: _jpeg(1080, 1350))
+    mp.setattr(pub, "_media", lambda n, feed=True: _jpeg(1080, 1350))
     return pub, calls, state
 
 
@@ -270,3 +270,36 @@ def test_a_reel_still_processing_times_out_without_posting(meta, tmp_path):
     with pytest.raises(Exception, match="still preparing"):
         pub.publish("x", ai_generated=False, video_name="promo")
     assert not [c for c in calls if c.url.path.endswith("/media_publish")] and staged[-1][0] == "delete"
+
+
+def test_a_reel_can_have_a_cover_image_or_a_cover_frame(meta, tmp_path):
+    """1 Nov: a slideshow fades in from black, so its Reel showed a black tile on the profile grid."""
+    staged = []
+    pub, calls, _ = _ready(meta, staged)
+    meta[-1].setattr(pub, "VIDEO_DIR", tmp_path)
+    _clip(tmp_path)
+    pub.publish("New drop.", ai_generated=False, video_name="promo", cover_image="slide1.png", thumb_offset_ms=900)
+    made = parse_qs(next(c for c in calls if c.url.path == "/v21.0/1784/media").content.decode())
+    assert made["cover_url"][0].startswith("https://acct.r2.cloudflarestorage.com/b/instagram/")
+    assert "thumb_offset" not in made  # the cover image wins
+    puts = [s for s in staged if s[0] == "put"]
+    assert [p[2] for p in puts] == ["video/mp4", "image/jpeg"]
+    assert {s[1] for s in staged if s[0] == "delete"} == {p[1] for p in puts}  # both staged copies deleted
+    calls.clear()
+    pub.publish("Again.", ai_generated=False, video_name="promo", thumb_offset_ms=1500)
+    made = parse_qs(next(c for c in calls if c.url.path == "/v21.0/1784/media").content.decode())
+    assert made["thumb_offset"] == ["1500"] and "cover_url" not in made
+
+
+def test_a_cover_is_only_for_a_reel_and_the_offset_is_checked(meta, tmp_path):
+    staged = []
+    pub, calls, _ = _ready(meta, staged)
+    meta[-1].setattr(pub, "VIDEO_DIR", tmp_path)
+    _clip(tmp_path)
+    for kw, match in ((dict(image_names=["a.png"], cover_image="c.png"), "for a Reel"),
+                      (dict(image_names=["a.png"], thumb_offset_ms=10), "for a Reel"),
+                      (dict(video_name="promo", thumb_offset_ms=-1), "0 to 90000"),
+                      (dict(video_name="promo", thumb_offset_ms=True), "0 to 90000")):
+        with pytest.raises(Exception, match=match):
+            pub.publish("hi", ai_generated=False, **kw)
+    assert staged == []

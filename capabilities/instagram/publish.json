@@ -33,6 +33,14 @@
       "type": "string",
       "required": false
     },
+    "cover_image": {
+      "type": "string",
+      "required": false
+    },
+    "thumb_offset_ms": {
+      "type": "integer",
+      "required": false
+    },
     "video_name": {
       "type": "string",
       "required": false

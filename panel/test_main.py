@@ -1001,8 +1001,10 @@ def test_a_first_run_shows_what_isnt_set_up_in_grey_never_red(monkeypatch):
 
 def test_with_no_helper_pc_the_runner_and_rtk_say_not_set_up(monkeypatch):
     import main
+    import rtk_stats
 
     monkeypatch.setattr(main, "GPU_SERVICE_URL", "")
+    monkeypatch.setattr(rtk_stats, "rtk_bin", lambda: None)  # and no RTK on this PC (else its numbers are read here)
     monkeypatch.setattr(main, "DASHBOARD_PASSWORD", OWNER_PW)
     client = TestClient(main.app, headers=OWNER)
     runner = client.get("/api/todo/runner").json()
@@ -1093,10 +1095,12 @@ def test_the_memory_card_counts_an_installs_own_categories(monkeypatch):
     assert client.get("/api/memory/Bad_Name").status_code == 404
 
 
-def test_without_a_helper_pc_its_pages_say_not_set_up(monkeypatch):
+def test_without_a_helper_pc_its_pages_say_not_set_up(monkeypatch, tmp_path):
+    import claude_sessions
     import main
 
     monkeypatch.setattr(main, "GPU_SERVICE_URL", "")
+    monkeypatch.setattr(claude_sessions, "CLAUDE_DIR", tmp_path / "no-claude")  # no chats on this PC either (else listed here)
     monkeypatch.setattr(main, "DASHBOARD_PASSWORD", OWNER_PW)
     client = TestClient(main.app, headers=OWNER)
     for path in ("/api/context", "/api/claude/sessions", "/api/rules", "/api/projects"):

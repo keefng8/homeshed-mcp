@@ -69,9 +69,10 @@ def _jpeg_size(data: bytes) -> tuple[int, int] | None:
     return None
 
 
-def _media(name: str) -> bytes:
+def _media(name: str, feed: bool = True) -> bytes:
     """A JPEG for one image by its saved_as name, checked against Meta's limits before anything is uploaded. Local
-    images come as the image service's JPEG (up to 1440 px); a paid one is used as it is, so it must be a JPEG."""
+    images come as the image service's JPEG (up to 1440 px); a paid one is used as it is, so it must be a JPEG.
+    feed=False (a Reel's cover): any shape, since Instagram crops the cover itself."""
     from tools.image import providers as prov
     if not NAME_RE.match(name or ""):
         raise h.CommerceError(f"{name!r} isn't an image file name (use the image's saved_as)")
@@ -99,7 +100,7 @@ def _media(name: str) -> bytes:
     if not size or not MIN_W <= size[0] <= MAX_W:
         raise h.CommerceError(f"{name} is {size[0] if size else '?'} px wide; Instagram takes {MIN_W}-{MAX_W}")
     ratio = size[0] / max(1, size[1])
-    if not MIN_RATIO - 0.005 <= ratio <= MAX_RATIO + 0.005:
+    if feed and not MIN_RATIO - 0.005 <= ratio <= MAX_RATIO + 0.005:
         raise h.CommerceError(f"{name} is {size[0]}x{size[1]}; Instagram's feed takes 4:5 (portrait) to 1.91:1: "
                               'use image.carousel shape "4:5" or "1:1"')
     return data
@@ -156,7 +157,7 @@ def _wait(cid: str, tok: str, limit_s: int = WAIT_S, step_s: float | None = None
 
 @tool(name="publish", category="instagram", doc="instagram/publish.md")
 def publish(text: str, ai_generated: bool, image_names: list[str] | None = None, alt_text: str = "",
-            video_name: str = "") -> dict:
+            video_name: str = "", cover_image: str = "", thumb_offset_ms: int | None = None) -> dict:
     """Post to the owner's connected Instagram professional account: one image, a carousel of 2-10, or a video as a
     Reel. PUBLIC, and
     can't be unposted from here: only call it for a post that has been approved for publishing. Off until the owner
@@ -173,6 +174,10 @@ def publish(text: str, ai_generated: bool, image_names: list[str] | None = None,
         alt_text: a description read out for each image (screen readers); up to 1000 characters.
         video_name: a finished video by file name without .mp4, from the videos folder (VIDEO_DIR), posted as a Reel
             (also shown in the feed): 9:16, 3-90 s, up to 300 MB. Not together with image_names.
+        cover_image: a Reel's cover by its saved_as name (a JPEG, any shape; Instagram crops it for the grid), instead
+            of the video's first frame (a fade-in from black shows a black tile, 1 Nov). Staged like the images.
+        thumb_offset_ms: a Reel's cover as the frame this many milliseconds in (0 up to the video's length), when
+            there's no cover_image (Instagram uses cover_image over it).
 
     Returns:
         {"posted": true, "id", "permalink", "media_type", "posted_today", "daily_max", "ai_generated", "ai_line"}.
@@ -199,7 +204,14 @@ def publish(text: str, ai_generated: bool, image_names: list[str] | None = None,
     if not video_name and not 1 <= len(names) <= MAX_IMAGES:
         raise h.CommerceError(f"give 1-{MAX_IMAGES} images or a video_name (Instagram has no text-only posts)")
     alt = {"alt_text": " ".join(alt_text.split())[:1000]} if (alt_text or "").strip() else {}
+    cover_image = (cover_image or "").strip()
+    if (cover_image or thumb_offset_ms is not None) and not video_name:
+        raise h.CommerceError("cover_image and thumb_offset_ms are for a Reel (with video_name)")
+    if thumb_offset_ms is not None and (isinstance(thumb_offset_ms, bool) or not isinstance(thumb_offset_ms, int)
+                                        or not 0 <= thumb_offset_ms <= MAX_REEL_S * 1000):
+        raise h.CommerceError(f"thumb_offset_ms must be a whole number from 0 to {MAX_REEL_S * 1000}")
     media = [_media(n) for n in names]  # every image checked before anything is uploaded or posted
+    cover = _media(cover_image, feed=False) if cover_image else None
     clip = _video(video_name) if video_name else None
     import clients
     import r2
@@ -221,8 +233,16 @@ def publish(text: str, ai_generated: bool, image_names: list[str] | None = None,
                 key = f"instagram/{time.strftime('%Y%m%d')}/{uuid.uuid4().hex}.mp4"
                 r2.put(key, clip, "video/mp4")
                 staged.append(key)
-                cid, kind = _create(uid, tok, {"media_type": "REELS", "video_url": r2.presign_get(key, 3600),
-                                               "caption": text, "share_to_feed": "true"}), "REELS"
+                body = {"media_type": "REELS", "video_url": r2.presign_get(key, 3600), "caption": text,
+                        "share_to_feed": "true"}
+                if cover is not None:
+                    ckey = f"instagram/{time.strftime('%Y%m%d')}/{uuid.uuid4().hex}.jpg"
+                    r2.put(ckey, cover, "image/jpeg")
+                    staged.append(ckey)
+                    body["cover_url"] = r2.presign_get(ckey, 3600)
+                elif thumb_offset_ms is not None:
+                    body["thumb_offset"] = str(thumb_offset_ms)
+                cid, kind = _create(uid, tok, body), "REELS"
                 _wait(cid, tok, WAIT_VIDEO_S, WAIT_VIDEO_STEP_S)  # a video takes Meta longer to fetch and process
             elif len(urls) == 1:
                 cid, kind = _create(uid, tok, {"image_url": urls[0], "caption": text, **alt}), "IMAGE"

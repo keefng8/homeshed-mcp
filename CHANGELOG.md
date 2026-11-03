@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.7] - 2026-11-03
+
+### Added
+- `instagram.publish` takes a Reel's cover: `cover_image` (a saved image, any shape; Instagram crops it for the grid) or `thumb_offset_ms` (a frame from the video). Without one, a video that fades in from black showed a black tile on the profile grid.
+
+### Fixed
+- Control Panel, **Pick up where you left off**: without a helper PC the list was always empty. The panel now reads your recent Claude Code chats on its own PC (the folder and names only, never what was said). **Resume** copies the command that reopens a chat in its folder, to paste into a terminal; hiding and bringing back chats work too. With no chats on the PC, the card says so.
+- Control Panel, **Projects**: without a helper PC the page showed "not set up". It now lists the folders your Claude Code chats worked in, read on the panel's own PC, with their git state, size, key files and pins.
+- Control Panel, token savings: when RTK is installed on the panel's PC, the Savings page and the token strip show its numbers without a helper PC.
+
+### Changed
+- The plugin runs 0.7.7.
+
+Existing installs: stop the panel with `uvx --refresh --from "homeshed-mcp[panel]" homeshed-mcp panel --stop`, then start it again with `uvx --from "homeshed-mcp[panel]" homeshed-mcp panel --start`. No new settings are needed.
+
 ## [0.7.6] - 2026-11-01
 
 ### Added

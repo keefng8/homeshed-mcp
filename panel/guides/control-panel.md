@@ -133,9 +133,10 @@ Each window can be moved, resized and minimised, and the layout is kept on this 
 
 From the top:
 
-- **Pick up where you left off:** your recent Claude Code chats. Search them, press **Resume** to reopen one in its own
-  folder, or **×** to hide it (**Undo** brings it straight back; nothing is deleted). **Hidden chats** lists the ones
-  you hid, with **Bring back**.
+- **Pick up where you left off:** your recent Claude Code chats on this PC. Search them, press **Resume** to reopen
+  one in its own folder, or **×** to hide it (**Undo** brings it straight back; nothing is deleted). **Hidden chats**
+  lists the ones you hid, with **Bring back**. Without a helper PC, **Resume** copies the command that reopens the chat
+  (`claude --resume ...` in its folder): paste it into a terminal (PowerShell on Windows) and press Enter.
 - **Tokens kept out of Claude:** two separate counts, never added together.
   - **Verified saved** is measured by RTK (switch between **All**, **30 d** and **7 d**). Without RTK it says
     "RTK isn't set up".

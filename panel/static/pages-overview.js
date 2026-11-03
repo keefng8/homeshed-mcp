@@ -1259,7 +1259,7 @@ if ('ResizeObserver' in window) new ResizeObserver(() => {
   const n = pastShown();
   if (n !== _pastFit) { _pastFit = n; if (_past.rows.length) renderPastSessions(); }
 }).observe(document.getElementById('ctxPastList'));
-const _past = { all: false, rows: [], on: false, can: true, q: '', hiddenView: false, hiddenRows: [], hiddenCount: 0, gone: new Set() };
+const _past = { all: false, rows: [], on: false, cmd: false, can: true, q: '', hiddenView: false, hiddenRows: [], hiddenCount: 0, gone: new Set() };
 async function loadPastSessions() {
   const box = document.getElementById('ovResume');
   let d, h = null;
@@ -1271,7 +1271,15 @@ async function loadPastSessions() {
     else { pastNote(e.message, true); document.getElementById('ctxPastList').innerHTML = ''; }
     return;
   }
+  if (d.not_set_up) {  // no chats readable: say why instead of an empty list (an end user, 2026-11-03)
+    box.hidden = false;
+    _past.rows = [];
+    pastNote(d.error);
+    document.getElementById('ctxPastList').innerHTML = '';
+    return;
+  }
   _past.rows = d.sessions || [];
+  _past.cmd = d.resume_mode === 'command';
   _past.on = !!d.resume_on;
   _past.can = d.can_resume !== false;
   _past.hiddenCount = d.hidden_count || 0;
@@ -1372,9 +1380,24 @@ async function setPastHidden(sid, hide, btn) {
 }
 async function resumeSession(btn) {
   btn.disabled = true;
-  btn.textContent = 'Opening…';
+  btn.textContent = _past.cmd ? 'Getting it…' : 'Opening…';
   try {
     const r = await apiCall('POST', `/api/claude/sessions/${encodeURIComponent(btn.dataset.id)}/resume`);
+    if (r.command) {  // read on this PC: the panel gives the command, it never starts a program itself
+      let copied = false;
+      try { await navigator.clipboard.writeText(r.command); copied = true; } catch (e) { /* shown below to copy by hand */ }
+      btn.innerHTML = PLAY_SVG + (copied ? 'Copied' : 'Resume');
+      btn.disabled = false;
+      const el = document.getElementById('ctxPastNote');
+      el.classList.remove('bad');
+      el.innerHTML = (copied ? 'Copied. Paste it into a terminal (PowerShell on Windows) and press Enter:'
+        : 'Run this in a terminal (PowerShell on Windows):')
+        + (r.cd_first ? ` first go to the folder <code>${escapeHtml(r.folder)}</code>, then` : '')
+        + ` <code class="ov-cmd">${escapeHtml(r.command)}</code>`
+        + (r.folder_ok ? '' : ' Its folder isn\'t there any more, so Claude starts somewhere else.');
+      setTimeout(() => { btn.innerHTML = PLAY_SVG + 'Resume'; }, 4000);
+      return;
+    }
     if (r.queued) {  // several at once take turns, a few seconds apart, so the PC isn't hit by them all together
       btn.textContent = `Queued (${r.position})`;
       btn.title = `Opens in about ${r.opens_in_s}s`;

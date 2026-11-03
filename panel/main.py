@@ -1904,25 +1904,52 @@ async def hide_announcements(request: Request):
 SESSION_ID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 
+# Without a helper that lists them (none set up, or one built from the helper plan, which leaves /sessions out), the
+# panel reads the chats on its own PC (claude_sessions.py; an end user, 2026-11-03: the list was always empty). The
+# panel a person installs runs on the same PC as their Claude Code.
+_helper_missing = {"sessions": False, "projects": False}  # the helper answered 404 for it: read here from then on
+
+
+def _sessions_here(what: str = "sessions") -> bool:
+    return not GPU_SERVICE_URL or _helper_missing[what]
+
+
+def _no_chats_here() -> JSONResponse:
+    return JSONResponse({"error": "No Claude Code chats on this PC yet. Chats from Claude Code on the PC this panel "
+                                  "runs on show up here once there's one.", "not_set_up": True})
+
+
 @app.get("/api/claude/sessions")
 async def claude_sessions(hidden: int = 0, limit: int = 30):
-    if (off := _no_helper("Past sessions")) is not None:
-        return off
-    params = {"limit": max(1, min(limit, 40))} | ({"hidden": 1} if hidden else {})
-    try:
-        async with httpx.AsyncClient(timeout=8) as client:
-            r = await client.get(f"{GPU_SERVICE_URL}/sessions", headers=_GPU_AUTH, params=params)
-        if r.status_code == 200:
-            return r.json()
-        return JSONResponse({"error": f"GPU service returned HTTP {r.status_code}"}, status_code=502)
-    except (httpx.RequestError, ValueError):
-        return JSONResponse({"error": "GPU service unreachable"}, status_code=502)
+    import claude_sessions as cs
+    limit = max(1, min(limit, 40))
+    if not _sessions_here():
+        params = {"limit": limit} | ({"hidden": 1} if hidden else {})
+        try:
+            async with httpx.AsyncClient(timeout=8) as client:
+                r = await client.get(f"{GPU_SERVICE_URL}/sessions", headers=_GPU_AUTH, params=params)
+            if r.status_code == 200:
+                return r.json()
+            if r.status_code != 404 or not cs.available():
+                return JSONResponse({"error": f"GPU service returned HTTP {r.status_code}"}, status_code=502)
+            _helper_missing["sessions"] = True
+        except (httpx.RequestError, ValueError):
+            return JSONResponse({"error": "GPU service unreachable"}, status_code=502)
+    if not cs.available():
+        return _no_chats_here()
+    return await asyncio.to_thread(cs.listing, limit, bool(hidden))
 
 
 @app.post("/api/claude/sessions/{sid}/resume")
 async def claude_session_resume(sid: str):
     if not SESSION_ID_RE.match(sid):
         return JSONResponse({"error": "That isn't a session id."}, status_code=400)
+    if _sessions_here():  # here, resume is the command to run: the panel never starts a program on the PC
+        import claude_sessions as cs
+        try:
+            return await asyncio.to_thread(cs.resume_command, sid)
+        except ValueError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=409 if "open now" in str(exc) else 404)
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             r = await client.post(f"{GPU_SERVICE_URL}/sessions/{sid}/resume", headers=_GPU_AUTH)
@@ -1938,8 +1965,12 @@ async def claude_session_resume(sid: str):
 async def _session_hide(sid: str, action: str):
     if not SESSION_ID_RE.match(sid):
         return JSONResponse({"error": "That isn't a session id."}, status_code=400)
-    if (off := _no_helper("Past sessions")) is not None:
-        return off
+    if _sessions_here():
+        import claude_sessions as cs
+        try:
+            return await asyncio.to_thread(cs.set_hidden, sid, action == "hide")
+        except ValueError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=404)
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             r = await client.post(f"{GPU_SERVICE_URL}/sessions/{sid}/{action}", headers=_GPU_AUTH)
@@ -1986,25 +2017,48 @@ async def claude_session_compact(sid: str):
     return JSONResponse({"error": detail}, status_code=r.status_code if r.status_code in (400, 404, 409, 429, 501) else 502)
 
 
-# --- Projects page (to-do #38): the folders Claude works in on the owner's PC, from the helper there (projects.py).
-# Owner only (not in VIEWER_ROUTES): it names folders, agents and repos, and a viewer can never POST.
+# --- Projects page (to-do #38): the folders Claude works in on the owner's PC, from the helper there (projects.py), or
+# read on this PC (claude_projects.py) when no helper lists them, as past chats are. Owner only (not in VIEWER_ROUTES):
+# it names folders, agents and repos, and a viewer can never POST.
 @app.get("/api/projects")
 async def projects_list():
-    if (off := _no_helper("The Projects page")) is not None:
-        return off
-    return await _main_pc("GET", "/projects")
+    import claude_projects as cp
+    import claude_sessions as cs
+    if not _sessions_here("projects"):
+        got = await _main_pc("GET", "/projects")
+        if not (isinstance(got, JSONResponse) and got.status_code == 404 and cs.available()):
+            return got
+        _helper_missing["projects"] = True
+    if not cs.available():
+        return _no_chats_here()
+    return await asyncio.to_thread(cp.listing)
+
+
+async def _pins_here(fn, *args):
+    try:
+        return await asyncio.to_thread(fn, *args)
+    except LookupError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=404)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400 if "inside" in str(exc) else 409)
 
 
 @app.post("/api/projects/pins")
 async def projects_pin(request: Request):
-    body = await request.json()
-    return await _main_pc("POST", "/projects/pins", {k: str(body.get(k) or "")[:500] for k in ("folder", "path", "note")})
+    body = {k: str((await request.json()).get(k) or "")[:500] for k in ("folder", "path", "note")}
+    if _sessions_here("projects"):
+        import claude_projects as cp
+        return await _pins_here(cp.pin, body["folder"], body["path"], body["note"])
+    return await _main_pc("POST", "/projects/pins", body)
 
 
 @app.post("/api/projects/pins/remove")
 async def projects_unpin(request: Request):
-    body = await request.json()
-    return await _main_pc("POST", "/projects/pins/remove", {k: str(body.get(k) or "")[:500] for k in ("folder", "path")})
+    body = {k: str((await request.json()).get(k) or "")[:500] for k in ("folder", "path")}
+    if _sessions_here("projects"):
+        import claude_projects as cp
+        return await _pins_here(cp.unpin, body["folder"], body["path"])
+    return await _main_pc("POST", "/projects/pins/remove", body)
 
 
 # --- Settings page: one list gathered from everywhere a setting lives ---------------------------------
@@ -3401,8 +3455,10 @@ async def savings():
     out: dict = {"daily": None, "discover": None, "estimate": None}
 
     async def rtk(client, key: str) -> None:
-        if not GPU_SERVICE_URL:  # RTK's numbers come from the helper PC: none set up, no numbers (never zeros)
-            out[key] = {"available": False, "not_set_up": True}
+        if not GPU_SERVICE_URL:  # no helper PC: RTK on this PC when it's installed, else no numbers (never zeros)
+            import rtk_stats
+            out[key] = (await asyncio.to_thread(rtk_stats.daily if key == "daily" else rtk_stats.discover)
+                        if rtk_stats.rtk_bin() else {"available": False, "not_set_up": True})
             return
         try:
             r = await client.get(f"{GPU_SERVICE_URL}/stats/rtk/{key}", headers=_GPU_AUTH,
@@ -3433,8 +3489,10 @@ async def tokens():
     out: dict = {"rtk": None, "estimate": None, "local_models": []}
 
     async def rtk(client) -> None:
-        if not GPU_SERVICE_URL:
-            out["rtk"] = {"available": False, "not_set_up": True}
+        if not GPU_SERVICE_URL:  # RTK on this PC when it's installed
+            import rtk_stats
+            out["rtk"] = (await asyncio.to_thread(rtk_stats.summary) if rtk_stats.rtk_bin()
+                          else {"available": False, "not_set_up": True})
             return
         try:
             r = await client.get(f"{GPU_SERVICE_URL}/stats/rtk", headers=_GPU_AUTH)
