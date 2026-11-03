@@ -146,15 +146,23 @@ def find(sid: str) -> Path | None:
     return hits[0] if len(hits) == 1 else None
 
 
+class NotAChat(ValueError):
+    """Not a chat on this PC. The panel answers its own fixed message (never the exception's text: CodeQL)."""
+
+
+class ChatOpen(ValueError):
+    """The chat is open in a window now."""
+
+
 def set_hidden(sid: str, hide: bool) -> dict:
-    """Hide or show one chat on the list. Only the id is stored. ValueError: not a chat on this PC."""
+    """Hide or show one chat on the list. Only the id is stored. NotAChat: not a chat on this PC."""
     if not ID_RE.match(sid or ""):
-        raise ValueError("That isn't a session id.")
+        raise NotAChat("not a session id")
     with _lock:
         ids = [i for i in hidden_ids() if i != sid]
         if hide:
             if not find(sid):
-                raise ValueError("No such chat on this PC.")
+                raise NotAChat("no such chat")
             ids = (ids + [sid])[-HIDDEN_KEEP:]
         f = _hidden_file()
         f.parent.mkdir(parents=True, exist_ok=True)
@@ -198,13 +206,13 @@ def listing(limit: int = 30, hidden: bool = False) -> dict:
 
 
 def resume_command(sid: str) -> dict:
-    """The command that reopens one chat where it left off. ValueError: not a chat on this PC, or it's open now."""
+    """The command that reopens one chat where it left off. NotAChat: not on this PC; ChatOpen: it's open now."""
     path = find(sid)
     info = read_chat(path) if path else None
     if not info or not info["cwd"]:
-        raise ValueError("No such chat on this PC.")
+        raise NotAChat("no such chat")
     if sid in running():
-        raise ValueError("That chat is open now: switch to its window.")
+        raise ChatOpen("open now")
     folder = info["cwd"]
     if re.search(r"[\"'`$;&|<>\r\n]", folder):  # a folder name that could break out of the quotes: no cd in it
         return {"command": f"claude --resume {sid}", "folder": folder, "folder_ok": Path(folder).is_dir(),

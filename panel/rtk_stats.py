@@ -17,6 +17,15 @@ _discover_cache: dict = {"t": 0.0, "data": None}
 DISCOVER_TTL_S = 600
 
 
+def _why(exc: Exception) -> str:
+    """A fixed reason for the page, never the exception's own text (CodeQL py/stack-trace-exposure)."""
+    if isinstance(exc, subprocess.TimeoutExpired):
+        return "rtk took too long"
+    if isinstance(exc, ValueError):
+        return "rtk's answer wasn't JSON"
+    return "rtk couldn't be run"
+
+
 def rtk_bin() -> str | None:
     return shutil.which("rtk")
 
@@ -34,7 +43,7 @@ def summary() -> dict:
     try:
         return {"available": True, **(_json(["gain"], 10).get("summary") or {})}
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
-        return {"available": False, "error": type(exc).__name__}
+        return {"available": False, "error": _why(exc)}
 
 
 def daily() -> dict:
@@ -42,7 +51,7 @@ def daily() -> dict:
         d = _json(["gain", "--daily"], 15)
         return {"available": True, "summary": d.get("summary", {}), "daily": d.get("daily", [])}
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
-        return {"available": False, "error": type(exc).__name__}
+        return {"available": False, "error": _why(exc)}
 
 
 def discover(refresh: bool = False) -> dict:
@@ -52,7 +61,7 @@ def discover(refresh: bool = False) -> dict:
     try:
         d = _json(["discover", "--all", "--since", "30", "--limit", "15"], 90)
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
-        return {"available": False, "error": type(exc).__name__}
+        return {"available": False, "error": _why(exc)}
 
     def clean(v):
         return _SECRET.sub("[redacted]", str(v or ""))[:120]

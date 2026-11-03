@@ -196,12 +196,29 @@ def listing() -> dict:
     return {"projects": list_projects(), "measuring": len(_measuring), "at": time.time()}
 
 
+# Each refusal is its own class: the panel answers a fixed message for each, never the exception's text (CodeQL).
+class NotAProject(LookupError):
+    pass
+
+
+class NotInProject(LookupError):
+    pass
+
+
+class PinOutside(ValueError):
+    pass
+
+
+class TooManyPins(ValueError):
+    pass
+
+
 def _project_folder(folder: str) -> str:
     k = _key(str(folder or ""))
     for p in list_projects():
         if _key(p["folder"]) == k:
             return p["folder"]
-    raise LookupError("That folder isn't one of your projects.")
+    raise NotAProject("not a project")
 
 
 def _inside(folder: str, path: str) -> str:
@@ -209,14 +226,14 @@ def _inside(folder: str, path: str) -> str:
     base = Path(folder).resolve()
     target = (base / str(path or "").strip()).resolve()
     if target != base and base not in target.parents:
-        raise ValueError("Pin something inside the project's folder.")
+        raise PinOutside("outside the project")
     if not target.exists():
-        raise LookupError(f"Not found in the project: {path}")
+        raise NotInProject("not found in the project")
     return str(target.relative_to(base)) or "."
 
 
 def pin(folder: str, path: str, note: str) -> dict:
-    """ValueError: a bad path or too many pins; LookupError: no such project or file."""
+    """NotAProject, NotInProject, PinOutside or TooManyPins when it can't be pinned."""
     folder = _project_folder(folder)
     rel = _inside(folder, path)
     note = re.sub(r"\s+", " ", str(note or "")).strip()[:200]
@@ -224,7 +241,7 @@ def pin(folder: str, path: str, note: str) -> dict:
         d = _load_pins()
         items = [p for p in d.get(_key(folder), []) if p.get("path") != rel]
         if len(items) >= MAX_PINS:
-            raise ValueError(f"A project holds up to {MAX_PINS} pins. Unpin one first.")
+            raise TooManyPins("too many pins")
         items.append({"path": rel, "dir": (Path(folder) / rel).is_dir(), "note": note, "at": time.time()})
         d[_key(folder)] = items
         _save_pins(d)

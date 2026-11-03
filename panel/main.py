@@ -1946,10 +1946,12 @@ async def claude_session_resume(sid: str):
         return JSONResponse({"error": "That isn't a session id."}, status_code=400)
     if _sessions_here():  # here, resume is the command to run: the panel never starts a program on the PC
         import claude_sessions as cs
-        try:
+        try:  # fixed messages only, never an exception's text (CodeQL py/stack-trace-exposure)
             return await asyncio.to_thread(cs.resume_command, sid)
-        except ValueError as exc:
-            return JSONResponse({"error": str(exc)}, status_code=409 if "open now" in str(exc) else 404)
+        except cs.ChatOpen:
+            return JSONResponse({"error": "That chat is open now: switch to its window."}, status_code=409)
+        except cs.NotAChat:
+            return JSONResponse({"error": "No such chat on this PC."}, status_code=404)
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             r = await client.post(f"{GPU_SERVICE_URL}/sessions/{sid}/resume", headers=_GPU_AUTH)
@@ -1969,8 +1971,8 @@ async def _session_hide(sid: str, action: str):
         import claude_sessions as cs
         try:
             return await asyncio.to_thread(cs.set_hidden, sid, action == "hide")
-        except ValueError as exc:
-            return JSONResponse({"error": str(exc)}, status_code=404)
+        except cs.NotAChat:
+            return JSONResponse({"error": "No such chat on this PC."}, status_code=404)
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             r = await client.post(f"{GPU_SERVICE_URL}/sessions/{sid}/{action}", headers=_GPU_AUTH)
@@ -2035,12 +2037,17 @@ async def projects_list():
 
 
 async def _pins_here(fn, *args):
-    try:
+    import claude_projects as cp
+    try:  # fixed messages only, never an exception's text (CodeQL py/stack-trace-exposure)
         return await asyncio.to_thread(fn, *args)
-    except LookupError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=404)
-    except ValueError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400 if "inside" in str(exc) else 409)
+    except cp.NotAProject:
+        return JSONResponse({"error": "That folder isn't one of your projects."}, status_code=404)
+    except cp.NotInProject:
+        return JSONResponse({"error": "That file or folder isn't in the project."}, status_code=404)
+    except cp.PinOutside:
+        return JSONResponse({"error": "Pin something inside the project's folder."}, status_code=400)
+    except cp.TooManyPins:
+        return JSONResponse({"error": f"A project holds up to {cp.MAX_PINS} pins. Unpin one first."}, status_code=409)
 
 
 @app.post("/api/projects/pins")
