@@ -30,7 +30,10 @@ Keeps your private patterns next to the project instead of in every call. The fi
 `public_identity` are literal text that's fine to publish, removed from a line before it's checked.
 
 ## Returns
-`{folder, source, files, checks: [{id, kind, ok, file, line, prefix?}], failed, counts, passed, more?}`. `id` is the
+`{folder, source, files, clean, not_checked, checks: [{id, kind, ok, file, line, prefix?}], failed, counts, passed,
+more?}`. **Use `clean`, not `failed: 0`**: `clean` is true only when nothing was found, at least one file was read and
+no text went unread. `not_checked` counts what wasn't read, by reason: `binary` (doesn't affect `clean`), `too_big`,
+`long_lines`, `unreadable`, `over_file_limit`. `id` is the
 pattern's name or the secret's kind; `kind` is `"leak"` or `"secret"`. The matched text is never returned: a secret
 shows at most its first 4 characters, and only for kinds whose start is public anyway (`ghp_`, `sk-ant-`). A line
 marked `secret-scan: allow` or `leak-scan: allow` is skipped. `source` says where the patterns came from: `"call"`,
@@ -40,12 +43,14 @@ marked `secret-scan: allow` or `leak-scan: allow` is skipped. `source` says wher
 Raises `LeakScanError` if the folder doesn't exist, isn't a folder, or is outside the allowed folders; if a pattern is
 invalid, longer than 300 characters, or nests quantifiers like `(a+)+` (Python's regular expressions have no time
 limit, so that shape could run for ever); if there are more than 50 patterns; if `.repo-release.json` isn't valid
-JSON; or if `detail` isn't `"compact"` or `"full"`.
+JSON; if `detail` isn't `"compact"` or `"full"`; or if there's nothing to check (`secrets` off and no patterns).
 
 ## Configuration
 `READ_ALLOWED_ROOTS` (else `CLAUDE_PROJECT_DIR`, else the server's working folder) decides which folders it may read.
-It skips `.git`, `node_modules`, virtualenvs, binary files, files over 1 MB and lines over 2,000 characters, and stops
-after 5,000 files.
+It skips `.git`, `node_modules`, `dist`, `build`, virtualenvs, binary files, files over 1 MB and lines over 2,000
+characters, and stops reading after 5,000 files. Anything skipped except those folders is counted in `not_checked`.
+It runs on the server, so `folder` must be a path the server can see. Leaving it as `"."` on a shared server scans the
+server's own folder, not your project: `clean` is then false and `note` says so.
 
 ## Implementation
 `tools/repo/leak_scan.py`; the secret kinds are `secrets.transcript_scan`'s.

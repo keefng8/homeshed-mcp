@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from collections import Counter
 from pathlib import Path
 
 import findings
@@ -25,6 +26,8 @@ MAX_FILES, MAX_FILE_BYTES, MAX_LINE = 5000, 1_000_000, 2000
 NESTED = re.compile(r"\((?:[^()\\]|\\.)*[+*](?:[^()\\]|\\.)*\)(?:[+*]|\{\d)")
 ALLOW_MARK = re.compile(r"(?:secret|leak)-scan:\s*allow")
 SKIP_DIRS = {".git", "node_modules", "__pycache__", "dist", "build", ".tox", ".mypy_cache", ".pytest_cache"}
+# this scan reads one line at a time, so the header alone must count: transcript_scan's pattern wants the key's body too
+PRIVATE_KEY = re.compile(r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----")
 
 
 class LeakScanError(RuntimeError):
@@ -60,7 +63,8 @@ def _config(root: Path) -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def _files(root: Path):
+def _files(root: Path, not_checked: Counter):
+    """Each text file as (relative path, text). Whatever it can't read is counted in not_checked, never just dropped."""
     seen = 0
     for base, dirs, files in os.walk(root):
         dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS and not (Path(base) / d / "pyvenv.cfg").is_file())
@@ -68,21 +72,25 @@ def _files(root: Path):
             path = Path(base) / name
             if name == CONFIG:
                 continue  # it holds the private patterns themselves
-            try:
-                if path.stat().st_size > MAX_FILE_BYTES:
-                    continue
-                data = path.read_bytes()
-            except OSError:
-                continue
-            if b"\0" in data[:1024]:
-                continue  # binary
-            try:
-                yield path.relative_to(root).as_posix(), data.decode("utf-8")
-            except UnicodeDecodeError:
-                continue
-            seen += 1
             if seen >= MAX_FILES:
-                return
+                not_checked["over_file_limit"] += 1
+                continue
+            try:
+                with open(path, "rb") as handle:
+                    data = handle.read(MAX_FILE_BYTES + 1)
+            except OSError:
+                not_checked["unreadable"] += 1
+                continue
+            wide = data.startswith((b"\xff\xfe", b"\xfe\xff"))  # UTF-16, what Windows PowerShell's > writes
+            if not wide and b"\0" in data[:1024]:
+                not_checked["binary"] += 1
+                continue
+            if len(data) > MAX_FILE_BYTES:
+                not_checked["too_big"] += 1
+                continue
+            # secrets are plain ASCII, so a stray byte in another encoding must not hide the whole file
+            yield path.relative_to(root).as_posix(), data.decode("utf-16" if wide else "utf-8", "replace")
+            seen += 1
 
 
 @tool(name="leak_scan", category="repo", doc="repo/leak-scan.md")
@@ -99,14 +107,18 @@ def leak_scan(folder: str = ".", patterns: dict | None = None, secrets: bool = T
         detail: "compact" (the default: totals and at most 20 findings) or "full" (every finding).
 
     Returns:
-        {folder, source: "call" | ".repo-release.json" | "none", files: int, checks: [{id (the pattern or secret
-        kind), kind: "leak" | "secret", ok: false, file, line, prefix?}], failed, counts, passed, more?}. prefix is
-        the first 4 characters, only for secret kinds whose start is public anyway. A line marked
-        "secret-scan: allow" or "leak-scan: allow" is skipped.
+        {folder, source: "call" | ".repo-release.json" | "none", files: int, clean: bool, not_checked: {reason: count},
+        checks: [{id (the pattern or secret kind), kind: "leak" | "secret", ok: false, file, line, prefix?}], failed,
+        counts, passed, note?, more?}. clean is true only when nothing was found, at least one file was read, no text
+        went unread, and the folder isn't the server's own by default: failed 0 alone doesn't mean clean. not_checked
+        reasons: binary (doesn't affect clean), too_big,
+        long_lines, unreadable, over_file_limit. prefix is the first 4 characters, only for secret kinds whose start
+        is public anyway. A line marked "secret-scan: allow" or "leak-scan: allow" is skipped.
 
     Raises:
         LeakScanError: the folder is missing, not a folder, or outside the allowed folders; a pattern is invalid, too
-            long or nests quantifiers; more than 50 patterns; an unreadable config; or a bad detail value.
+            long or nests quantifiers; more than 50 patterns; an unreadable config; a bad detail value; or nothing to
+            check (secrets off and no patterns).
     """
     findings.check_detail(detail, LeakScanError)
     import readroots
@@ -122,14 +134,19 @@ def leak_scan(folder: str = ".", patterns: dict | None = None, secrets: bool = T
     kinds = []
     if secrets:
         from tools.secrets.transcript_scan import KINDS
-        kinds = [(kind, rx, public) for kind, rx, _action, public in KINDS]
+        kinds = [(kind, PRIVATE_KEY if kind == "private key" else rx, public) for kind, rx, _action, public in KINDS]
+    if not leaks and not kinds:
+        raise LeakScanError("nothing to check: secrets is off and there are no patterns, so no result could mean clean")
 
-    rows, files = [], 0
-    for rel, text in _files(root):
+    rows, files, not_checked = [], 0, Counter()
+    for rel, text in _files(root, not_checked):
         files += 1
         skip = {name for name, prefixes in exempt.items() if any(rel.startswith(p) for p in prefixes)}
         for no, line in enumerate(text.splitlines(), 1):
-            if len(line) > MAX_LINE or ALLOW_MARK.search(line):
+            if ALLOW_MARK.search(line):
+                continue
+            if len(line) > MAX_LINE:
+                not_checked["long_lines"] += 1
                 continue
             for literal in literals:
                 line = line.replace(literal, "")
@@ -143,5 +160,10 @@ def leak_scan(folder: str = ".", patterns: dict | None = None, secrets: bool = T
                     rows.append({"id": kind, "kind": "secret", "ok": False, "file": rel, "line": no,
                                  **({"prefix": value[:4]} if public else {})})
                     break  # the most specific kind wins, as in transcript_scan
-    result = {"folder": str(root), "source": source, "files": files, "checks": rows, "failed": len(rows)}
+    own_folder = folder == "." and Path(__file__).resolve().is_relative_to(root)
+    clean = not rows and files > 0 and not set(not_checked) - {"binary"} and not own_folder
+    result = {"folder": str(root), "source": source, "files": files, "clean": clean, "not_checked": dict(not_checked),
+              "checks": rows, "failed": len(rows)}
+    if own_folder:
+        result["note"] = "no folder given, so this scanned the server's own folder, not your project: pass its full path"
     return findings.compact(result, detail)

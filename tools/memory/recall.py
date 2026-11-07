@@ -31,7 +31,8 @@ def check_max_chars(max_chars: int) -> None:
 
 
 @tool(name="recall", category="memory", doc="memory/recall.md")
-def recall(session_id: str, limit: int = 20, max_chars: int = 0, scope: str = "project", project_dir: str = "") -> dict:
+def recall(session_id: str, limit: int = 20, max_chars: int = 0, scope: str = "project", project_dir: str = "",
+           offset: int = 0) -> dict:
     """Read back messages previously saved with memory.capture for a given session. Raw L0
     conversation history, not semantic search — returns exactly what was written, in order.
 
@@ -43,6 +44,7 @@ def recall(session_id: str, limit: int = 20, max_chars: int = 0, scope: str = "p
         scope: "project" (default) reads this project's own memory; "global" reads the shared platform
             memory (homelab-wide facts every project may need), whichever client asks.
         project_dir: the caller's working folder; picks that project's own memory (projects.py).
+        offset: skip this many of the newest messages, to read further back a page at a time.
 
     Returns:
         {"messages": [{"id", "role", "content", "timestamp"}], "total": int}
@@ -54,11 +56,13 @@ def recall(session_id: str, limit: int = 20, max_chars: int = 0, scope: str = "p
         raise MemoryError("session_id must be non-empty")
     if not 1 <= limit <= MAX_LIMIT:
         raise MemoryError(f"limit must be between 1 and {MAX_LIMIT}")
+    if offset < 0:
+        raise MemoryError("offset can't be negative")
     check_max_chars(max_chars)
 
     cfg = _config(scope, project_dir)
     if cfg.get("local"):  # the built-in store (memory_local.py): the same shapes, newest first
-        trimmed = _local(lambda m: m.query(cfg["agent_id"], session_id, limit))
+        trimmed = _local(lambda m: m.query(cfg["agent_id"], session_id, limit, offset))
         return {"messages": shorten(trimmed, max_chars), "total": len(trimmed)}
 
     try:
@@ -75,6 +79,7 @@ def recall(session_id: str, limit: int = 20, max_chars: int = 0, scope: str = "p
                 "agent_id": cfg["agent_id"],
                 "session_id": session_id,
                 "limit": limit,
+                **({"offset": offset} if offset else {}),
             },
             timeout=15,
         )

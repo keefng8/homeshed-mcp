@@ -2,7 +2,7 @@
 # tool server's), an ordinary user, a .dockerignore that keeps .env out, and a HEALTHCHECK that needs no password.
 # Only public files are copied, and everything it needs is inside this folder, so it builds from here alone. Private
 # add-ons are mounted by their owner's own docker-compose.yml.
-FROM python:3.12-slim@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f
+FROM python:3.12-slim@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635c12fcd0a3d74c21a5b93a54
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir --root-user-action=ignore -r requirements.txt \

@@ -51,14 +51,45 @@ def test_product_get_lists_mockups(fake):
 
 
 def test_fetch_saves_once_and_returns_an_image_name(fake):
-    store, fetched, _ = fake
+    store, _, _ = fake
     out = mk.mockup_fetch("abc123", SRC)
     assert out["name"].startswith("printify-abc123-") and out["name"].endswith(".jpg") and out["new"] is True
     assert (store / out["name"]).read_bytes() == JPEG and out["width"] == 1000
     again = mk.mockup_fetch("abc123", SRC)
-    assert again["name"] == out["name"] and again["new"] is False and len(fetched) == 1  # no second download
+    assert again["name"] == out["name"] and again["new"] is False and len(list(store.iterdir())) == 1
     from tools.image.print_file import NAME_RE
     assert NAME_RE.match(out["name"])  # image.carousel and threads.publish accept the name
+
+
+def test_a_replaced_print_at_the_same_address_gets_a_new_copy(fake):
+    """The address stays the same when a print is replaced, and the old picture kept coming back (KB-0152)."""
+    store, _, state = fake
+    first = mk.mockup_fetch("abc123", SRC)
+    state["body"] = JPEG + b"replaced"
+    second = mk.mockup_fetch("abc123", SRC)
+    assert second["new"] is True and second["name"] != first["name"]
+    assert (store / second["name"]).read_bytes() == JPEG + b"replaced"
+    assert (store / first["name"]).read_bytes() == JPEG  # a card approved on the old name still shows what was approved
+    state["body"] = JPEG  # the print put back
+    assert mk.mockup_fetch("abc123", SRC) == {**first, "new": False}
+
+
+def test_a_copy_made_before_the_fix_keeps_its_name_while_the_picture_is_the_same(fake):
+    store, _, state = fake
+    name = mk.mockup_fetch("abc123", SRC)["name"]
+    old_style = name.rsplit("-", 1)[0] + ".jpg"
+    (store / name).rename(store / old_style)
+    assert mk.mockup_fetch("abc123", SRC)["name"] == old_style
+    state["body"] = JPEG + b"replaced"
+    assert mk.mockup_fetch("abc123", SRC)["name"] != old_style
+
+
+def test_no_old_copy_is_passed_off_as_current_when_the_host_fails(fake):
+    _, _, state = fake
+    mk.mockup_fetch("abc123", SRC)
+    state["status"] = 503
+    with pytest.raises(Exception, match="HTTP 503"):
+        mk.mockup_fetch("abc123", SRC)
 
 
 def test_fetch_takes_the_images_host_product_get_lists_now(fake, monkeypatch):

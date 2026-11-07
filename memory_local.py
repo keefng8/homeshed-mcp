@@ -63,11 +63,12 @@ def add(agent: str, session: str, role: str, content: str) -> str:
     return message_id
 
 
-def query(agent: str, session: str, limit: int) -> list[dict]:
-    """The newest `limit` messages of one agent's session, newest first."""
+def query(agent: str, session: str, limit: int, offset: int = 0) -> list[dict]:
+    """The newest `limit` messages of one agent's session after skipping `offset`, newest first."""
     with closing(_connect()) as con:
         rows = con.execute("SELECT id, role, content, at FROM messages WHERE agent = ? AND session = ? "
-                           "ORDER BY at DESC, rowid DESC LIMIT ?", (agent, session, max(0, int(limit)))).fetchall()
+                           "ORDER BY at DESC, rowid DESC LIMIT ? OFFSET ?",
+                           (agent, session, max(0, int(limit)), max(0, int(offset)))).fetchall()
     return [{"id": i, "role": r, "content": c, "timestamp": _stamp(at)} for i, r, c, at in rows]
 
 

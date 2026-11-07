@@ -3774,5 +3774,28 @@ class _Compress:
         return await self.inner(scope, receive, send)
 
 
+# The attack scan of 7 Nov 2026 found every reply without these. Same-origin framing, because the map page shows diagrams in
+# its own iframe. No script policy yet: the page's inline scripts would need moving first.
+SECURITY_HEADERS = ((b"x-frame-options", b"SAMEORIGIN"), (b"content-security-policy", b"frame-ancestors 'self'"),
+                    (b"x-content-type-options", b"nosniff"), (b"referrer-policy", b"same-origin"))
+
+
+class _SecurityHeaders:
+    def __init__(self, inner):
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.inner(scope, receive, send)
+
+        async def with_headers(message):
+            if message["type"] == "http.response.start":
+                message = {**message, "headers": [*message.get("headers", []), *SECURITY_HEADERS]}
+            await send(message)
+
+        await self.inner(scope, receive, with_headers)
+
+
+app.add_middleware(_SecurityHeaders)
 app.add_middleware(_Compress)  # added last, so it wraps every other middleware: it compresses what they send
 app.mount("/", _CachedStatic(directory=Path(__file__).parent / "static", html=True), name="static")

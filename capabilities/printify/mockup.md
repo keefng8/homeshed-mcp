@@ -15,8 +15,12 @@ watermark) and `threads.publish`. Read-only towards Printify.
 | `src` | yes | One of its mockups' `src`, from `printify.product.get` ("mockups"). |
 
 ## Returns
-`{"name", "product_id", "bytes", "mime", "width", "new"}`. `name` is `printify-<product_id>-<8 hex>.jpg|png`; the same
-mockup fetched again returns the copy already made (`new: false`).
+`{"name", "product_id", "bytes", "mime", "width", "new"}`. `name` is `printify-<product_id>-<8 hex>-<8 hex>.jpg|png`.
+
+It downloads the mockup on every call, because a replaced print keeps the same address. The same picture returns the
+copy already made (`new: false`). A changed picture gets a new copy under a new name (`new: true`), and the old copy
+stays, so anything already using the old name still shows that picture. Use the name from the latest call. If Printify's
+image host doesn't answer, the call fails rather than returning a copy that may be old.
 
 ## Safety
 Only Printify's image hosts (`https://images.printify.com/...`, which product.get lists since 2026-10-07, or

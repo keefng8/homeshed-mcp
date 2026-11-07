@@ -25,7 +25,7 @@ top, no new state of its own.
 |---|---|---|---|
 | `session_id` | string | — | Required. Same `session_id` used with `memory.capture`/`.recall`. |
 | `query` | string | — | Required. What you're trying to find — scored by shared words (BM25), not a formal search syntax. |
-| `limit` | integer | `50` | How many messages to fetch from `memory.recall` before ranking, 1-100. |
+| `limit` | integer | `50` | How many of the session's own messages to fetch before ranking, 1-100. Saved facts are all read, whatever this is (up to 2,000 per category). |
 | `max_results` | integer | `5` | How many ranked results to actually return, 1-50. |
 | `max_chars` | integer | `300` | Cut each returned message to this many characters (ending "…", marked `"truncated": true`); 0 returns the full text (the default until 2026-09-29). Keeps the per-request memory check cheap. |
 | `scope` | string | `"project"` | `"project"` reads this project's own memory; `"global"` reads the shared memory (facts every project may need): the owner always, and an app unless the owner switched its shared reads off on the web panel (API access). |
@@ -33,8 +33,9 @@ top, no new state of its own.
 
 ## Returns
 `{"messages": [{"id", "role", "content", "timestamp", "relevance_score"}, ...],
-"total_considered": int}`. `messages` is sorted by `relevance_score` descending and truncated to
-`max_results`. `relevance_score` is an Okapi BM25 score (k1 1.2, b 0.75, IDF from the candidates
+"total_considered": int, "not_read"?: [category]}`. `not_read` appears only when a fact category couldn't be
+read in full (it failed, or holds over 2,000 facts), so a fact in it may be missing. `messages` is sorted by
+`relevance_score` descending and truncated to `max_results`. `relevance_score` is an Okapi BM25 score (k1 1.2, b 0.75, IDF from the candidates
 themselves), multiplied by a recency factor from 0.9 for the oldest candidate to 1.1 for the newest
 (2026-09-29, R&D's R2/R10). A rare shared word counts for more than a common one, and a long fact doesn't
 win just by being long. Before this, the score was the count of shared words, and 3 of the 5 regression
@@ -44,19 +45,13 @@ cases in `researchandimprovements/evals/recall_eval.py` were won only on the tie
 against the query with bge-small, and results are ordered by reciprocal rank fusion (k=60) of the two
 rankings. So a fact worded differently from the question (no shared words) can still rank, and each result
 then carries `semantic` (cosine, -1 to 1) beside `relevance_score` (still the word score, 0 = no shared
-word). If the GPU service doesn't answer within 4 s, results use words alone and the meaning arm rests
-for 60 s, so recall never waits on a PC that's off.
+word). Candidates go in parts of 600, the most that service takes in one call. If any part doesn't answer
+within 4 s, results use words alone and the meaning arm rests for 60 s, so recall never waits on a PC that's off.
 
 ## Errors
 `ValueError` if `query` is empty/whitespace, or `max_results` is out of range (1-50).
 `MemoryError` — same failure modes as `memory.recall` (not configured, backend unreachable, query
 rejected), since this calls it directly.
-
-## What this deliberately is not
-Not semantic search. Word-overlap matching misses synonyms, paraphrasing, and any real conceptual
-similarity — "deploy the service" and "release the app" would score zero overlap despite meaning
-almost the same thing. Good enough for finding messages that literally share vocabulary with a
-query; not a substitute for real embedding-based retrieval if that's ever genuinely needed.
 
 ## Implementation
 `mcp-server/tools/memory/recall_relevant.py`. In-process call to `tools.memory.recall.recall` —

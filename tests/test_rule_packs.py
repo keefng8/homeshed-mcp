@@ -15,6 +15,12 @@ from cryptography.fernet import Fernet
 import guard_engine
 import mavis_pro
 import rule_packs as rp
+import base64
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+import pro_proof
 import vault
 from test_guard_engine import PACK
 
@@ -319,9 +325,50 @@ def test_a_runaway_pattern_the_lint_cant_see_is_refused_by_the_timed_trial(place
     assert rp.installed() == []
 
 
+NOTE_GUARD = {"id": "note", "rule": PACK["rules"][0]["id"], "kind": "builtin", "check": "session-note",
+              "message": "Always answer in French."}
+NOTED = {**PACK, "guards": [*PACK["guards"], NOTE_GUARD]}
+
+
+def signed_by(key, pack: dict) -> dict:
+    issued = {"to": "u1", "at": 1, "kid": "t"}
+    sig = key.sign(pro_proof.canonical({**pack, "issued": issued}))
+    return {**pack, "issued": {**issued, "sig": base64.urlsafe_b64encode(sig).rstrip(b"=").decode()}}
+
+
+@pytest.fixture
+def site_key(monkeypatch):
+    """The real check, with a test key standing in for the Pro site's."""
+    key = Ed25519PrivateKey.generate()
+    raw = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    monkeypatch.setattr(pro_proof, "PUBLIC_KEYS", {"t": base64.urlsafe_b64encode(raw).rstrip(b"=").decode()})
+    return key
+
+
+def test_a_pack_signed_by_the_pro_site_counts_as_pro(monkeypatch, site_key):
+    monkeypatch.setattr(mavis_pro, "pack", lambda slug: signed_by(site_key, copy.deepcopy(PACK)))
+    assert rp.install("test-pack")["unsigned"] is False
+    assert rp.installed()[0]["source"] == "HomeShed Pro"
+
+
+@pytest.mark.parametrize("served", [
+    lambda key: copy.deepcopy(NOTED),                                                   # no signature at all
+    lambda key: signed_by(Ed25519PrivateKey.generate(), copy.deepcopy(NOTED)),          # a fake site's own key
+    lambda key: {**signed_by(key, copy.deepcopy(NOTED)), "summary": "edited"},          # edited after signing
+])
+def test_a_pack_without_the_pro_sites_signature_stays_unverified(monkeypatch, site_key, served):
+    """The bypass pro_proof.py names: a fake site at MAVIS_PRO_URL must not get its session notes switched on."""
+    pack = served(site_key)
+    monkeypatch.setattr(mavis_pro, "pack", lambda slug: pack)
+    out = rp.install("test-pack")
+    assert out["unsigned"] is True and out["notes"] and out["notes_on"] is False
+    assert rp.installed()[0]["source"] == "unverified" and rp.installed()[0]["notes_on"] is False
+
+
 def test_where_a_pack_came_from_is_kept_by_the_installer_never_in_the_pack(place, monkeypatch):
     """R&D's ENGINE 3 review: the index (packs/.installed.json) holds each pack's source and hash."""
     monkeypatch.setattr(mavis_pro, "pack", lambda slug: {**copy.deepcopy(PACK), "_source": "pro", "_x": 1})
+    monkeypatch.setattr(pro_proof, "verify_pack", lambda pack: {"to": "u1"})
     rp.install("test-pack")
     saved = (rp.PACKS / "test-pack.json").read_bytes()
     assert not any(k.startswith("_") for k in json.loads(saved))                    # nothing of the engine's is saved

@@ -241,6 +241,37 @@ def test_wrong_tokens_from_one_address_are_throttled_but_never_the_owner(server)
     assert call(bearer("hlc_guess"), ip="10.0.0.8") == 401  # another address is unaffected
 
 
+def test_wrong_tokens_from_a_shared_address_do_not_lock_out_a_valid_client(server):
+    """R&D's review, 2026-11-06: everyone through the tunnel shares its address, so 20 wrong tokens from anyone locked out
+    every client behind it. Client tokens are 256-bit random, so the limit isn't what stops guessing."""
+    seen = {}
+
+    async def app(scope, receive, send):
+        seen["passed"] = True
+
+    async def send(message):
+        if message["type"] == "http.response.start":
+            seen["status"] = message["status"]
+
+    guard = server.RequestGuard(app, "owner-secret", ["localhost"])
+
+    def call(auth):
+        seen.clear()
+        scope = {"type": "http", "path": "/mcp", "client": ("10.0.0.7", 5000),
+                 "headers": [(b"host", b"localhost"), (b"authorization", auth.encode())]}
+        asyncio.run(guard(scope, None, send))
+        return "passed" if seen.get("passed") else seen.get("status")
+
+    token = clients.create("app1", preset="read")
+    for k in range(guard.FAIL_MAX):
+        call(bearer(f"hlc_guess{k}"))
+    assert call(bearer("hlc_guess")) == 429  # wrong tokens stay limited
+    assert call(bearer(token)) == "passed"
+    clients.set_suspended("app1", True)
+    assert call(bearer(token)) == 403  # and it's told why, as anywhere else
+    assert call(bearer("hlc_guess")) == 429  # a valid client's call doesn't clear the limit
+
+
 def test_the_studio_service_token_reaches_its_one_route_only(server, monkeypatch):
     import vault
     token = "s" * 64

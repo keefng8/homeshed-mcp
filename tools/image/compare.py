@@ -9,7 +9,7 @@ from registry import tool
 from tools._helper_auth import helper_headers
 from tools.image.generate import ImageError, base_url, raise_for_backend
 
-MAX_BYTES = 20 * 1024 * 1024
+MAX_BYTES = 40 * 1024 * 1024  # KB-0150: print files reach 32 MB. The image service's COMPARE_MAX_BYTES must match.
 
 
 @tool(name="compare", category="image", doc="image/compare.md")

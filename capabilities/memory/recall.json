@@ -23,6 +23,11 @@
       "required": false,
       "default": 20
     },
+    "offset": {
+      "type": "integer",
+      "required": false,
+      "default": 0
+    },
     "max_chars": {
       "type": "integer",
       "required": false,

@@ -1451,16 +1451,18 @@ class RequestGuard:
             return await self.app(scope, receive, send)
         if _service_allowed(scope.get("path", ""), auth):
             return await self.app(scope, receive, send)
-        ip, now = str((scope.get("client") or ("?",))[0]), time.time()
-        if self._throttled(ip, now):
-            response = PlainTextResponse("too many wrong tokens from this address: try again in a few minutes",
-                                         status_code=429)
-            return await response(scope, receive, send)
+        # The token before the limit (R&D, 2026-11-06): everyone through the tunnel shares its address, so 20 wrong tokens
+        # from anyone locked out every valid client behind it. Only wrong tokens are limited.
         client, status = clients.resolve(auth.decode("latin-1"))
         if status in ("suspended", "expired"):
             response = PlainTextResponse(f"client {client!r} is {status}", status_code=403)
             return await response(scope, receive, send)
         if status != "ok":
+            ip, now = str((scope.get("client") or ("?",))[0]), time.time()
+            if self._throttled(ip, now):
+                response = PlainTextResponse("too many wrong tokens from this address: try again in a few minutes",
+                                             status_code=429)
+                return await response(scope, receive, send)
             self._throttled(ip, now, failed=True)
             response = PlainTextResponse("unauthorized", status_code=401)
             if self.oauth is not None and scope.get("path", "").startswith("/mcp"):  # where a chat app signs in
@@ -1468,8 +1470,9 @@ class RequestGuard:
                 response.headers["WWW-Authenticate"] = (
                     f'Bearer resource_metadata="{oauth_server.public_url()}/.well-known/oauth-protected-resource/mcp"')
             return await response(scope, receive, send)
-        if not scope.get("path", "").startswith("/mcp"):
-            # Client tokens reach the MCP endpoint only: never the admin routes that manage grants.
+        if scope.get("path", "").rstrip("/") != "/mcp":
+            # Client tokens reach the MCP endpoint only: never the admin routes that manage grants. Exactly that path: a
+            # prefix also let through /mcpadmin and /mcp/../clients, which a tidying proxy would make an admin route.
             response = PlainTextResponse("client tokens can only use the MCP endpoint", status_code=403)
             return await response(scope, receive, send)
         await self.app(scope, receive, send)

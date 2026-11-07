@@ -42,6 +42,12 @@ def test_query_is_newest_first_in_memory_cores_shape():
     assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z", got[0]["timestamp"])
 
 
+def test_query_reads_further_back_with_an_offset():
+    ids = [memory_local.add("a", "s", "user", str(i)) for i in range(5)][::-1]
+    assert [m["id"] for m in memory_local.query("a", "s", 2, 2)] == ids[2:4]
+    assert [m["id"] for m in memory_local.query("a", "s", 2, 4)] == ids[4:]
+
+
 def test_query_keeps_to_one_agent_and_session_and_the_limit():
     for i in range(5):
         memory_local.add("a", "s", "user", f"a-s-{i}")

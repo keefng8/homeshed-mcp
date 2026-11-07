@@ -104,13 +104,91 @@ def test_empty_message_history_returns_empty_results(monkeypatch):
 def _no_fact_categories_unless_asked(monkeypatch, request):
     """The ranking tests above are about one session's messages; the facts tests below opt back in."""
     if "facts" not in request.node.name:
-        monkeypatch.setattr(recall_relevant_module, "_facts", lambda limit, scope: [])
+        monkeypatch.setattr(recall_relevant_module, "_facts", lambda scope: ([], []))
 
 
 def _by_session(table):
-    def fake(session_id, limit=50, scope="project", max_chars=0):
-        return {"messages": list(table.get(session_id, [])), "total": len(table.get(session_id, []))}
+    def fake(session_id, limit=50, scope="project", max_chars=0, offset=0):
+        rows = table.get(session_id, [])[offset:offset + limit]
+        return {"messages": list(rows), "total": len(rows)}
     return fake
+
+
+def _facts_in(count):
+    return [{"id": f"f{i}", "role": "user", "content": f"filler note number {i}", "timestamp": f"{i:05}"}
+            for i in range(count)]
+
+
+def test_facts_older_than_any_window_are_still_found(monkeypatch):
+    """R33: the oldest of 447 task facts could never be recalled, and nothing said so."""
+    oldest = {"id": "old", "role": "user", "content": "password reset email for website users", "timestamp": "0"}
+    monkeypatch.setattr(recall_relevant_module, "recall", _by_session({"facts:tasks": _facts_in(250) + [oldest]}))
+    out = recall_relevant("s", "password reset email")
+    assert out["total_considered"] == 251 and out["messages"][0]["id"] == "old" and "not_read" not in out
+
+
+def test_a_category_over_the_page_limit_is_named_in_the_facts_result(monkeypatch):
+    monkeypatch.setattr(recall_relevant_module, "MAX_FACT_PAGES", 2)
+    monkeypatch.setattr(recall_relevant_module, "recall", _by_session({"facts:tasks": _facts_in(250)}))
+    out = recall_relevant("s", "filler")
+    assert out["total_considered"] == 200 and out["not_read"] == ["tasks"]
+
+
+def test_a_category_that_fails_part_way_keeps_its_pages_and_is_named_in_the_facts_result(monkeypatch):
+    table = _by_session({"facts:tasks": _facts_in(150)})
+
+    def flaky(session_id, offset=0, **kw):
+        if offset:
+            raise recall_relevant_module.MemoryError("backend refused")
+        return table(session_id, offset=offset, **kw)
+    monkeypatch.setattr(recall_relevant_module, "recall", flaky)
+    out = recall_relevant("s", "filler")
+    assert out["total_considered"] == 100 and out["not_read"] == ["tasks"]
+
+
+class _Reply:
+    status_code = 200
+
+    def __init__(self, count):
+        self.count = count
+
+    def json(self):
+        return {"scores": [0.5] * self.count}
+
+
+def _meaning_ready(monkeypatch):
+    import httpx
+
+    import vault
+    monkeypatch.setenv("LOCAL_AI_DECIDE_BASE_URL", "http://gpu")
+    monkeypatch.setattr(vault, "secret", lambda name, default=None: "token")
+    monkeypatch.setattr(recall_relevant_module, "_semantic_rest_until", 0.0)
+    return httpx
+
+
+def test_meaning_splits_more_texts_than_the_gpu_service_takes_in_one_call(monkeypatch):
+    """Its limit is 600 and there are 752 facts: one big call was refused, and meaning would have rested on every recall."""
+    httpx = _meaning_ready(monkeypatch)
+    sizes = []
+
+    def post(url, json, headers, timeout):
+        sizes.append(len(json["texts"]))
+        return _Reply(len(json["texts"]))
+    monkeypatch.setattr(httpx, "post", post)
+    assert len(recall_relevant_module._semantic("q", ["t"] * 1300)) == 1300
+    assert sizes == [600, 600, 100]
+
+
+def test_one_failed_meaning_part_means_words_alone_and_a_rest(monkeypatch):
+    httpx = _meaning_ready(monkeypatch)
+    calls = []
+
+    def post(url, json, headers, timeout):
+        calls.append(1)
+        return _Reply(len(json["texts"]) - (len(calls) == 2))  # the second part answers one score short
+    monkeypatch.setattr(httpx, "post", post)
+    assert recall_relevant_module._semantic("q", ["t"] * 700) is None
+    assert recall_relevant_module._semantic_rest_until > 0
 
 
 def test_facts_are_searched_even_when_the_session_has_nothing(monkeypatch):

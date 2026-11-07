@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.8] - 2026-11-07
+
+### Security
+- Tool server: client tokens now work on exactly `/mcp`. Before, any path starting with `/mcp` passed this check, including `/mcpadmin` and `/mcp/../clients`, which a tidying proxy could turn into an admin route.
+- Tool server: wrong tokens no longer lock out valid clients who share an address, for example everyone behind one tunnel. The token is checked before the throttle, and only wrong tokens count.
+- Pro pack install now checks the pack's signature. A pack without a valid one still runs its checks but is marked unverified, so it can't ask you anything or add a session note.
+- Control Panel: every reply now tells browsers not to let other sites frame the panel, not to guess content types, and to keep the panel's address out of the referrer sent to other sites. There's no script policy yet.
+- Tool server and Control Panel images: moved to a newer Python base image, clearing the critical and high findings a Trivy scan reported in old system packages.
+
+### Fixed
+- `memory.recall_relevant` reads every saved fact, up to 2,000 per category, not just the newest 50. If a category can't be read in full, the new `not_read` field names it.
+- `repo.leak_scan`: a call that checked nothing, or had no folder, no longer reports clean. Use the new `clean` field rather than `failed: 0`; `not_checked` counts what wasn't read.
+- `printify.mockup.fetch`: a replaced print gets a new copy under a new name instead of returning the old picture.
+- `image.compare` takes files up to 40 MB, if your image service accepts that size too.
+
+### Changed
+- The plugin runs 0.7.8.
+
+Existing installs: stop the panel with `uvx --refresh --from "homeshed-mcp[panel]" homeshed-mcp panel --stop`, then start it again with `uvx --from "homeshed-mcp[panel]" homeshed-mcp panel --start`. No new settings are needed.
+
 ## [0.7.7] - 2026-11-03
 
 ### Added

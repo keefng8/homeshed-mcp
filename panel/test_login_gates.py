@@ -36,6 +36,16 @@ def fresh(tmp_path, monkeypatch):
     return tmp_path
 
 
+@pytest.mark.parametrize("path", ["/healthz", "/api/me", "/no-such-page-at-all", "/"])
+def test_every_reply_carries_the_browser_protections(path):
+    """The attack scan of 7 Nov 2026 found them missing, whatever the status or route. Compressed replies keep them too."""
+    reply = TestClient(main.app, raise_server_exceptions=False).get(path, headers={"Accept-Encoding": "gzip"}, follow_redirects=False)
+    assert reply.headers["x-frame-options"] == "SAMEORIGIN"
+    assert reply.headers["content-security-policy"] == "frame-ancestors 'self'"  # 'self': the map page frames our own diagrams
+    assert reply.headers["x-content-type-options"] == "nosniff"
+    assert reply.headers["referrer-policy"] == "same-origin"
+
+
 def signed_in(password=SAVED):
     client = TestClient(main.app, headers=PANEL)
     assert client.post("/login", json={"password": password}).json()["role"] == "owner"

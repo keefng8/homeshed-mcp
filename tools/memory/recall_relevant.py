@@ -17,7 +17,7 @@ from collections import Counter
 import projects
 from registry import tool
 from tools.memory.capture import MemoryError, facts_session_id
-from tools.memory.recall import check_max_chars, recall, shorten
+from tools.memory.recall import MAX_LIMIT, check_max_chars, recall, shorten
 from tools.memory.task_state import current_only
 
 # Fact categories to search besides the session itself. Found 2026-09-29: recall_relevant only ranked one session's
@@ -31,6 +31,7 @@ KNOWN_FACT_CATEGORIES = ("general", "platform", "mcp-server", "memory-stack", "l
                          "external-audits", "bugs-fixed", "tasks", "scripts")
 SUPERSEDES_RE = re.compile(r"SUPERSEDES\s+(msg-[0-9a-f]{6,})", re.I)
 FACT_INDEX = "fact-index"
+MAX_FACT_PAGES = 20  # 2,000 facts in one category; beyond that the result names it in not_read
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 
@@ -82,6 +83,7 @@ def bm25(query: str, docs: list[str]) -> list[float]:
 # Any failure means word ranking alone, and the meaning arm rests for SEMANTIC_REST_S so every recall doesn't wait on
 # a PC that's off.
 SEMANTIC_TIMEOUT_S, SEMANTIC_REST_S, RRF_K = 4.0, 60.0, 60
+SEMANTIC_MAX_TEXTS = 600  # the most one /knowledge/similarity call takes (MAX_TEXTS in the GPU service's knowledge.py)
 _semantic_rest_until = 0.0
 
 
@@ -97,12 +99,18 @@ def _semantic(query: str, docs: list[str]) -> list[float] | None:
     token = vault.secret("GPU_SERVICE_TOKEN")
     if not (url and token and docs) or time.time() < _semantic_rest_until:
         return None
+    out: list[float] = []
     try:
-        r = httpx.post(f"{url}/knowledge/similarity", json={"query": query, "texts": docs},
-                       headers={"X-GPU-Token": token}, timeout=SEMANTIC_TIMEOUT_S)
-        scores = r.json().get("scores") if r.status_code == 200 else None
-        if isinstance(scores, list) and len(scores) == len(docs):
-            return [float(s) for s in scores]
+        for start in range(0, len(docs), SEMANTIC_MAX_TEXTS):
+            part = docs[start:start + SEMANTIC_MAX_TEXTS]
+            r = httpx.post(f"{url}/knowledge/similarity", json={"query": query, "texts": part},
+                           headers={"X-GPU-Token": token}, timeout=SEMANTIC_TIMEOUT_S)
+            scores = r.json().get("scores") if r.status_code == 200 else None
+            if not isinstance(scores, list) or len(scores) != len(part):
+                break
+            out += [float(s) for s in scores]
+        else:
+            return out
     except (httpx.HTTPError, ValueError, TypeError):
         pass
     _semantic_rest_until = time.time() + SEMANTIC_REST_S
@@ -143,7 +151,7 @@ def recall_relevant(session_id: str, query: str, limit: int = 50, max_results: i
         session_id: the session_id used when capturing (same as memory.recall).
         query: what you're trying to find -- scored by word overlap against each message's
             content, not a formal search syntax.
-        limit: how many messages to fetch from memory.recall before ranking, 1-100.
+        limit: how many of the session's own messages to fetch before ranking, 1-100. Saved facts are all read.
         max_results: how many of the ranked results to actually return, 1-50.
         max_chars: cut each returned message to this many characters (0 = full text). Defaults
             to 300 (0 until 2026-09-29). Ranking always uses the full text.
@@ -153,7 +161,8 @@ def recall_relevant(session_id: str, query: str, limit: int = 50, max_results: i
 
     Returns:
         {"messages": [{"id", "role", "content", "timestamp", "relevance_score"}, ...],
-         "total_considered": int}
+         "total_considered": int, "not_read"?: [category, ...]}
+        `not_read` appears only when a fact category couldn't be read in full, so a fact in it may be missing.
         `messages` is sorted by `relevance_score` descending and truncated to `max_results`.
         `relevance_score` is an Okapi BM25 score over the candidates (a rare shared word counts
         for more than a common one; long messages don't win by length), times a recency factor
@@ -178,7 +187,8 @@ def _ranked(session_id: str, query: str, limit: int, max_results: int, max_chars
     check_max_chars(max_chars)
     result = recall(session_id, limit=limit, scope=scope)
     messages = [{**m, "source": "session"} for m in result["messages"]]
-    messages += _facts(min(limit, 50), scope)
+    facts, not_read = _facts(scope)
+    messages += facts
     # A fact that says "SUPERSEDES msg-<id>" hides the one it replaces (ids may be given in short form).
     gone = {g.lower() for m in messages for g in SUPERSEDES_RE.findall(str(m.get("content") or ""))}
     messages = [m for m in messages if not any(str(m.get("id") or "").lower().startswith(g) for g in gone)]
@@ -195,7 +205,8 @@ def _ranked(session_id: str, query: str, limit: int, max_results: int, max_chars
     for m in scored:
         del m["_order"]
 
-    return {"messages": shorten(scored[:max_results], max_chars), "total_considered": len(messages)}
+    return {"messages": shorten(scored[:max_results], max_chars), "total_considered": len(messages),
+            **({"not_read": not_read} if not_read else {})}
 
 
 def fact_categories(scope: str = "project") -> list[str]:
@@ -211,14 +222,24 @@ def fact_categories(scope: str = "project") -> list[str]:
     return found
 
 
-def _facts(limit: int, scope: str) -> list[dict]:
-    """Saved facts from every category, each tagged with where it came from. A category that can't be read is
-    skipped: one bad category never costs the whole recall."""
-    out = []
+def _facts(scope: str) -> tuple[list[dict], list[str]]:
+    """Every saved fact, each tagged with its category, and the categories not read in full. R&D's R33, 2026-11-06: only
+    the newest 50 per category were read, so older facts became unfindable with no sign of it (tasks holds 447). One bad
+    category never costs the whole recall, but it's named in the result, with whatever pages it gave."""
+    out: list[dict] = []
+    not_read: list[str] = []
     for category in fact_categories(scope):
+        got: list[dict] = []
         try:
-            got = recall(facts_session_id(category), limit=limit, scope=scope)["messages"]
+            for page in range(MAX_FACT_PAGES):
+                rows = recall(facts_session_id(category), limit=MAX_LIMIT, offset=page * MAX_LIMIT,
+                              scope=scope)["messages"]
+                got += rows
+                if len(rows) < MAX_LIMIT:
+                    break
+            else:
+                not_read.append(category)
         except (MemoryError, ValueError):
-            continue
+            not_read.append(category)
         out += [{**m, "source": f"fact:{category}"} for m in got]
-    return out
+    return out, not_read

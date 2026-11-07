@@ -3,6 +3,7 @@ secrets are built at run time so this file itself doesn't trip the commit scanne
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -78,6 +79,81 @@ def test_no_patterns_and_no_config_still_finds_secrets(tmp_path):
     _write(tmp_path, "a.py", f"T = '{TOKEN}'\n")
     out = leak_scan(str(tmp_path))
     assert out["source"] == "none" and [c["id"] for c in out["checks"]] == ["GitHub token"]
+
+
+PEM_HEADER = "-----BEGIN " + "PRIVATE KEY-----"
+
+
+def test_a_multi_line_private_key_is_found(tmp_path):
+    """KB-0074: the shared pattern wants the key's body after its header, but this scan reads one line at a time."""
+    _write(tmp_path, "id_key", f"{PEM_HEADER}\n{'A' * 64}\n{'B' * 64}\n-----END PRIVATE KEY-----\n")
+    assert _hits(leak_scan(str(tmp_path), detail="full")) == {("private key", "id_key", 1)}
+
+
+def test_a_key_inside_json_is_found(tmp_path):
+    _write(tmp_path, "account.json", json.dumps({"private_key": f"{PEM_HEADER}\n{'A' * 64}\n"}) + "\n")
+    assert [c["id"] for c in leak_scan(str(tmp_path), detail="full")["checks"]] == ["private key"]
+
+
+def test_asking_for_no_checks_is_refused_not_clean(tmp_path):
+    _write(tmp_path, "a.py", f"T = '{TOKEN}'\n")
+    with pytest.raises(LeakScanError, match="nothing to check"):
+        leak_scan(str(tmp_path), secrets=False)
+
+
+def test_a_clean_folder_says_clean(tmp_path):
+    _write(tmp_path, "a.py", "x = 1\n")
+    (tmp_path / "logo.png").write_bytes(b"\0" * 2_000_000)  # a binary file holds no text to check
+    out = leak_scan(str(tmp_path))
+    assert out["clean"] is True and out["files"] == 1 and out["not_checked"] == {"binary": 1}
+
+
+def test_the_default_folder_on_the_server_itself_is_not_clean(monkeypatch):
+    """KB-0074's first report: a call with no folder scanned /app and read like a pass for the caller's project."""
+    import tools.repo.leak_scan as module
+    server_folder = Path(module.__file__).resolve().parents[1]
+    monkeypatch.setenv("READ_ALLOWED_ROOTS", str(server_folder))
+    monkeypatch.chdir(server_folder)
+    monkeypatch.setattr(module, "_files", lambda root, not_checked: iter([("a.py", "x = 1\n")]))
+    out = leak_scan()
+    assert out["clean"] is False and "own folder" in out["note"]
+    assert leak_scan(str(server_folder))["clean"] is True  # naming it on purpose is fine
+
+
+def test_a_finding_is_not_clean(tmp_path):
+    _write(tmp_path, "a.py", f"T = '{TOKEN}'\n")
+    assert leak_scan(str(tmp_path))["clean"] is False
+
+
+def test_an_empty_folder_is_not_clean(tmp_path):
+    out = leak_scan(str(tmp_path))
+    assert out["files"] == 0 and out["failed"] == 0 and out["clean"] is False
+
+
+@pytest.mark.parametrize("name, text, key", [
+    ("huge.txt", "x = 1\n" * 200_000, "too_big"),
+    ("min.js", "x" * 3000 + "\n", "long_lines"),
+], ids=["too_big", "long_lines"])
+def test_text_it_could_not_check_stops_it_being_clean(tmp_path, name, text, key):
+    _write(tmp_path, name, text)
+    out = leak_scan(str(tmp_path))
+    assert out["failed"] == 0 and out["clean"] is False and out["not_checked"][key] == 1
+
+
+def test_stopping_at_the_file_limit_is_not_clean(tmp_path, monkeypatch):
+    import tools.repo.leak_scan as module
+    monkeypatch.setattr(module, "MAX_FILES", 1)
+    _write(tmp_path, "a.py", "x = 1\n")
+    _write(tmp_path, "b.py", f"T = '{TOKEN}'\n")
+    out = leak_scan(str(tmp_path))
+    assert out["clean"] is False and out["not_checked"]["over_file_limit"] == 1
+
+
+@pytest.mark.parametrize("encoding", ["utf-16", "cp1252"])
+def test_other_text_encodings_are_still_read(tmp_path, encoding):
+    """UTF-16 is what Windows PowerShell's > writes; both were skipped without a word."""
+    (tmp_path / "settings.env").write_bytes(f"café = 1\nT = '{TOKEN}'\n".encode(encoding))
+    assert [c["id"] for c in leak_scan(str(tmp_path), detail="full")["checks"]] == ["GitHub token"]
 
 
 @pytest.mark.parametrize("patterns, words", [

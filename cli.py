@@ -747,6 +747,9 @@ def cmd_packs(args) -> int:
         return 1
     p = out["installed"]
     print(f"Installed {p['title']} {p['version']}.")
+    if out.get("unsigned"):
+        print("It doesn't carry a valid HomeShed Pro signature, so it's marked unverified: its checks run, but it can't "
+              "ask you anything or add a session note. If you didn't expect that, check your Pro website address.")
     if out["notes"] and not out["notes_on"]:
         print("Its session note stays off: Claude isn't told it. Add the pack again to read and accept it.")
     print("Claude follows it from its next action." if out["hook_on"] else

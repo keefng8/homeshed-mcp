@@ -20,6 +20,8 @@ only. `include_env_values=true` is a materially higher-risk call than the base r
 policy/confirmation layer gets built (Recommendations doc §11), gate this flag specifically, not
 just the capability as a whole.
 
+If this server reaches Docker through a proxy that removes container environments, `env` comes back empty, names included. To read an environment there, use a shell on the host.
+
 ## Returns
 `{id, name, image, status, networks, ports, mounts, env}` — `networks` is `{name: {ip, gateway}}`,
 `mounts` is `[{source, destination, mode}]`. `image` is `"<unknown>"` if the container's own

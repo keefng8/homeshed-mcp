@@ -67,6 +67,7 @@ def installed() -> list[dict]:
 
 
 TRIAL_EACH_S = 3.0
+UNSIGNED = "unsigned"  # an index source the engine doesn't know, so it treats the pack as unverified
 
 
 def _index_write(update) -> None:
@@ -91,7 +92,7 @@ def _save(pack: dict, source: str, notes_ok: bool = False) -> dict:
     entry = {"source": source, "sha256": guard_engine.file_hash(raw), **({"notes_ok": True} if notes_ok else {})}
     _index_write(lambda index: index.__setitem__(pack["slug"], entry))
     return {"installed": {k: pack[k] for k in ("slug", "title", "version", "tier")}, "hook_on": hook_state()["on"],
-            "notes": session_notes(pack), "notes_on": source == "pro" or notes_ok}
+            "notes": session_notes(pack), "notes_on": source == "pro" or notes_ok, "unsigned": source == UNSIGNED}
 
 
 def timed_trial(pack: dict) -> list[str]:
@@ -210,7 +211,11 @@ def install(slug: str, server: str | None = None, token: str | None = None, conf
             pack = mavis_pro.pack(slug)
         except mavis_pro.MavisProError as exc:
             raise PackError(str(exc)) from None
-    return _save(_checked(pack, slug), "pro")
+    # Only the Pro site's signature earns the "pro" label (session notes on, may ask the user). Anything else, such as a
+    # fake site at MAVIS_PRO_URL or an edited pack, still gets its checks but stays unverified (the engine's safe state).
+    import pro_proof
+    pack = _checked(pack, slug)
+    return _save(pack, "pro" if pro_proof.verify_pack(pack) else UNSIGNED)
 
 
 def _read_pack(file) -> dict:

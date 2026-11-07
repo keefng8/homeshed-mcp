@@ -26,7 +26,8 @@ MAX_MOCKUP_BYTES = 15 * 1024 * 1024
 def mockup_fetch(product_id: str, src: str) -> dict:
     """Copy one of a product's Printify mockups into the image store and return its image name, for image.carousel
     (slides with the brand watermark) and threads.publish. Only a src that printify.product.get lists for that
-    product, on Printify's image host. Fetching the same mockup again returns the copy already made.
+    product, on Printify's image host. It always downloads the mockup: the same picture returns the copy already made,
+    a changed one (a replaced print keeps its address) a new copy under a new name.
 
     Args:
         product_id: the product's id.
@@ -46,14 +47,6 @@ def mockup_fetch(product_id: str, src: str) -> dict:
     p = pf.get(f"/v1/shops/{pf.shop_id()}/products/{pid}.json") or {}
     if src not in {i.get("src") for i in (p.get("images") or []) if isinstance(i, dict)}:
         raise h.CommerceError("that src isn't one of this product's mockups (printify.product.get lists them)")
-    stem = f"printify-{pid}-{hashlib.sha256(src.encode()).hexdigest()[:8]}"
-    store = prov.output_dir()
-    for ext in ("jpg", "png"):
-        old = store / f"{stem}.{ext}"
-        if old.is_file():
-            data = old.read_bytes()
-            return {"name": old.name, "product_id": pid, "bytes": len(data), "mime": prov.sniff_mime(data),
-                    "width": _width(data), "new": False}
     try:
         with httpx.stream("GET", src, timeout=60, follow_redirects=False,
                           headers={"User-Agent": pf.USER_AGENT}) as r:
@@ -69,7 +62,15 @@ def mockup_fetch(product_id: str, src: str) -> dict:
     mime = prov.sniff_mime(data)
     if mime not in ("image/jpeg", "image/png"):
         raise h.CommerceError("that mockup isn't a JPEG or PNG")
-    name = f"{stem}.{'png' if mime == 'image/png' else 'jpg'}"
+    # The address stays the same when a print is replaced, so only the picture itself can say it's changed (KB-0152).
+    # A new picture gets a new name: a card approved on the old name keeps showing what was approved.
+    stem = f"printify-{pid}-{hashlib.sha256(src.encode()).hexdigest()[:8]}"
+    store = prov.output_dir()
+    for old in store.glob(f"{stem}*"):
+        if old.read_bytes() == data:
+            return {"name": old.name, "product_id": pid, "bytes": len(data), "mime": mime, "width": _width(data),
+                    "new": False}
+    name = f"{stem}-{hashlib.sha256(data).hexdigest()[:8]}.{'png' if mime == 'image/png' else 'jpg'}"
     store.mkdir(parents=True, exist_ok=True)
     tmp = store / f".{name}.part"
     tmp.write_bytes(data)
