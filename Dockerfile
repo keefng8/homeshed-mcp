@@ -1,6 +1,6 @@
 # Pinned by digest, so every build starts from the same base (2026-09-30); Dependabot's docker ecosystem keeps it current
 # in the public repo. The tag stays for readers.
-FROM python:3.12-slim@sha256:4840d514c583a4d3d8cad3940e68dee6f0f6f3635c12fcd0a3d74c21a5b93a54
+FROM python:3.12-slim@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
 
 # git installed here -- real gap found live 2026-09-24: git.status/.diff (deployed since
 # 2026-09-20, previously believed "verified live") and the new git.commit/.branch/.clone/.pull/
